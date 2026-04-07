@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.expo/
+web-build/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+npm-debug.log*
+expo_qr_code.png
+qr_page.html
+logs/
