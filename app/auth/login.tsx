@@ -68,24 +68,6 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
-        {/* QR Code section */}
-        <View style={styles.qrSection}>
-          <View style={styles.qrDivider}>
-            <View style={styles.qrDividerLine} />
-            <Text style={styles.qrDividerText}>OR</Text>
-            <View style={styles.qrDividerLine} />
-          </View>
-          <Text style={styles.qrTitle}>📱 Scan to access on mobile</Text>
-          <View style={styles.qrImageWrap}>
-            <Image
-              source={require('../../assets/qr-code.png')}
-              style={styles.qrImage}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.qrHint}>Point your phone camera at the QR code</Text>
-        </View>
       </ScrollView>
 
       {/* Forgot Password Modal */}
@@ -165,53 +147,6 @@ const styles = StyleSheet.create({
   forgotLinkText: { color: Colors.accent, fontSize: 13, fontWeight: '500' },
   link: { marginTop: 10, alignItems: 'center' },
   linkText: { color: Colors.textSecondary, fontSize: 13 },
-  /* ---- QR Code ---- */
-  qrSection: {
-    alignItems: 'center',
-    marginTop: 28,
-    maxWidth: 380,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  qrDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    width: '100%',
-  },
-  qrDividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border,
-  },
-  qrDividerText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-    marginHorizontal: 12,
-  },
-  qrTitle: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  qrImageWrap: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  qrImage: {
-    width: 150,
-    height: 150,
-  },
-  qrHint: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    marginTop: 8,
-  },
   /* ---- Forgot Password Modal ---- */
   modalOverlay: {
     flex: 1,
