@@ -1,5 +1,5 @@
 export const COMPETITIONS = ['Futures', 'Colts', 'Reserves', 'League', 'State 18s'] as const;
-export const POSITIONS = ['Forward', 'High Forward', 'Inside Mid', 'Outside Mid', 'Key Defender', 'Mid Defender', 'Sml Defender'] as const;
+export const POSITIONS = ['Forward', 'High Forward', 'Hybrid Fwd', 'Inside Mid', 'Outside Mid', 'Ruck', 'Key Defender', 'Mid Defender', 'Sml Defender', 'Hybrid Back'] as const;
 export const PROJECTIONS = ['Strong Prospect', 'Watch Player', 'Not Recommended'] as const;
 
 export interface User {
