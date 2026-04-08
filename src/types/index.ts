@@ -104,6 +104,30 @@ export interface FullReport {
   updatedAt: string;
 }
 
+export const MEETING_TYPES = ['INITIAL', 'FOLLOW_UP', 'CONTRACT', 'REVIEW', 'OTHER'] as const;
+export type MeetingType = typeof MEETING_TYPES[number];
+
+export const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
+  INITIAL: 'Initial Meeting',
+  FOLLOW_UP: 'Follow Up',
+  CONTRACT: 'Contract Discussion',
+  REVIEW: 'Review',
+  OTHER: 'Other',
+};
+
+export interface Meeting {
+  id: string;
+  playerId: string;
+  meetingDate: string;
+  meetingType: MeetingType;
+  notes: string;
+  attendees: string | null;
+  location: string | null;
+  actionItems: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DashboardData {
   totalPlayers: number;
   totalReports: number;
