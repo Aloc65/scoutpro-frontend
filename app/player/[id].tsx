@@ -10,6 +10,7 @@ import ProjectionBadge from '../../src/components/ProjectionBadge';
 import GradientButton from '../../src/components/GradientButton';
 import EmptyState from '../../src/components/EmptyState';
 import MeetingForm from '../../src/components/MeetingForm';
+import EditPlayerForm from '../../src/components/EditPlayerForm';
 import { getMeetingsByPlayer, createMeeting, updateMeeting, deleteMeeting } from '../../src/api/meetings';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -54,6 +55,9 @@ export default function PlayerDetailScreen() {
   const [gameStatAverages, setGameStatAverages] = useState<GameStats | null>(null);
   const [gamesWithStats, setGamesWithStats] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Edit player state
+  const [editFormVisible, setEditFormVisible] = useState(false);
 
   // Meeting state
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -145,6 +149,18 @@ export default function PlayerDetailScreen() {
     setMeetingFormVisible(true);
   };
 
+  const handleUpdatePlayer = async (data: Partial<Player>) => {
+    await api.patch(`/api/players/${id}`, data);
+    await load();
+    setEditFormVisible(false);
+    const msg = 'Player updated successfully';
+    if (Platform.OS === 'web') {
+      window.alert(msg);
+    } else {
+      Alert.alert('Success', msg);
+    }
+  };
+
   if (!player) return null;
 
   return (
@@ -156,7 +172,17 @@ export default function PlayerDetailScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
       >
         <Card style={{ marginBottom: 16 }}>
-          <Text style={styles.name}>{player.fullName}</Text>
+          <View style={styles.playerHeaderRow}>
+            <Text style={[styles.name, { flex: 1 }]}>{player.fullName}</Text>
+            <TouchableOpacity
+              style={styles.editPlayerBtn}
+              onPress={() => setEditFormVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="create-outline" size={16} color={Colors.accent} />
+              <Text style={styles.editPlayerBtnText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
           {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
           <Text style={styles.info}>
             {[player.age ? `${player.age}yo` : null, player.competition, player.dominantFoot, player.height ? `${player.height}cm` : null, player.weight ? `${player.weight}kg` : null].filter(Boolean).join(' • ')}
@@ -329,12 +355,42 @@ export default function PlayerDetailScreen() {
         onSave={handleSaveMeeting}
         onClose={() => { setMeetingFormVisible(false); setEditingMeeting(null); }}
       />
+
+      {/* Edit Player Modal */}
+      <EditPlayerForm
+        visible={editFormVisible}
+        player={player}
+        onSave={handleUpdatePlayer}
+        onClose={() => setEditFormVisible(false)}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  playerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  editPlayerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(6,182,212,0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(6,182,212,0.25)',
+  },
+  editPlayerBtnText: {
+    color: Colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   name: { fontSize: 22, fontWeight: '800', color: Colors.text },
   info: { fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
   notes: { fontSize: 13, color: Colors.textMuted, marginTop: 8, fontStyle: 'italic' },
