@@ -15,6 +15,35 @@ interface UserItem {
   name: string;
   role: 'ADMIN' | 'SCOUT';
   createdAt: string;
+  lastLoginAt: string | null;
+}
+
+/** Format lastLoginAt for display */
+function formatLastLogin(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'Never';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return 'Never';
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+
+  if (diffMs < 0) {
+    // future date – just show formatted
+  } else if (diffMins < 1) return 'Just now';
+  else if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+  else if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+
+  // Older than 24 hours – show formatted date
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = date.getHours();
+  const mins = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h12 = hours % 12 || 12;
+  return `${day}/${month}/${year} ${h12}:${mins} ${ampm}`;
 }
 
 interface UserForm {
@@ -202,10 +231,18 @@ export default function UsersScreen() {
         <View style={styles.userDetails}>
           <Text style={styles.userName}>{item.name}</Text>
           <Text style={styles.userEmail}>{item.email}</Text>
-          <View style={[styles.roleBadge, item.role === 'ADMIN' ? styles.roleBadgeAdmin : styles.roleBadgeScout]}>
-            <Text style={[styles.roleBadgeText, item.role === 'ADMIN' ? styles.roleBadgeTextAdmin : styles.roleBadgeTextScout]}>
-              {item.role}
-            </Text>
+          <View style={styles.roleBadgeRow}>
+            <View style={[styles.roleBadge, item.role === 'ADMIN' ? styles.roleBadgeAdmin : styles.roleBadgeScout]}>
+              <Text style={[styles.roleBadgeText, item.role === 'ADMIN' ? styles.roleBadgeTextAdmin : styles.roleBadgeTextScout]}>
+                {item.role}
+              </Text>
+            </View>
+            <View style={styles.lastLoginContainer}>
+              <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
+              <Text style={[styles.lastLoginText, !item.lastLoginAt && styles.lastLoginNever]}>
+                {formatLastLogin(item.lastLoginAt)}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -453,6 +490,9 @@ const styles = StyleSheet.create({
   userDetails: { flex: 1 },
   userName: { fontSize: 16, fontWeight: '600', color: Colors.text, marginBottom: 2 },
   userEmail: { fontSize: 13, color: Colors.textSecondary, marginBottom: 4 },
+  roleBadgeRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+  },
   roleBadge: {
     alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4,
   },
@@ -461,6 +501,15 @@ const styles = StyleSheet.create({
   roleBadgeText: { fontSize: 11, fontWeight: '700' },
   roleBadgeTextAdmin: { color: Colors.primary },
   roleBadgeTextScout: { color: Colors.accent },
+  lastLoginContainer: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+  },
+  lastLoginText: {
+    fontSize: 11, color: Colors.textMuted,
+  },
+  lastLoginNever: {
+    fontStyle: 'italic', color: Colors.textMuted,
+  },
   userActions: { flexDirection: 'row', gap: 8 },
   actionBtn: {
     width: 36, height: 36, borderRadius: 8, backgroundColor: Colors.elevated,
