@@ -1,8 +1,22 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, RefreshControl, TouchableOpacity, Alert, Modal, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TextInput,
+  RefreshControl,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/api/client';
+import { api, getToken } from '../../src/api/client';
 import { useAuth } from '../../src/context/AuthContext';
 import { Colors } from '../../src/theme/colors';
 import { Player, COMPETITIONS } from '../../src/types';
@@ -28,6 +42,16 @@ export default function PlayersScreen() {
   const [nameFilter, setNameFilter] = useState('');
   const [competitionFilter, setCompetitionFilter] = useState<string>('All');
 
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+  const [emailing, setEmailing] = useState(false);
+
+  // Email modal state
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailAddress, setEmailAddress] = useState('');
+  const [emailError, setEmailError] = useState('');
+
   const load = useCallback(async () => {
     try {
       const d = await api.get<{ items: Player[] }>(`/api/players?limit=200`);
@@ -42,18 +66,13 @@ export default function PlayersScreen() {
   // Client-side filtering
   const filteredPlayers = useMemo(() => {
     let result = players;
-
-    // Filter by competition
     if (competitionFilter !== 'All') {
       result = result.filter((p) => p.competition === competitionFilter);
     }
-
-    // Filter by name
     if (nameFilter.trim()) {
       const query = nameFilter.trim().toLowerCase();
       result = result.filter((p) => p.fullName.toLowerCase().includes(query));
     }
-
     return result;
   }, [players, competitionFilter, nameFilter]);
 
@@ -64,6 +83,152 @@ export default function PlayersScreen() {
     setCompetitionFilter('All');
   };
 
+  // ─── Selection logic ──────────────────────────────────
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const filteredIds = useMemo(() => filteredPlayers.map((p) => p.id), [filteredPlayers]);
+
+  const allFilteredSelected = filteredPlayers.length > 0 && filteredIds.every((id) => selectedIds.has(id));
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      // Deselect all filtered
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      // Select all filtered
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const selectedCount = selectedIds.size;
+
+  // ─── Export PDF ───────────────────────────────────────
+  const handleExportPdf = async () => {
+    if (selectedCount === 0) return;
+    setExporting(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${api.baseUrl}/api/export/players`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ playerIds: Array.from(selectedIds) }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || `Export failed: ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const filename = `scouting_reports_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (Platform.OS === 'web') {
+        // Web: trigger download via anchor tag
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        // Native: use expo-file-system + sharing
+        try {
+          const FileSystem = require('expo-file-system');
+          const Sharing = require('expo-sharing');
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = async () => {
+            const base64 = (reader.result as string).split(',')[1];
+            const fileUri = FileSystem.documentDirectory + filename;
+            await FileSystem.writeAsStringAsync(fileUri, base64, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            if (await Sharing.isAvailableAsync()) {
+              await Sharing.shareAsync(fileUri, {
+                mimeType: 'application/pdf',
+                dialogTitle: 'Save Scouting Report',
+              });
+            }
+          };
+        } catch {
+          showAlert('Info', 'PDF generated but sharing is not available on this device.');
+        }
+      }
+
+      showAlert('Success', `PDF exported for ${selectedCount} player(s).`);
+      clearSelection();
+    } catch (e: any) {
+      showAlert('Export Error', e.message || 'Failed to export PDF');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ─── Email PDF ────────────────────────────────────────
+  const openEmailModal = () => {
+    setEmailAddress('');
+    setEmailError('');
+    setEmailModalOpen(true);
+  };
+
+  const validateEmail = (email: string): boolean => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const handleEmailSend = async () => {
+    const trimmed = emailAddress.trim();
+    if (!trimmed) {
+      setEmailError('Email address is required');
+      return;
+    }
+    if (!validateEmail(trimmed)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    setEmailing(true);
+    setEmailError('');
+    try {
+      const result = await api.post<{ success: boolean; message: string }>('/api/export/players/email', {
+        playerIds: Array.from(selectedIds),
+        email: trimmed,
+      });
+      setEmailModalOpen(false);
+      showAlert('Success', result.message || `Reports sent to ${trimmed}`);
+      clearSelection();
+    } catch (e: any) {
+      setEmailError(e.message || 'Failed to send email');
+    } finally {
+      setEmailing(false);
+    }
+  };
+
+  // ─── Add / Delete Player ─────────────────────────────
   const addPlayer = async () => {
     if (!form.fullName.trim()) return showAlert('Error', 'Name is required');
     try {
@@ -91,6 +256,8 @@ export default function PlayersScreen() {
   const deletePlayer = (id: string, name: string) => {
     showConfirm('Delete Player', `Delete ${name}?`, async () => { await api.delete(`/api/players/${id}`); load(); });
   };
+
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <View style={styles.container}>
@@ -141,6 +308,60 @@ export default function PlayersScreen() {
             <Ionicons name="add" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
+
+        {/* Select All & Selection Info (admin only) */}
+        {isAdmin && filteredPlayers.length > 0 && (
+          <View style={styles.selectionRow}>
+            <TouchableOpacity onPress={toggleSelectAll} style={styles.selectAllBtn}>
+              <Ionicons
+                name={allFilteredSelected ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={allFilteredSelected ? Colors.accent : Colors.textMuted}
+              />
+              <Text style={styles.selectAllText}>Select All</Text>
+            </TouchableOpacity>
+
+            {selectedCount > 0 && (
+              <View style={styles.selectionInfo}>
+                <Text style={styles.selectedCountText}>
+                  {selectedCount} selected
+                </Text>
+                <TouchableOpacity onPress={clearSelection} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Action Buttons (show only when players are selected) */}
+        {isAdmin && selectedCount > 0 && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.exportBtn, exporting && styles.actionBtnDisabled]}
+              onPress={handleExportPdf}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="document-outline" size={18} color="#fff" />
+              )}
+              <Text style={styles.actionBtnText}>
+                {exporting ? 'Generating...' : 'Export PDF'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.emailBtn, emailing && styles.actionBtnDisabled]}
+              onPress={openEmailModal}
+              disabled={emailing}
+            >
+              <Ionicons name="mail-outline" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Email PDF</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <FlatList
@@ -153,26 +374,47 @@ export default function PlayersScreen() {
             ? <EmptyState icon="filter-outline" message="No players match your filters" actionLabel="Clear Filters" onAction={clearFilters} />
             : <EmptyState icon="people-outline" message="No players found" actionLabel="Add Player" onAction={() => setModalOpen(true)} />
         }
-        renderItem={({ item }) => (
-          <Card
-            onPress={() => router.push(`/player/${item.id}`)}
-            style={styles.playerCard}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.fullName}</Text>
-                <Text style={styles.meta}>{[item.team, item.competition, item.age != null ? `${item.age}yo` : null, item.dominantFoot].filter(Boolean).join(' • ')}</Text>
+        renderItem={({ item }) => {
+          const isSelected = selectedIds.has(item.id);
+          return (
+            <Card
+              onPress={() => router.push(`/player/${item.id}`)}
+              style={[styles.playerCard, isSelected && styles.playerCardSelected]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {/* Checkbox (admin only) */}
+                {isAdmin && (
+                  <TouchableOpacity
+                    onPress={() => toggleSelection(item.id)}
+                    style={styles.checkbox}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={isSelected ? 'checkbox' : 'square-outline'}
+                      size={24}
+                      color={isSelected ? Colors.accent : Colors.textMuted}
+                    />
+                  </TouchableOpacity>
+                )}
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>{item.fullName}</Text>
+                  <Text style={styles.meta}>
+                    {[item.team, item.competition, item.age != null ? `${item.age}yo` : null, item.dominantFoot].filter(Boolean).join(' • ')}
+                  </Text>
+                </View>
+                {isAdmin && (
+                  <TouchableOpacity onPress={() => deletePlayer(item.id, item.fullName)}>
+                    <Ionicons name="trash-outline" size={20} color={Colors.error} />
+                  </TouchableOpacity>
+                )}
               </View>
-              {user?.role === 'ADMIN' && (
-                <TouchableOpacity onPress={() => deletePlayer(item.id, item.fullName)}>
-                  <Ionicons name="trash-outline" size={20} color={Colors.error} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </Card>
-        )}
+            </Card>
+          );
+        }}
       />
 
+      {/* Add Player Modal */}
       <Modal visible={modalOpen} animationType="slide" transparent>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modal}>
@@ -201,6 +443,59 @@ export default function PlayersScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Email Modal */}
+      <Modal visible={emailModalOpen} animationType="fade" transparent>
+        <View style={styles.emailModalOverlay}>
+          <View style={styles.emailModal}>
+            <Text style={styles.emailModalTitle}>Email Scouting Reports</Text>
+            <Text style={styles.emailModalSubtitle}>
+              Send PDF reports for {selectedCount} player(s) to:
+            </Text>
+
+            <TextInput
+              value={emailAddress}
+              onChangeText={(t) => {
+                setEmailAddress(t);
+                if (emailError) setEmailError('');
+              }}
+              placeholder="recipient@example.com"
+              placeholderTextColor={Colors.textMuted}
+              style={[styles.emailInput, emailError ? styles.emailInputError : null]}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!emailing}
+            />
+            {emailError ? <Text style={styles.emailErrorText}>{emailError}</Text> : null}
+
+            <View style={styles.emailModalActions}>
+              <TouchableOpacity
+                onPress={() => setEmailModalOpen(false)}
+                style={styles.emailCancelBtn}
+                disabled={emailing}
+              >
+                <Text style={styles.emailCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.emailSendBtn, emailing && styles.actionBtnDisabled]}
+                onPress={handleEmailSend}
+                disabled={emailing}
+              >
+                {emailing ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={16} color="#fff" />
+                )}
+                <Text style={styles.emailSendText}>
+                  {emailing ? 'Sending...' : 'Send'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -233,8 +528,153 @@ const styles = StyleSheet.create({
   clearBtnText: { color: Colors.accent, fontSize: 12, fontWeight: '600' },
   addBtn: { backgroundColor: Colors.primary, borderRadius: 10, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   playerCard: { marginBottom: 10 },
+  playerCardSelected: {
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    backgroundColor: 'rgba(6, 182, 212, 0.08)',
+  },
   name: { fontSize: 16, fontWeight: '700', color: Colors.text },
   meta: { fontSize: 13, color: Colors.textSecondary, marginTop: 3 },
+
+  // Selection
+  selectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingVertical: 6,
+  },
+  selectAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectAllText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  selectionInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  selectedCountText: {
+    color: Colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  checkbox: {
+    marginRight: 12,
+  },
+
+  // Action buttons
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  actionBtnDisabled: {
+    opacity: 0.6,
+  },
+  exportBtn: {
+    backgroundColor: Colors.primary,
+  },
+  emailBtn: {
+    backgroundColor: Colors.accent,
+  },
+  actionBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Email modal
+  emailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emailModal: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 420,
+  },
+  emailModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  emailModalSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 16,
+  },
+  emailInput: {
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: Colors.text,
+    fontSize: 15,
+  },
+  emailInputError: {
+    borderColor: Colors.error,
+  },
+  emailErrorText: {
+    color: Colors.error,
+    fontSize: 12,
+    marginTop: 6,
+  },
+  emailModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 20,
+  },
+  emailCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.elevated,
+  },
+  emailCancelText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emailSendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+  },
+  emailSendText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Modals (existing)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modal: { backgroundColor: Colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '85%' },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
