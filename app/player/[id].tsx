@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Platform, ActivityIndicator, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors } from '../../src/theme/colors';
@@ -11,7 +11,7 @@ import GradientButton from '../../src/components/GradientButton';
 import EmptyState from '../../src/components/EmptyState';
 import MeetingForm from '../../src/components/MeetingForm';
 import EditPlayerForm from '../../src/components/EditPlayerForm';
-import DatePicker from '../../src/components/DatePicker';
+// DatePicker no longer used for DOB – using text input instead
 import { getMeetingsByPlayer, createMeeting, updateMeeting, deleteMeeting } from '../../src/api/meetings';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,10 +63,12 @@ export default function PlayerDetailScreen() {
   // Edit player state
   const [editFormVisible, setEditFormVisible] = useState(false);
 
-  // Inline DOB editing state
-  const [dobPickerVisible, setDobPickerVisible] = useState(false);
+  // Inline DOB editing state (text input with DD/MM/YYYY)
+  const [dobEditing, setDobEditing] = useState(false);
+  const [dobInputValue, setDobInputValue] = useState('');
   const [dobSaving, setDobSaving] = useState(false);
   const [dobMessage, setDobMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [dobError, setDobError] = useState<string | null>(null);
 
   // Meeting state
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -170,13 +172,52 @@ export default function PlayerDetailScreen() {
     }
   };
 
-  // Inline DOB save handler
-  const handleDobChange = async (dateStr: string) => {
-    setDobPickerVisible(false);
+  // Open DOB text input for editing
+  const startDobEdit = () => {
+    const currentDob = player?.dateOfBirth ? formatDateAU(player.dateOfBirth) : '';
+    setDobInputValue(currentDob);
+    setDobError(null);
+    setDobMessage(null);
+    setDobEditing(true);
+  };
+
+  // Validate DD/MM/YYYY format
+  const validateDobInput = (value: string): string | null => {
+    if (!value.trim()) return 'Date of birth is required';
+    const formatRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!formatRegex.test(value)) return 'Invalid format. Use DD/MM/YYYY';
+    const [dd, mm, yyyy] = value.split('/').map(Number);
+    if (mm < 1 || mm > 12) return 'Invalid month (01-12)';
+    if (dd < 1 || dd > 31) return 'Invalid day (01-31)';
+    if (yyyy < 1990 || yyyy > 2015) return 'Year must be between 1990 and 2015';
+    // Check valid date (e.g. Feb 30 would be invalid)
+    const dateObj = new Date(yyyy, mm - 1, dd);
+    if (dateObj.getFullYear() !== yyyy || dateObj.getMonth() !== mm - 1 || dateObj.getDate() !== dd) {
+      return 'Invalid date';
+    }
+    return null;
+  };
+
+  // Parse DD/MM/YYYY to ISO date string YYYY-MM-DD
+  const parseDobToISO = (value: string): string => {
+    const [dd, mm, yyyy] = value.split('/');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Save DOB from text input
+  const saveDob = async () => {
+    const validationError = validateDobInput(dobInputValue);
+    if (validationError) {
+      setDobError(validationError);
+      return;
+    }
+    setDobError(null);
+    setDobEditing(false);
     setDobSaving(true);
     setDobMessage(null);
     try {
-      await api.patch(`/api/players/${id}`, { dateOfBirth: dateStr });
+      const isoDate = parseDobToISO(dobInputValue);
+      await api.patch(`/api/players/${id}`, { dateOfBirth: isoDate });
       await load(); // Reload player data – age & draft year recalculate on server
       setDobMessage({ type: 'success', text: 'DOB updated successfully' });
       setTimeout(() => setDobMessage(null), 3000);
@@ -186,6 +227,31 @@ export default function PlayerDetailScreen() {
       setTimeout(() => setDobMessage(null), 5000);
     } finally {
       setDobSaving(false);
+    }
+  };
+
+  // Cancel DOB editing on ESC or no changes
+  const cancelDobEdit = () => {
+    setDobEditing(false);
+    setDobError(null);
+  };
+
+  // Handle blur – save if value changed, cancel if unchanged
+  const handleDobBlur = () => {
+    const currentDob = player?.dateOfBirth ? formatDateAU(player.dateOfBirth) : '';
+    if (dobInputValue === currentDob) {
+      cancelDobEdit();
+    } else {
+      saveDob();
+    }
+  };
+
+  // Handle key press in DOB input
+  const handleDobKeyPress = (e: any) => {
+    if (e.nativeEvent.key === 'Enter') {
+      saveDob();
+    } else if (e.nativeEvent.key === 'Escape') {
+      cancelDobEdit();
     }
   };
 
@@ -215,11 +281,11 @@ export default function PlayerDetailScreen() {
 
           {/* ── DOB / Age / Draft Year row ── */}
           <View style={styles.dobRow}>
-            {/* DOB – tappable for ADMIN users */}
-            {isAdmin ? (
+            {/* DOB – tappable text input for ADMIN users */}
+            {isAdmin && !dobEditing ? (
               <TouchableOpacity
                 style={styles.dobItem}
-                onPress={() => setDobPickerVisible(true)}
+                onPress={startDobEdit}
                 activeOpacity={0.6}
                 disabled={dobSaving}
               >
@@ -234,6 +300,32 @@ export default function PlayerDetailScreen() {
                 )}
                 <Ionicons name="pencil" size={12} color={Colors.accent} style={{ marginLeft: 3, opacity: 0.7 }} />
               </TouchableOpacity>
+            ) : isAdmin && dobEditing ? (
+              <View style={styles.dobEditContainer}>
+                <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
+                <Text style={styles.dobLabel}>DOB</Text>
+                <TextInput
+                  style={[styles.dobTextInput, dobError ? styles.dobTextInputError : null]}
+                  value={dobInputValue}
+                  onChangeText={(text) => { setDobInputValue(text); setDobError(null); }}
+                  onBlur={handleDobBlur}
+                  onKeyPress={handleDobKeyPress}
+                  onSubmitEditing={saveDob}
+                  placeholder="DD/MM/YYYY"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="numeric"
+                  maxLength={10}
+                  autoFocus
+                  selectTextOnFocus
+                  returnKeyType="done"
+                />
+                <TouchableOpacity onPress={saveDob} activeOpacity={0.7} style={styles.dobSaveBtn}>
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.green} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={cancelDobEdit} activeOpacity={0.7} style={styles.dobCancelBtn}>
+                  <Ionicons name="close-circle" size={20} color={Colors.error} />
+                </TouchableOpacity>
+              </View>
             ) : (
               <View style={styles.dobItem}>
                 <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
@@ -265,6 +357,14 @@ export default function PlayerDetailScreen() {
             )}
           </View>
 
+          {/* DOB validation error */}
+          {dobError && dobEditing && (
+            <View style={styles.dobErrorBanner}>
+              <Ionicons name="alert-circle" size={14} color={Colors.error} />
+              <Text style={styles.dobErrorText}>{dobError}</Text>
+            </View>
+          )}
+
           {/* DOB success/error message */}
           {dobMessage && (
             <View style={[styles.dobMessageBanner, dobMessage.type === 'success' ? styles.dobMessageSuccess : styles.dobMessageError]}>
@@ -274,23 +374,6 @@ export default function PlayerDetailScreen() {
                 color="#fff"
               />
               <Text style={styles.dobMessageText}>{dobMessage.text}</Text>
-            </View>
-          )}
-
-          {/* Inline DOB DatePicker (shown when admin taps DOB) */}
-          {dobPickerVisible && isAdmin && (
-            <View style={styles.dobPickerContainer}>
-              <View style={styles.dobPickerHeader}>
-                <Text style={styles.dobPickerTitle}>Select Date of Birth</Text>
-                <TouchableOpacity onPress={() => setDobPickerVisible(false)} activeOpacity={0.7}>
-                  <Ionicons name="close-circle" size={24} color={Colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-              <DatePicker
-                label=""
-                value={player.dateOfBirth ? player.dateOfBirth.slice(0, 10) : ''}
-                onChange={handleDobChange}
-              />
             </View>
           )}
 
@@ -585,24 +668,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  dobPickerContainer: {
-    marginTop: 10,
-    backgroundColor: Colors.elevated,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    padding: 12,
-  },
-  dobPickerHeader: {
+  dobEditContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 5,
+    flex: 1,
   },
-  dobPickerTitle: {
+  dobTextInput: {
+    backgroundColor: Colors.background,
+    color: Colors.text,
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.text,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 110,
+    textAlign: 'center',
+  },
+  dobTextInputError: {
+    borderColor: Colors.error,
+  },
+  dobSaveBtn: {
+    padding: 4,
+  },
+  dobCancelBtn: {
+    padding: 4,
+  },
+  dobErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 6,
+  },
+  dobErrorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.error,
   },
   dobDivider: {
     width: 1,
