@@ -1,7 +1,27 @@
 import { Platform } from 'react-native';
 
-// Production backend URL on Railway
-const BASE_URL = 'https://astonishing-alignment-production.up.railway.app';
+// Determine backend URL based on environment
+const RAILWAY_BACKEND_URL = 'https://astonishing-alignment-production.up.railway.app';
+
+const getBaseUrl = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // If running on Railway (production), use the Railway backend URL
+    if (host.includes('railway.app') || host.includes('up.railway.app')) {
+      return RAILWAY_BACKEND_URL;
+    }
+    // If accessed via Abacus preview URL, use the backend preview URL
+    if (host.includes('preview.abacusai.app')) {
+      return 'https://aa50c4e62.na105.preview.abacusai.app';
+    }
+    // Local development
+    return 'http://localhost:3000';
+  }
+  // Native / fallback
+  return RAILWAY_BACKEND_URL;
+};
+
+const BASE_URL = getBaseUrl();
 
 const TOKEN_KEY = 'auth_token';
 
