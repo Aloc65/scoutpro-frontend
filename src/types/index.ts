@@ -1,6 +1,12 @@
 export const COMPETITIONS = ['Futures', 'Colts', 'Reserves', 'League', 'State 18s'] as const;
 export const POSITIONS = ['Forward', 'High Forward', 'Hybrid Fwd', 'Inside Mid', 'Outside Mid', 'Ruck', 'Key Defender', 'Mid Defender', 'Sml Defender', 'Hybrid Back'] as const;
 export const PROJECTIONS = ['Strong Prospect', 'Watch Player', 'Not Recommended'] as const;
+export const SIGNING_STATUSES = ['SIGNED', 'NOT_SIGNED'] as const;
+export type SigningStatus = typeof SIGNING_STATUSES[number];
+export const SIGNING_STATUS_LABELS: Record<SigningStatus, string> = {
+  SIGNED: 'Signed',
+  NOT_SIGNED: 'Not Signed',
+};
 
 export interface User {
   id: string;
@@ -21,6 +27,7 @@ export interface Player {
   height: number | null;
   weight: number | null;
   draftYear: number | null;
+  signingStatus: 'SIGNED' | 'NOT_SIGNED';
   notes: string | null;
   createdAt: string;
 }

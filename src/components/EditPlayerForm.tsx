@@ -4,7 +4,7 @@ import {
   TouchableOpacity, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native';
 import { Colors } from '../theme/colors';
-import { Player, COMPETITIONS } from '../types';
+import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus } from '../types';
 import GradientButton from './GradientButton';
 import DatePicker from './DatePicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,10 +27,12 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [notes, setNotes] = useState('');
+  const [signingStatus, setSigningStatus] = useState<SigningStatus>('NOT_SIGNED');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showCompDropdown, setShowCompDropdown] = useState(false);
   const [showFootDropdown, setShowFootDropdown] = useState(false);
+  const [showSigningDropdown, setShowSigningDropdown] = useState(false);
 
   useEffect(() => {
     if (player && visible) {
@@ -55,6 +57,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
       setHeight(player.height != null ? String(player.height) : '');
       setWeight(player.weight != null ? String(player.weight) : '');
       setNotes(player.notes || '');
+      setSigningStatus(player.signingStatus || 'NOT_SIGNED');
       setError('');
     }
   }, [player, visible]);
@@ -84,6 +87,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
         dominantFoot: dominantFoot || null,
         height: height ? Number(height) : null,
         weight: weight ? Number(weight) : null,
+        signingStatus,
         notes: notes.trim() || null,
       } as any);
     } catch (e: any) {
@@ -195,6 +199,33 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
 
             {/* Dominant Foot dropdown */}
             {renderDropdown('Dominant Foot', dominantFoot, DOMINANT_FOOT_OPTIONS, showFootDropdown, setShowFootDropdown, setDominantFoot)}
+
+            {/* Signing Status */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Signing Status</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                {SIGNING_STATUSES.map((s) => (
+                  <TouchableOpacity
+                    key={s}
+                    style={[
+                      styles.signingChip,
+                      signingStatus === s && (s === 'SIGNED' ? styles.signingChipSigned : styles.signingChipNotSigned),
+                    ]}
+                    onPress={() => setSigningStatus(s)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={s === 'SIGNED' ? 'checkmark-circle' : 'remove-circle'}
+                      size={16}
+                      color={signingStatus === s ? '#fff' : Colors.textMuted}
+                    />
+                    <Text style={[styles.signingChipText, signingStatus === s && { color: '#fff' }]}>
+                      {SIGNING_STATUS_LABELS[s]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             {/* Height */}
             <View style={styles.fieldContainer}>
@@ -388,5 +419,29 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 15,
     fontWeight: '600',
+  },
+  signingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  signingChipSigned: {
+    backgroundColor: Colors.green,
+    borderColor: Colors.green,
+  },
+  signingChipNotSigned: {
+    backgroundColor: Colors.orange,
+    borderColor: Colors.orange,
+  },
+  signingChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
   },
 });

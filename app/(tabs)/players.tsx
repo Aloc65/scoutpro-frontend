@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api, getToken } from '../../src/api/client';
 import { useAuth } from '../../src/context/AuthContext';
 import { Colors } from '../../src/theme/colors';
-import { Player, COMPETITIONS } from '../../src/types';
+import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus } from '../../src/types';
 import Card from '../../src/components/Card';
 import EmptyState from '../../src/components/EmptyState';
 import Input from '../../src/components/Input';
@@ -35,7 +35,7 @@ export default function PlayersScreen() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '' });
+  const [form, setForm] = useState({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' as SigningStatus });
   const [saving, setSaving] = useState(false);
 
   // Filter state
@@ -242,9 +242,10 @@ export default function PlayersScreen() {
         height: form.height ? parseFloat(form.height) : undefined,
         weight: form.weight ? parseFloat(form.weight) : undefined,
         notes: form.notes || undefined,
+        signingStatus: form.signingStatus,
       });
       setModalOpen(false);
-      setForm({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '' });
+      setForm({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' });
       load();
     } catch (e: any) {
       showAlert('Error', e.message);
@@ -398,7 +399,21 @@ export default function PlayersScreen() {
                 )}
 
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{item.fullName}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.name}>{item.fullName}</Text>
+                    {item.signingStatus === 'SIGNED' && (
+                      <View style={styles.signingBadgeSigned}>
+                        <Ionicons name="checkmark-circle" size={12} color="#fff" />
+                        <Text style={styles.signingBadgeText}>Signed</Text>
+                      </View>
+                    )}
+                    {item.signingStatus === 'NOT_SIGNED' && (
+                      <View style={styles.signingBadgeNotSigned}>
+                        <Ionicons name="remove-circle" size={12} color="#fff" />
+                        <Text style={styles.signingBadgeText}>Not Signed</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.meta}>
                     {[item.team, item.competition, item.age != null ? (item.draftYear ? `${item.age}yo | ${item.draftYear} Draft` : `${item.age}yo`) : (item.draftYear ? `${item.draftYear} Draft` : null), item.dominantFoot].filter(Boolean).join(' • ')}
                   </Text>
@@ -435,6 +450,15 @@ export default function PlayersScreen() {
               <Input label="Dominant Foot" value={form.dominantFoot} onChangeText={(t) => setForm({ ...form, dominantFoot: t })} placeholder="Left / Right / Both" />
               <Input label="Height (cm)" value={form.height} onChangeText={(t) => setForm({ ...form, height: t })} keyboardType="numeric" />
               <Input label="Weight (kg)" value={form.weight} onChangeText={(t) => setForm({ ...form, weight: t })} keyboardType="numeric" />
+              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 6, marginTop: 4 }}>Signing Status</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {SIGNING_STATUSES.map((s) => (
+                  <TouchableOpacity key={s} onPress={() => setForm({ ...form, signingStatus: s })}
+                    style={[styles.chip, form.signingStatus === s && (s === 'SIGNED' ? styles.chipSigned : styles.chipNotSigned)]}>
+                    <Text style={[styles.chipText, form.signingStatus === s && { color: '#fff' }]}>{SIGNING_STATUS_LABELS[s]}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               <Input label="Notes" value={form.notes} onChangeText={(t) => setForm({ ...form, notes: t })} multiline />
               <GradientButton title="Save" onPress={addPlayer} loading={saving} />
               <TouchableOpacity onPress={() => setModalOpen(false)} style={{ marginTop: 12, alignItems: 'center' }}>
@@ -680,5 +704,32 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  chipSigned: { backgroundColor: Colors.green, borderColor: Colors.green },
+  chipNotSigned: { backgroundColor: Colors.orange, borderColor: Colors.orange },
   chipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
+
+  // Signing status badges on player cards
+  signingBadgeSigned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: Colors.green,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  signingBadgeNotSigned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: Colors.orange,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  signingBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
 });

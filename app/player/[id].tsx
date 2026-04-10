@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, A
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors } from '../../src/theme/colors';
-import { Player, Ratings, GameStats, GAME_STAT_KEYS, Meeting, MEETING_TYPE_LABELS, MeetingType } from '../../src/types';
+import { Player, Ratings, GameStats, GAME_STAT_KEYS, Meeting, MEETING_TYPE_LABELS, MeetingType, SIGNING_STATUS_LABELS } from '../../src/types';
 import Card from '../../src/components/Card';
 import RatingBar from '../../src/components/RatingBar';
 import ProjectionBadge from '../../src/components/ProjectionBadge';
@@ -200,12 +200,24 @@ export default function PlayerDetailScreen() {
               player.weight ? `${player.weight}kg` : null,
             ].filter(Boolean).join(' • ')}
           </Text>
-          {player.draftYear && (
-            <View style={styles.draftYearBadge}>
-              <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
-              <Text style={styles.draftYearText}>{player.draftYear} Draft</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {player.draftYear && (
+              <View style={styles.draftYearBadge}>
+                <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
+                <Text style={styles.draftYearText}>{player.draftYear} Draft</Text>
+              </View>
+            )}
+            <View style={player.signingStatus === 'SIGNED' ? styles.signingBadgeSigned : styles.signingBadgeNotSigned}>
+              <Ionicons
+                name={player.signingStatus === 'SIGNED' ? 'checkmark-circle' : 'remove-circle'}
+                size={14}
+                color="#fff"
+              />
+              <Text style={styles.signingBadgeText}>
+                {SIGNING_STATUS_LABELS[player.signingStatus] || 'Not Signed'}
+              </Text>
             </View>
-          )}
+          </View>
           {player.notes && <Text style={styles.notes}>{player.notes}</Text>}
         </Card>
 
@@ -420,13 +432,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    marginTop: 8,
     gap: 5,
   },
   draftYearText: {
     fontSize: 13,
     fontWeight: '700',
     color: Colors.accent,
+  },
+  signingBadgeSigned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: Colors.green,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  signingBadgeNotSigned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: Colors.orange,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  signingBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
   },
   notes: { fontSize: 13, color: Colors.textMuted, marginTop: 8, fontStyle: 'italic' },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 12 },

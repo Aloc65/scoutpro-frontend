@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../../src/api/client';
 import { useAuth } from '../../../src/context/AuthContext';
 import { Colors, ratingColor } from '../../../src/theme/colors';
-import { FullReport, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS } from '../../../src/types';
+import { FullReport, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, Player, SIGNING_STATUS_LABELS, SigningStatus } from '../../../src/types';
 import Input from '../../../src/components/Input';
 import GradientButton from '../../../src/components/GradientButton';
 import Card from '../../../src/components/Card';
@@ -12,6 +12,7 @@ import RatingBar from '../../../src/components/RatingBar';
 import ProjectionBadge from '../../../src/components/ProjectionBadge';
 
 import { showAlert, showConfirm } from '../../../src/utils/alert';
+import { Ionicons } from '@expo/vector-icons';
 const RATING_KEYS = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
   ['workRate', 'Work Rate'], ['decisionMaking', 'Decision Making'], ['composure', 'Composure'],
@@ -59,6 +60,7 @@ export default function EditReportScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [report, setReport] = useState<FullReport | null>(null);
+  const [playerSigningStatus, setPlayerSigningStatus] = useState<SigningStatus | null>(null);
   const [editing, setEditing] = useState(false);
 
   // Editable fields
@@ -127,6 +129,12 @@ export default function EditReportScreen() {
     api.get<{ report: FullReport }>(`/api/reports/${id}`).then((d) => {
       const r = d.report;
       setReport(r);
+      // Fetch player signing status
+      if (r.playerId) {
+        api.get<{ player: Player }>(`/api/players/${r.playerId}`).then((pd) => {
+          setPlayerSigningStatus(pd.player.signingStatus);
+        }).catch(() => {});
+      }
       setOpponent(r.opponent);
       setVenue(r.venue || '');
       setCompetition(r.competition || '');
@@ -209,7 +217,21 @@ export default function EditReportScreen() {
             {report.venue && <Text style={styles.meta}>📍 {report.venue}</Text>}
             {report.result && <Text style={styles.meta}>Result: {report.result}</Text>}
             {report.minutesPlayed && <Text style={styles.meta}>Minutes: {report.minutesPlayed}</Text>}
-            <View style={{ marginTop: 8 }}><ProjectionBadge value={report.overallProjection} /></View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' }}>
+              <ProjectionBadge value={report.overallProjection} />
+              {playerSigningStatus && (
+                <View style={playerSigningStatus === 'SIGNED' ? styles.signingBadgeSigned : styles.signingBadgeNotSigned}>
+                  <Ionicons
+                    name={playerSigningStatus === 'SIGNED' ? 'checkmark-circle' : 'remove-circle'}
+                    size={13}
+                    color="#fff"
+                  />
+                  <Text style={styles.signingBadgeText}>
+                    {SIGNING_STATUS_LABELS[playerSigningStatus]}
+                  </Text>
+                </View>
+              )}
+            </View>
           </Card>
 
           <Card style={{ marginBottom: 16 }}>
@@ -402,4 +424,27 @@ const styles = StyleSheet.create({
   deleteText: { color: '#fff', fontWeight: '700' },
   backToMainBtn: { alignItems: 'center', padding: 14, borderRadius: 12, marginTop: 12, backgroundColor: Colors.accent },
   backToMainText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  signingBadgeSigned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.green,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  signingBadgeNotSigned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.orange,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  signingBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
 });
