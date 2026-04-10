@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors } from '../../src/theme/colors';
@@ -11,7 +11,9 @@ import GradientButton from '../../src/components/GradientButton';
 import EmptyState from '../../src/components/EmptyState';
 import MeetingForm from '../../src/components/MeetingForm';
 import EditPlayerForm from '../../src/components/EditPlayerForm';
+import DatePicker from '../../src/components/DatePicker';
 import { getMeetingsByPlayer, createMeeting, updateMeeting, deleteMeeting } from '../../src/api/meetings';
+import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 const RATING_LABELS: [keyof Ratings, string][] = [
@@ -48,6 +50,8 @@ function formatDateAU(iso: string): string {
 export default function PlayerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [player, setPlayer] = useState<Player | null>(null);
   const [reports, setReports] = useState<any[]>([]);
   const [avgRatings, setAvgRatings] = useState<Ratings | null>(null);
@@ -58,6 +62,11 @@ export default function PlayerDetailScreen() {
 
   // Edit player state
   const [editFormVisible, setEditFormVisible] = useState(false);
+
+  // Inline DOB editing state
+  const [dobPickerVisible, setDobPickerVisible] = useState(false);
+  const [dobSaving, setDobSaving] = useState(false);
+  const [dobMessage, setDobMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Meeting state
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -161,6 +170,25 @@ export default function PlayerDetailScreen() {
     }
   };
 
+  // Inline DOB save handler
+  const handleDobChange = async (dateStr: string) => {
+    setDobPickerVisible(false);
+    setDobSaving(true);
+    setDobMessage(null);
+    try {
+      await api.patch(`/api/players/${id}`, { dateOfBirth: dateStr });
+      await load(); // Reload player data – age & draft year recalculate on server
+      setDobMessage({ type: 'success', text: 'DOB updated successfully' });
+      setTimeout(() => setDobMessage(null), 3000);
+    } catch (e: any) {
+      const msg = e.message || 'Failed to update DOB';
+      setDobMessage({ type: 'error', text: msg });
+      setTimeout(() => setDobMessage(null), 5000);
+    } finally {
+      setDobSaving(false);
+    }
+  };
+
   if (!player) return null;
 
   return (
@@ -187,13 +215,34 @@ export default function PlayerDetailScreen() {
 
           {/* ── DOB / Age / Draft Year row ── */}
           <View style={styles.dobRow}>
-            <View style={styles.dobItem}>
-              <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
-              <Text style={styles.dobLabel}>DOB</Text>
-              <Text style={styles.dobValue}>
-                {player.dateOfBirth ? formatDateAU(player.dateOfBirth) : 'Not set'}
-              </Text>
-            </View>
+            {/* DOB – tappable for ADMIN users */}
+            {isAdmin ? (
+              <TouchableOpacity
+                style={styles.dobItem}
+                onPress={() => setDobPickerVisible(true)}
+                activeOpacity={0.6}
+                disabled={dobSaving}
+              >
+                <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
+                <Text style={styles.dobLabel}>DOB</Text>
+                {dobSaving ? (
+                  <ActivityIndicator size="small" color={Colors.accent} style={{ marginLeft: 4 }} />
+                ) : (
+                  <Text style={[styles.dobValue, styles.dobValueEditable]}>
+                    {player.dateOfBirth ? formatDateAU(player.dateOfBirth) : 'Not set'}
+                  </Text>
+                )}
+                <Ionicons name="pencil" size={12} color={Colors.accent} style={{ marginLeft: 3, opacity: 0.7 }} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.dobItem}>
+                <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
+                <Text style={styles.dobLabel}>DOB</Text>
+                <Text style={styles.dobValue}>
+                  {player.dateOfBirth ? formatDateAU(player.dateOfBirth) : 'Not set'}
+                </Text>
+              </View>
+            )}
             {player.age != null && (
               <>
                 <View style={styles.dobDivider} />
@@ -215,6 +264,35 @@ export default function PlayerDetailScreen() {
               </>
             )}
           </View>
+
+          {/* DOB success/error message */}
+          {dobMessage && (
+            <View style={[styles.dobMessageBanner, dobMessage.type === 'success' ? styles.dobMessageSuccess : styles.dobMessageError]}>
+              <Ionicons
+                name={dobMessage.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                size={14}
+                color="#fff"
+              />
+              <Text style={styles.dobMessageText}>{dobMessage.text}</Text>
+            </View>
+          )}
+
+          {/* Inline DOB DatePicker (shown when admin taps DOB) */}
+          {dobPickerVisible && isAdmin && (
+            <View style={styles.dobPickerContainer}>
+              <View style={styles.dobPickerHeader}>
+                <Text style={styles.dobPickerTitle}>Select Date of Birth</Text>
+                <TouchableOpacity onPress={() => setDobPickerVisible(false)} activeOpacity={0.7}>
+                  <Ionicons name="close-circle" size={24} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+              <DatePicker
+                label=""
+                value={player.dateOfBirth ? player.dateOfBirth.slice(0, 10) : ''}
+                onChange={handleDobChange}
+              />
+            </View>
+          )}
 
           {/* ── Other player details ── */}
           <Text style={styles.info}>
@@ -479,6 +557,51 @@ const styles = StyleSheet.create({
   dobValue: {
     fontSize: 14,
     fontWeight: '800',
+    color: Colors.text,
+  },
+  dobValueEditable: {
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'dashed',
+    textDecorationColor: Colors.accent,
+    color: Colors.accent,
+  },
+  dobMessageBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  dobMessageSuccess: {
+    backgroundColor: 'rgba(34,197,94,0.2)',
+  },
+  dobMessageError: {
+    backgroundColor: 'rgba(239,68,68,0.2)',
+  },
+  dobMessageText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  dobPickerContainer: {
+    marginTop: 10,
+    backgroundColor: Colors.elevated,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    padding: 12,
+  },
+  dobPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dobPickerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
     color: Colors.text,
   },
   dobDivider: {
