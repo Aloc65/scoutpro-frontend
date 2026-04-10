@@ -193,12 +193,19 @@ export default function PlayerDetailScreen() {
                 : player.dateOfBirth
                   ? `DOB: ${formatDateAU(player.dateOfBirth)}`
                   : null,
+              player.draftYear ? `${player.draftYear} Draft` : null,
               player.competition,
               player.dominantFoot,
               player.height ? `${player.height}cm` : null,
               player.weight ? `${player.weight}kg` : null,
             ].filter(Boolean).join(' • ')}
           </Text>
+          {player.draftYear && (
+            <View style={styles.draftYearBadge}>
+              <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
+              <Text style={styles.draftYearText}>{player.draftYear} Draft</Text>
+            </View>
+          )}
           {player.notes && <Text style={styles.notes}>{player.notes}</Text>}
         </Card>
 
@@ -405,6 +412,22 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 22, fontWeight: '800', color: Colors.text },
   info: { fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
+  draftYearBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 122, 255, 0.12)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 5,
+  },
+  draftYearText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.accent,
+  },
   notes: { fontSize: 13, color: Colors.textMuted, marginTop: 8, fontStyle: 'italic' },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 12 },
   statsSubtitle: { fontSize: 13, color: Colors.textMuted, marginBottom: 12 },

@@ -400,7 +400,7 @@ export default function PlayersScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{item.fullName}</Text>
                   <Text style={styles.meta}>
-                    {[item.team, item.competition, item.age != null ? `${item.age}yo` : null, item.dominantFoot].filter(Boolean).join(' • ')}
+                    {[item.team, item.competition, item.age != null ? (item.draftYear ? `${item.age}yo | ${item.draftYear} Draft` : `${item.age}yo`) : (item.draftYear ? `${item.draftYear} Draft` : null), item.dominantFoot].filter(Boolean).join(' • ')}
                   </Text>
                 </View>
                 {isAdmin && (

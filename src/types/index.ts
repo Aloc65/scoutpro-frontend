@@ -20,6 +20,7 @@ export interface Player {
   dominantFoot: string | null;
   height: number | null;
   weight: number | null;
+  draftYear: number | null;
   notes: string | null;
   createdAt: string;
 }
