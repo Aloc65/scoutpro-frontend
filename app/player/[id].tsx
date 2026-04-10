@@ -184,22 +184,49 @@ export default function PlayerDetailScreen() {
             </TouchableOpacity>
           </View>
           {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
+
+          {/* ── DOB / Age / Draft Year row ── */}
+          <View style={styles.dobRow}>
+            <View style={styles.dobItem}>
+              <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
+              <Text style={styles.dobLabel}>DOB</Text>
+              <Text style={styles.dobValue}>
+                {player.dateOfBirth ? formatDateAU(player.dateOfBirth) : 'Not set'}
+              </Text>
+            </View>
+            {player.age != null && (
+              <>
+                <View style={styles.dobDivider} />
+                <View style={styles.dobItem}>
+                  <Ionicons name="person-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.dobLabel}>Age</Text>
+                  <Text style={styles.dobValue}>{player.age}yo</Text>
+                </View>
+              </>
+            )}
+            {player.draftYear != null && (
+              <>
+                <View style={styles.dobDivider} />
+                <View style={styles.dobItem}>
+                  <Ionicons name="trophy-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.dobLabel}>Draft Year</Text>
+                  <Text style={styles.dobValue}>{player.draftYear}</Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* ── Other player details ── */}
           <Text style={styles.info}>
             {[
-              player.age != null
-                ? player.dateOfBirth
-                  ? `${player.age}yo (DOB: ${formatDateAU(player.dateOfBirth)})`
-                  : `${player.age}yo`
-                : player.dateOfBirth
-                  ? `DOB: ${formatDateAU(player.dateOfBirth)}`
-                  : null,
-              player.draftYear ? `${player.draftYear} Draft` : null,
               player.competition,
               player.dominantFoot,
               player.height ? `${player.height}cm` : null,
               player.weight ? `${player.weight}kg` : null,
             ].filter(Boolean).join(' • ')}
           </Text>
+
+          {/* ── Badges row ── */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
             {player.draftYear && (
               <View style={styles.draftYearBadge}>
@@ -424,6 +451,42 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 22, fontWeight: '800', color: Colors.text },
   info: { fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
+  dobRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.elevated,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 10,
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  dobItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  dobLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dobValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  dobDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: Colors.border,
+    marginHorizontal: 10,
+  },
   draftYearBadge: {
     flexDirection: 'row',
     alignItems: 'center',
