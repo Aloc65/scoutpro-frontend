@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, RefreshControl, TouchableOpacity, Alert, Modal, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,26 +13,56 @@ import GradientButton from '../../src/components/GradientButton';
 import DatePicker from '../../src/components/DatePicker';
 import { showAlert, showConfirm } from '../../src/utils/alert';
 
+const COMPETITION_OPTIONS = ['All', ...COMPETITIONS] as const;
+
 export default function PlayersScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
-  const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '' });
   const [saving, setSaving] = useState(false);
 
+  // Filter state
+  const [nameFilter, setNameFilter] = useState('');
+  const [competitionFilter, setCompetitionFilter] = useState<string>('All');
+
   const load = useCallback(async () => {
     try {
-      const d = await api.get<{ items: Player[] }>(`/api/players?search=${search}&limit=100`);
+      const d = await api.get<{ items: Player[] }>(`/api/players?limit=200`);
       setPlayers(d.items);
     } catch {}
-  }, [search]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+
+  // Client-side filtering
+  const filteredPlayers = useMemo(() => {
+    let result = players;
+
+    // Filter by competition
+    if (competitionFilter !== 'All') {
+      result = result.filter((p) => p.competition === competitionFilter);
+    }
+
+    // Filter by name
+    if (nameFilter.trim()) {
+      const query = nameFilter.trim().toLowerCase();
+      result = result.filter((p) => p.fullName.toLowerCase().includes(query));
+    }
+
+    return result;
+  }, [players, competitionFilter, nameFilter]);
+
+  const hasActiveFilters = competitionFilter !== 'All' || nameFilter.trim().length > 0;
+
+  const clearFilters = () => {
+    setNameFilter('');
+    setCompetitionFilter('All');
+  };
 
   const addPlayer = async () => {
     if (!form.fullName.trim()) return showAlert('Error', 'Name is required');
@@ -64,28 +94,65 @@ export default function PlayersScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchRow}>
+      {/* Filters Section */}
+      <View style={styles.filtersContainer}>
+        {/* Name search */}
         <View style={styles.searchWrap}>
           <Ionicons name="search" size={18} color={Colors.textMuted} />
           <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search players..."
+            value={nameFilter}
+            onChangeText={setNameFilter}
+            placeholder="Search by name..."
             placeholderTextColor={Colors.textMuted}
             style={styles.searchInput}
           />
+          {nameFilter.length > 0 && (
+            <TouchableOpacity onPress={() => setNameFilter('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setModalOpen(true)}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+
+        {/* Competition filter chips */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+          {COMPETITION_OPTIONS.map((c) => (
+            <TouchableOpacity
+              key={c}
+              onPress={() => setCompetitionFilter(c)}
+              style={[styles.filterChip, competitionFilter === c && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterChipText, competitionFilter === c && styles.filterChipTextActive]}>{c}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Results count & clear */}
+        <View style={styles.resultsRow}>
+          <Text style={styles.resultsText}>
+            Showing {filteredPlayers.length} of {players.length} players
+          </Text>
+          {hasActiveFilters && (
+            <TouchableOpacity onPress={clearFilters} style={styles.clearBtn}>
+              <Ionicons name="close-circle-outline" size={14} color={Colors.accent} />
+              <Text style={styles.clearBtnText}>Clear filters</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.addBtn} onPress={() => setModalOpen(true)}>
+            <Ionicons name="add" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
-        data={players}
+        data={filteredPlayers}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         contentContainerStyle={{ padding: 16, paddingTop: 0 }}
-        ListEmptyComponent={<EmptyState icon="people-outline" message="No players found" actionLabel="Add Player" onAction={() => setModalOpen(true)} />}
+        ListEmptyComponent={
+          hasActiveFilters
+            ? <EmptyState icon="filter-outline" message="No players match your filters" actionLabel="Clear Filters" onAction={clearFilters} />
+            : <EmptyState icon="people-outline" message="No players found" actionLabel="Add Player" onAction={() => setModalOpen(true)} />
+        }
         renderItem={({ item }) => (
           <Card
             onPress={() => router.push(`/player/${item.id}`)}
@@ -141,10 +208,30 @@ export default function PlayersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  searchRow: { flexDirection: 'row', padding: 16, gap: 8 },
-  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.elevated, borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: Colors.border },
+  filtersContainer: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.elevated, borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: Colors.border },
   searchInput: { flex: 1, color: Colors.text, fontSize: 15, paddingVertical: 10, marginLeft: 8 },
-  addBtn: { backgroundColor: Colors.primary, borderRadius: 12, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  chipScroll: { marginTop: 10 },
+  chipScrollContent: { gap: 8 },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterChipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  filterChipTextActive: { color: '#fff' },
+  resultsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 8 },
+  resultsText: { color: Colors.textMuted, fontSize: 12, flex: 1 },
+  clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  clearBtnText: { color: Colors.accent, fontSize: 12, fontWeight: '600' },
+  addBtn: { backgroundColor: Colors.primary, borderRadius: 10, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   playerCard: { marginBottom: 10 },
   name: { fontSize: 16, fontWeight: '700', color: Colors.text },
   meta: { fontSize: 13, color: Colors.textSecondary, marginTop: 3 },
