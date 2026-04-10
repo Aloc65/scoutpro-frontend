@@ -14,6 +14,7 @@ export interface Player {
   id: string;
   fullName: string;
   team: string | null;
+  dateOfBirth: string | null;
   age: number | null;
   competition: string | null;
   dominantFoot: string | null;

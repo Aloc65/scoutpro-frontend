@@ -10,6 +10,7 @@ import Card from '../../src/components/Card';
 import EmptyState from '../../src/components/EmptyState';
 import Input from '../../src/components/Input';
 import GradientButton from '../../src/components/GradientButton';
+import DatePicker from '../../src/components/DatePicker';
 import { showAlert, showConfirm } from '../../src/utils/alert';
 
 export default function PlayersScreen() {
@@ -19,7 +20,7 @@ export default function PlayersScreen() {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ fullName: '', team: '', age: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '' });
+  const [form, setForm] = useState({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '' });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -40,7 +41,7 @@ export default function PlayersScreen() {
       await api.post('/api/players', {
         fullName: form.fullName,
         team: form.team || undefined,
-        age: form.age ? parseInt(form.age) : undefined,
+        dateOfBirth: form.dateOfBirth || undefined,
         competition: form.competition || undefined,
         dominantFoot: form.dominantFoot || undefined,
         height: form.height ? parseFloat(form.height) : undefined,
@@ -48,7 +49,7 @@ export default function PlayersScreen() {
         notes: form.notes || undefined,
       });
       setModalOpen(false);
-      setForm({ fullName: '', team: '', age: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '' });
+      setForm({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '' });
       load();
     } catch (e: any) {
       showAlert('Error', e.message);
@@ -93,7 +94,7 @@ export default function PlayersScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.fullName}</Text>
-                <Text style={styles.meta}>{[item.team, item.competition, item.age ? `${item.age}yo` : null, item.dominantFoot].filter(Boolean).join(' • ')}</Text>
+                <Text style={styles.meta}>{[item.team, item.competition, item.age != null ? `${item.age}yo` : null, item.dominantFoot].filter(Boolean).join(' • ')}</Text>
               </View>
               {user?.role === 'ADMIN' && (
                 <TouchableOpacity onPress={() => deletePlayer(item.id, item.fullName)}>
@@ -112,7 +113,7 @@ export default function PlayersScreen() {
               <Text style={styles.modalTitle}>Add Player</Text>
               <Input label="Full Name *" value={form.fullName} onChangeText={(t) => setForm({ ...form, fullName: t })} />
               <Input label="Team" value={form.team} onChangeText={(t) => setForm({ ...form, team: t })} />
-              <Input label="Age" value={form.age} onChangeText={(t) => setForm({ ...form, age: t })} keyboardType="numeric" />
+              <DatePicker label="Date of Birth" value={form.dateOfBirth} onChange={(v) => setForm({ ...form, dateOfBirth: v })} />
               <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 6, marginTop: 4 }}>Competition</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                 {COMPETITIONS.map((c) => (

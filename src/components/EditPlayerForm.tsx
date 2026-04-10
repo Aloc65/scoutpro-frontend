@@ -6,6 +6,7 @@ import {
 import { Colors } from '../theme/colors';
 import { Player, COMPETITIONS } from '../types';
 import GradientButton from './GradientButton';
+import DatePicker from './DatePicker';
 import { Ionicons } from '@expo/vector-icons';
 
 const DOMINANT_FOOT_OPTIONS = ['Left', 'Right', 'Both'];
@@ -20,7 +21,7 @@ interface EditPlayerFormProps {
 export default function EditPlayerForm({ visible, player, onSave, onClose }: EditPlayerFormProps) {
   const [fullName, setFullName] = useState('');
   const [team, setTeam] = useState('');
-  const [age, setAge] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [competition, setCompetition] = useState('');
   const [dominantFoot, setDominantFoot] = useState('');
   const [height, setHeight] = useState('');
@@ -35,7 +36,20 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
     if (player && visible) {
       setFullName(player.fullName || '');
       setTeam(player.team || '');
-      setAge(player.age != null ? String(player.age) : '');
+      // Convert ISO datetime to YYYY-MM-DD for DatePicker
+      if (player.dateOfBirth) {
+        const d = new Date(player.dateOfBirth);
+        if (!isNaN(d.getTime())) {
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          setDateOfBirth(`${yyyy}-${mm}-${dd}`);
+        } else {
+          setDateOfBirth('');
+        }
+      } else {
+        setDateOfBirth('');
+      }
       setCompetition(player.competition || '');
       setDominantFoot(player.dominantFoot || '');
       setHeight(player.height != null ? String(player.height) : '');
@@ -49,10 +63,6 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
     setError('');
     if (!fullName.trim()) {
       setError('Full name is required');
-      return;
-    }
-    if (age && (isNaN(Number(age)) || Number(age) < 1 || Number(age) > 99)) {
-      setError('Age must be a number between 1 and 99');
       return;
     }
     if (height && (isNaN(Number(height)) || Number(height) < 50 || Number(height) > 250)) {
@@ -69,7 +79,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
       await onSave({
         fullName: fullName.trim(),
         team: team.trim() || null,
-        age: age ? Number(age) : null,
+        dateOfBirth: dateOfBirth || null,
         competition: competition || null,
         dominantFoot: dominantFoot || null,
         height: height ? Number(height) : null,
@@ -175,17 +185,9 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
               />
             </View>
 
-            {/* Age */}
+            {/* Date of Birth */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.label}>Age</Text>
-              <TextInput
-                style={styles.input}
-                value={age}
-                onChangeText={setAge}
-                placeholder="Age"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="numeric"
-              />
+              <DatePicker label="Date of Birth" value={dateOfBirth} onChange={setDateOfBirth} />
             </View>
 
             {/* Competition dropdown */}

@@ -185,7 +185,19 @@ export default function PlayerDetailScreen() {
           </View>
           {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
           <Text style={styles.info}>
-            {[player.age ? `${player.age}yo` : null, player.competition, player.dominantFoot, player.height ? `${player.height}cm` : null, player.weight ? `${player.weight}kg` : null].filter(Boolean).join(' • ')}
+            {[
+              player.age != null
+                ? player.dateOfBirth
+                  ? `${player.age}yo (DOB: ${formatDateAU(player.dateOfBirth)})`
+                  : `${player.age}yo`
+                : player.dateOfBirth
+                  ? `DOB: ${formatDateAU(player.dateOfBirth)}`
+                  : null,
+              player.competition,
+              player.dominantFoot,
+              player.height ? `${player.height}cm` : null,
+              player.weight ? `${player.weight}kg` : null,
+            ].filter(Boolean).join(' • ')}
           </Text>
           {player.notes && <Text style={styles.notes}>{player.notes}</Text>}
         </Card>

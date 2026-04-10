@@ -105,7 +105,15 @@ export default function EditReportScreen() {
         const info = result.matchInfo?.versus
           ? `Stats loaded: ${result.matchInfo.versus} (${result.matchInfo.round || ''} ${result.matchInfo.season || ''})`
           : 'Stats loaded successfully';
-        setFetchMessage(note || info);
+        let msg = note || info;
+        // If DOB was returned from WAFL, update the player
+        if (result.dateOfBirth && report.playerId) {
+          try {
+            await api.patch(`/api/players/${report.playerId}`, { dateOfBirth: result.dateOfBirth });
+            msg += ' • DOB updated';
+          } catch {}
+        }
+        setFetchMessage(msg);
       }
     } catch (e: any) {
       setFetchMessage('Failed to fetch stats');
