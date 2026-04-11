@@ -334,6 +334,7 @@ export default function PlayerDetailScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const canEditNotes = user?.role === 'ADMIN' || user?.role === 'SCOUT';
   const [player, setPlayer] = useState<Player | null>(null);
   const [reports, setReports] = useState<any[]>([]);
   const [avgRatings, setAvgRatings] = useState<Ratings | null>(null);
@@ -694,7 +695,7 @@ export default function PlayerDetailScreen() {
         <GeneralNotesSection
           player={player}
           playerId={id!}
-          isAdmin={isAdmin}
+          isAdmin={canEditNotes}
           onUpdated={load}
         />
 
