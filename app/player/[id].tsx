@@ -47,6 +47,288 @@ function formatDateAU(iso: string): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+/* ═══════════ General Notes Inline Editor ═══════════ */
+function GeneralNotesSection({ player, playerId, isAdmin, onUpdated }: {
+  player: Player;
+  playerId: string;
+  isAdmin: boolean;
+  onUpdated: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(player.notes || '');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const CHARACTER_LIMIT = 1000;
+
+  // Sync draft when player data refreshes (and not currently editing)
+  useEffect(() => {
+    if (!editing) setDraft(player.notes || '');
+  }, [player.notes, editing]);
+
+  const startEdit = () => {
+    setDraft(player.notes || '');
+    setMessage(null);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setDraft(player.notes || '');
+    setEditing(false);
+    setMessage(null);
+  };
+
+  const saveNotes = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await api.patch(`/api/players/${playerId}`, { notes: draft.trim() });
+      await onUpdated();
+      setEditing(false);
+      setMessage({ type: 'success', text: 'Notes saved' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message || 'Failed to save notes' });
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBlur = () => {
+    // Auto-save on blur if content changed
+    const current = player.notes || '';
+    if (draft.trim() !== current) {
+      saveNotes();
+    } else {
+      setEditing(false);
+    }
+  };
+
+  return (
+    <Card style={{ marginBottom: 16 }}>
+      {/* Header */}
+      <View style={notesStyles.header}>
+        <View style={notesStyles.headerLeft}>
+          <Ionicons name="document-text-outline" size={18} color={Colors.accent} />
+          <Text style={notesStyles.sectionHeading}>General Notes</Text>
+        </View>
+        {isAdmin && !editing && (
+          <TouchableOpacity style={notesStyles.editBtn} onPress={startEdit} activeOpacity={0.7}>
+            <Ionicons name="pencil" size={14} color={Colors.accent} />
+            <Text style={notesStyles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Message banner */}
+      {message && (
+        <View style={[notesStyles.messageBanner, message.type === 'success' ? notesStyles.messageSuccess : notesStyles.messageError]}>
+          <Ionicons name={message.type === 'success' ? 'checkmark-circle' : 'alert-circle'} size={14} color="#fff" />
+          <Text style={notesStyles.messageText}>{message.text}</Text>
+        </View>
+      )}
+
+      {/* Edit mode */}
+      {editing ? (
+        <View>
+          <TextInput
+            style={notesStyles.textInput}
+            value={draft}
+            onChangeText={(t) => setDraft(t.slice(0, CHARACTER_LIMIT))}
+            onBlur={handleBlur}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+            placeholder="Add general notes about this player..."
+            placeholderTextColor={Colors.textMuted}
+            autoFocus
+            editable={!saving}
+          />
+          <View style={notesStyles.editFooter}>
+            <Text style={notesStyles.charCount}>{draft.length}/{CHARACTER_LIMIT}</Text>
+            <View style={notesStyles.editActions}>
+              <TouchableOpacity style={notesStyles.cancelBtn} onPress={cancelEdit} activeOpacity={0.7} disabled={saving}>
+                <Text style={notesStyles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[notesStyles.saveBtn, saving && notesStyles.saveBtnDisabled]}
+                onPress={saveNotes}
+                activeOpacity={0.7}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={16} color="#fff" />
+                    <Text style={notesStyles.saveBtnText}>Save</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : (
+        /* View mode */
+        <TouchableOpacity
+          activeOpacity={isAdmin ? 0.6 : 1}
+          onPress={isAdmin ? startEdit : undefined}
+          disabled={!isAdmin}
+        >
+          {player.notes ? (
+            <Text style={notesStyles.notesText}>{player.notes}</Text>
+          ) : (
+            <Text style={notesStyles.placeholder}>
+              {isAdmin ? 'No notes yet. Tap to add notes.' : 'No notes yet.'}
+            </Text>
+          )}
+          {isAdmin && (
+            <View style={notesStyles.tapHint}>
+              <Ionicons name="pencil" size={11} color={Colors.textMuted} />
+              <Text style={notesStyles.tapHintText}>Tap to edit</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
+    </Card>
+  );
+}
+
+const notesStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(6,182,212,0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(6,182,212,0.25)',
+  },
+  editBtnText: {
+    color: Colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  messageBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  messageSuccess: {
+    backgroundColor: 'rgba(34,197,94,0.2)',
+  },
+  messageError: {
+    backgroundColor: 'rgba(239,68,68,0.2)',
+  },
+  messageText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  textInput: {
+    backgroundColor: Colors.elevated,
+    color: Colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 10,
+    padding: 14,
+    minHeight: 120,
+    maxHeight: 300,
+  },
+  editFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  charCount: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cancelBtnText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.primary,
+  },
+  saveBtnDisabled: {
+    opacity: 0.6,
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  notesText: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 22,
+  },
+  placeholder: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+    lineHeight: 22,
+  },
+  tapHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    opacity: 0.5,
+  },
+  tapHintText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  sectionHeading: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+});
+
 export default function PlayerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -406,8 +688,15 @@ export default function PlayerDetailScreen() {
               </Text>
             </View>
           </View>
-          {player.notes && <Text style={styles.notes}>{player.notes}</Text>}
         </Card>
+
+        {/* ═══════════ GENERAL NOTES SECTION ═══════════ */}
+        <GeneralNotesSection
+          player={player}
+          playerId={id!}
+          isAdmin={isAdmin}
+          onUpdated={load}
+        />
 
         {avgRatings && (
           <Card style={{ marginBottom: 16 }}>
