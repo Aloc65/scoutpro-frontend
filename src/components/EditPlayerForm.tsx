@@ -6,7 +6,6 @@ import {
 import { Colors } from '../theme/colors';
 import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus } from '../types';
 import GradientButton from './GradientButton';
-import DatePicker from './DatePicker';
 import { Ionicons } from '@expo/vector-icons';
 
 const DOMINANT_FOOT_OPTIONS = ['Left', 'Right', 'Both'];
@@ -28,6 +27,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
   const [weight, setWeight] = useState('');
   const [notes, setNotes] = useState('');
   const [signingStatus, setSigningStatus] = useState<SigningStatus>('NOT_SIGNED');
+  const [dobError, setDobError] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showCompDropdown, setShowCompDropdown] = useState(false);
@@ -38,20 +38,21 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
     if (player && visible) {
       setFullName(player.fullName || '');
       setTeam(player.team || '');
-      // Convert ISO datetime to YYYY-MM-DD for DatePicker
+      // Convert ISO datetime to DD/MM/YYYY for text input
       if (player.dateOfBirth) {
         const d = new Date(player.dateOfBirth);
         if (!isNaN(d.getTime())) {
           const yyyy = d.getFullYear();
           const mm = String(d.getMonth() + 1).padStart(2, '0');
           const dd = String(d.getDate()).padStart(2, '0');
-          setDateOfBirth(`${yyyy}-${mm}-${dd}`);
+          setDateOfBirth(`${dd}/${mm}/${yyyy}`);
         } else {
           setDateOfBirth('');
         }
       } else {
         setDateOfBirth('');
       }
+      setDobError(null);
       setCompetition(player.competition || '');
       setDominantFoot(player.dominantFoot || '');
       setHeight(player.height != null ? String(player.height) : '');
@@ -62,11 +63,41 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
     }
   }, [player, visible]);
 
+  // Validate DD/MM/YYYY format for DOB
+  const validateDobInput = (value: string): string | null => {
+    if (!value.trim()) return null; // DOB is optional
+    const formatRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!formatRegex.test(value)) return 'Invalid format. Use DD/MM/YYYY';
+    const [dd, mm, yyyy] = value.split('/').map(Number);
+    if (mm < 1 || mm > 12) return 'Invalid month (01-12)';
+    if (dd < 1 || dd > 31) return 'Invalid day (01-31)';
+    if (yyyy < 1990 || yyyy > 2015) return 'Year must be between 1990 and 2015';
+    const dateObj = new Date(yyyy, mm - 1, dd);
+    if (dateObj.getFullYear() !== yyyy || dateObj.getMonth() !== mm - 1 || dateObj.getDate() !== dd) {
+      return 'Invalid date';
+    }
+    return null;
+  };
+
+  // Parse DD/MM/YYYY to ISO YYYY-MM-DD
+  const parseDobToISO = (value: string): string => {
+    const [dd, mm, yyyy] = value.split('/');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const handleSave = async () => {
     setError('');
+    setDobError(null);
     if (!fullName.trim()) {
       setError('Full name is required');
       return;
+    }
+    if (dateOfBirth.trim()) {
+      const dobValidation = validateDobInput(dateOfBirth);
+      if (dobValidation) {
+        setDobError(dobValidation);
+        return;
+      }
     }
     if (height && (isNaN(Number(height)) || Number(height) < 50 || Number(height) > 250)) {
       setError('Height must be between 50 and 250 cm');
@@ -77,12 +108,13 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
       return;
     }
 
+    const dobISO = dateOfBirth.trim() ? parseDobToISO(dateOfBirth) : null;
     setSaving(true);
     try {
       await onSave({
         fullName: fullName.trim(),
         team: team.trim() || null,
-        dateOfBirth: dateOfBirth || null,
+        dateOfBirth: dobISO,
         competition: competition || null,
         dominantFoot: dominantFoot || null,
         height: height ? Number(height) : null,
@@ -191,7 +223,17 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
 
             {/* Date of Birth */}
             <View style={styles.fieldContainer}>
-              <DatePicker label="Date of Birth" value={dateOfBirth} onChange={setDateOfBirth} />
+              <Text style={styles.label}>Date of Birth</Text>
+              <TextInput
+                style={[styles.input, dobError ? styles.dobInputError : null]}
+                value={dateOfBirth}
+                onChangeText={(t) => { setDateOfBirth(t); if (dobError) setDobError(null); }}
+                placeholder="DD/MM/YYYY"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="numeric"
+                maxLength={10}
+              />
+              {dobError ? <Text style={styles.dobErrorText}>{dobError}</Text> : null}
             </View>
 
             {/* Competition dropdown */}
@@ -443,5 +485,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textSecondary,
+  },
+  dobInputError: {
+    borderColor: Colors.error || '#ef4444',
+  },
+  dobErrorText: {
+    color: Colors.error || '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
   },
 });

@@ -24,7 +24,6 @@ import Card from '../../src/components/Card';
 import EmptyState from '../../src/components/EmptyState';
 import Input from '../../src/components/Input';
 import GradientButton from '../../src/components/GradientButton';
-import DatePicker from '../../src/components/DatePicker';
 import { showAlert, showConfirm } from '../../src/utils/alert';
 
 const COMPETITION_OPTIONS = ['All', ...COMPETITIONS] as const;
@@ -37,6 +36,30 @@ export default function PlayersScreen() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' as SigningStatus });
   const [saving, setSaving] = useState(false);
+  const [dobError, setDobError] = useState<string | null>(null);
+
+  // Validate DD/MM/YYYY format for DOB
+  const validateDobInput = (value: string): string | null => {
+    if (!value.trim()) return null; // DOB is optional for Add Player
+    const formatRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!formatRegex.test(value)) return 'Invalid format. Use DD/MM/YYYY';
+    const [dd, mm, yyyy] = value.split('/').map(Number);
+    if (mm < 1 || mm > 12) return 'Invalid month (01-12)';
+    if (dd < 1 || dd > 31) return 'Invalid day (01-31)';
+    if (yyyy < 1990 || yyyy > 2015) return 'Year must be between 1990 and 2015';
+    const dateObj = new Date(yyyy, mm - 1, dd);
+    if (dateObj.getFullYear() !== yyyy || dateObj.getMonth() !== mm - 1 || dateObj.getDate() !== dd) {
+      return 'Invalid date';
+    }
+    return null;
+  };
+
+  // Parse DD/MM/YYYY to ISO YYYY-MM-DD
+  const parseDobToISO = (value: string): string => {
+    const [dd, mm, yyyy] = value.split('/');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
 
   // Filter state
   const [nameFilter, setNameFilter] = useState('');
@@ -231,12 +254,22 @@ export default function PlayersScreen() {
   // ─── Add / Delete Player ─────────────────────────────
   const addPlayer = async () => {
     if (!form.fullName.trim()) return showAlert('Error', 'Name is required');
+    // Validate DOB if provided
+    if (form.dateOfBirth.trim()) {
+      const dobValidation = validateDobInput(form.dateOfBirth);
+      if (dobValidation) {
+        setDobError(dobValidation);
+        return;
+      }
+    }
+    setDobError(null);
     try {
       setSaving(true);
+      const dobISO = form.dateOfBirth.trim() ? parseDobToISO(form.dateOfBirth) : undefined;
       await api.post('/api/players', {
         fullName: form.fullName,
         team: form.team || undefined,
-        dateOfBirth: form.dateOfBirth || undefined,
+        dateOfBirth: dobISO,
         competition: form.competition || undefined,
         dominantFoot: form.dominantFoot || undefined,
         height: form.height ? parseFloat(form.height) : undefined,
@@ -246,6 +279,7 @@ export default function PlayersScreen() {
       });
       setModalOpen(false);
       setForm({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' });
+      setDobError(null);
       load();
     } catch (e: any) {
       showAlert('Error', e.message);
@@ -437,7 +471,19 @@ export default function PlayersScreen() {
               <Text style={styles.modalTitle}>Add Player</Text>
               <Input label="Full Name *" value={form.fullName} onChangeText={(t) => setForm({ ...form, fullName: t })} />
               <Input label="Team" value={form.team} onChangeText={(t) => setForm({ ...form, team: t })} />
-              <DatePicker label="Date of Birth" value={form.dateOfBirth} onChange={(v) => setForm({ ...form, dateOfBirth: v })} />
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 6 }}>Date of Birth</Text>
+                <TextInput
+                  style={[styles.dobInput, dobError ? styles.dobInputError : null]}
+                  value={form.dateOfBirth}
+                  onChangeText={(t) => { setForm({ ...form, dateOfBirth: t }); if (dobError) setDobError(null); }}
+                  placeholder="DD/MM/YYYY"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+                {dobError ? <Text style={styles.dobErrorText}>{dobError}</Text> : null}
+              </View>
               <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 6, marginTop: 4 }}>Competition</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                 {COMPETITIONS.map((c) => (
@@ -731,5 +777,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
+  },
+  dobInput: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    padding: 12,
+    color: Colors.text,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  dobInputError: {
+    borderColor: Colors.error || '#ef4444',
+  },
+  dobErrorText: {
+    color: Colors.error || '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
   },
 });
