@@ -16,12 +16,18 @@ import { getMeetingsByPlayer, createMeeting, updateMeeting, deleteMeeting } from
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
-const RATING_LABELS: [keyof Ratings, string][] = [
+const FUNDAMENTALS_LABELS: [keyof Ratings, string][] = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
-  ['workRate', 'Work Rate'], ['decisionMaking', 'Decision Making'], ['composure', 'Composure'],
-  ['speed', 'Speed'], ['agility', 'Agility'], ['defensiveEffort', 'Defensive Effort'],
-  ['contestWork', 'Contest Work'], ['gameAwareness', 'Game Awareness'],
+  ['contestWork', 'Contested Work'], ['speed', 'Speed'],
 ];
+
+const TRAITS_LABELS: [keyof Ratings, string][] = [
+  ['workRate', 'Work Rate'], ['decisionMaking', 'Decision Making'], ['composure', 'Composure'],
+  ['flexibility', 'Flexibility'], ['defensiveEffort', 'Defensive Effort'],
+  ['gameAwareness', 'Game Awareness'],
+];
+
+const RATING_LABELS: [keyof Ratings, string][] = [...FUNDAMENTALS_LABELS, ...TRAITS_LABELS];
 
 const MEETING_TYPE_ICONS: Record<MeetingType, string> = {
   INITIAL: 'person-add-outline',
@@ -702,7 +708,13 @@ export default function PlayerDetailScreen() {
         {avgRatings && (
           <Card style={{ marginBottom: 16 }}>
             <Text style={styles.sectionTitle}>Average Ratings</Text>
-            {RATING_LABELS.map(([key, label]) => (
+            <Text style={styles.ratingGroupTitle}>FUNDAMENTALS</Text>
+            {FUNDAMENTALS_LABELS.map(([key, label]) => (
+              <RatingBar key={key} label={label} value={avgRatings[key] as number | null} />
+            ))}
+            <View style={styles.ratingDivider} />
+            <Text style={styles.ratingGroupTitle}>TRAITS</Text>
+            {TRAITS_LABELS.map(([key, label]) => (
               <RatingBar key={key} label={label} value={avgRatings[key] as number | null} />
             ))}
           </Card>
@@ -1045,6 +1057,8 @@ const styles = StyleSheet.create({
   },
   notes: { fontSize: 13, color: Colors.textMuted, marginTop: 8, fontStyle: 'italic' },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 12 },
+  ratingGroupTitle: { fontSize: 14, fontWeight: '800', color: Colors.accent, letterSpacing: 1, marginBottom: 10, marginTop: 4, textTransform: 'uppercase' },
+  ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
   statsSubtitle: { fontSize: 13, color: Colors.textMuted, marginBottom: 12 },
   statsViewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statViewItem: { width: '30%', minWidth: 90, backgroundColor: Colors.elevated, borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },

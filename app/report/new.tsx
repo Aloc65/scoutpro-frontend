@@ -10,12 +10,18 @@ import Card from '../../src/components/Card';
 import DatePicker from '../../src/components/DatePicker';
 
 import { showAlert } from '../../src/utils/alert';
-const RATING_KEYS = [
+const FUNDAMENTALS_KEYS = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
-  ['workRate', 'Work Rate'], ['decisionMaking', 'Decision Making'], ['composure', 'Composure'],
-  ['speed', 'Speed'], ['agility', 'Agility'], ['defensiveEffort', 'Defensive Effort'],
-  ['contestWork', 'Contest Work'], ['gameAwareness', 'Game Awareness'],
+  ['contestWork', 'Contested Work'], ['speed', 'Speed'],
 ] as const;
+
+const TRAITS_KEYS = [
+  ['workRate', 'Work Rate'], ['decisionMaking', 'Decision Making'], ['composure', 'Composure'],
+  ['flexibility', 'Flexibility'], ['defensiveEffort', 'Defensive Effort'],
+  ['gameAwareness', 'Game Awareness'],
+] as const;
+
+const RATING_KEYS = [...FUNDAMENTALS_KEYS, ...TRAITS_KEYS] as const;
 
 const RATING_OPTIONS = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
 
@@ -80,7 +86,7 @@ export default function NewReportScreen() {
   const [generalMatchNotes, setGeneralMatchNotes] = useState('');
   const [ratings, setRatings] = useState<Record<string, number>>({
     kicking: 3, handball: 3, marking: 3, workRate: 3, decisionMaking: 3,
-    composure: 3, speed: 3, agility: 3, defensiveEffort: 3, contestWork: 3, gameAwareness: 3,
+    composure: 3, speed: 3, flexibility: 3, defensiveEffort: 3, contestWork: 3, gameAwareness: 3,
   });
   const [gameStats, setGameStats] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -250,7 +256,13 @@ export default function NewReportScreen() {
           {/* SECTION: Ratings */}
           <Text style={styles.section}>Ratings</Text>
           <Card style={{ marginBottom: 16 }}>
-            {RATING_KEYS.map(([key, label]) => (
+            <Text style={styles.ratingGroupTitle}>FUNDAMENTALS</Text>
+            {FUNDAMENTALS_KEYS.map(([key, label]) => (
+              <RatingDropdown key={key} label={label} value={ratings[key]} onChange={(v) => setRatings({ ...ratings, [key]: v })} />
+            ))}
+            <View style={styles.ratingDivider} />
+            <Text style={styles.ratingGroupTitle}>TRAITS</Text>
+            {TRAITS_KEYS.map(([key, label]) => (
               <RatingDropdown key={key} label={label} value={ratings[key]} onChange={(v) => setRatings({ ...ratings, [key]: v })} />
             ))}
           </Card>
@@ -345,6 +357,8 @@ const styles = StyleSheet.create({
   fetchBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   fetchMsg: { fontSize: 13, marginBottom: 10, textAlign: 'center', paddingHorizontal: 8 },
   stickyBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: Colors.card, borderTopWidth: 1, borderTopColor: Colors.border },
+  ratingGroupTitle: { fontSize: 14, fontWeight: '800', color: Colors.accent, letterSpacing: 1, marginBottom: 10, marginTop: 4, textTransform: 'uppercase' },
+  ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
   backToMainBtn: { alignItems: 'center', padding: 14, borderRadius: 12, marginBottom: 16, backgroundColor: Colors.accent },
   backToMainText: { color: '#fff', fontWeight: '600', fontSize: 15 },
 });

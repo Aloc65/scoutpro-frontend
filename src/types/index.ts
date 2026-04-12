@@ -41,7 +41,7 @@ export interface Ratings {
   decisionMaking: number | null;
   composure: number | null;
   speed: number | null;
-  agility: number | null;
+  flexibility: number | null;
   defensiveEffort: number | null;
   contestWork: number | null;
   gameAwareness: number | null;
