@@ -98,7 +98,6 @@ export interface FullReport {
   weaknesses: string | null;
   developmentAreas: string | null;
   overallProjection: string | null;
-  generalMatchNotes: string | null;
   goals: number | null;
   behinds: number | null;
   disposals: number | null;

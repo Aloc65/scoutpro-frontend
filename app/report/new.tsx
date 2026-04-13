@@ -86,7 +86,6 @@ export default function NewReportScreen() {
   const [weaknesses, setWeaknesses] = useState('');
   const [developmentAreas, setDevelopmentAreas] = useState('');
   const [overallProjection, setOverallProjection] = useState('');
-  const [generalMatchNotes, setGeneralMatchNotes] = useState('');
   const [ratings, setRatings] = useState<Record<string, number>>({
     kicking: 3, handball: 3, marking: 3, workRate: 3, decisionMaking: 3,
     composure: 3, speed: 3, flexibility: 3, defensiveEffort: 3, contestWork: 3, gameAwareness: 3,
@@ -213,7 +212,6 @@ export default function NewReportScreen() {
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
         developmentAreas: developmentAreas || undefined,
         overallProjection: overallProjection || undefined,
-        generalMatchNotes: generalMatchNotes || undefined,
         ...statsPayload,
         ratings,
       });
@@ -365,7 +363,6 @@ export default function NewReportScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Input label="General Match Notes" value={generalMatchNotes} onChangeText={setGeneralMatchNotes} multiline />
           </Card>
 
           <TouchableOpacity onPress={() => router.replace('/(tabs)/dashboard')} style={styles.backToMainBtn}>

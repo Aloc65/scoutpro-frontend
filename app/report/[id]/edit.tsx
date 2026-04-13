@@ -83,7 +83,6 @@ export default function EditReportScreen() {
   const [weaknesses, setWeaknesses] = useState('');
   const [developmentAreas, setDevelopmentAreas] = useState('');
   const [overallProjection, setOverallProjection] = useState('');
-  const [generalMatchNotes, setGeneralMatchNotes] = useState('');
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [gameStats, setGameStats] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -179,7 +178,6 @@ export default function EditReportScreen() {
       setWeaknesses(r.weaknesses || '');
       setDevelopmentAreas(r.developmentAreas || '');
       setOverallProjection(r.overallProjection || '');
-      setGeneralMatchNotes(r.generalMatchNotes || '');
       const rat: Record<string, number> = {};
       RATING_KEYS.forEach(([key]) => { rat[key] = (r.ratings as any)?.[key] ?? 3; });
       setRatings(rat);
@@ -224,7 +222,6 @@ export default function EditReportScreen() {
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
         developmentAreas: developmentAreas || undefined,
         overallProjection: overallProjection || undefined,
-        generalMatchNotes: generalMatchNotes || undefined,
         ...statsPayload,
         ratings,
       });
@@ -309,7 +306,6 @@ export default function EditReportScreen() {
             {report.strengths && <><Text style={styles.subTitle}>Strengths</Text><Text style={styles.body}>{report.strengths}</Text></>}
             {report.weaknesses && <><Text style={styles.subTitle}>Weaknesses</Text><Text style={styles.body}>{report.weaknesses}</Text></>}
             {report.developmentAreas && <><Text style={styles.subTitle}>Development Areas</Text><Text style={styles.body}>{report.developmentAreas}</Text></>}
-            {report.generalMatchNotes && <><Text style={styles.subTitle}>Match Notes</Text><Text style={styles.body}>{report.generalMatchNotes}</Text></>}
           </Card>
 
           {canEdit && <GradientButton title="Edit Report" onPress={() => setEditing(true)} style={{ marginBottom: 12 }} />}
@@ -447,7 +443,6 @@ export default function EditReportScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Input label="General Match Notes" value={generalMatchNotes} onChangeText={setGeneralMatchNotes} multiline />
           </Card>
         </ScrollView>
 
