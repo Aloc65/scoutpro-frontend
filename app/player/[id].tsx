@@ -3,7 +3,18 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, A
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors } from '../../src/theme/colors';
-import { Player, Ratings, GameStats, GAME_STAT_KEYS, Meeting, MEETING_TYPE_LABELS, MeetingType, SIGNING_STATUS_LABELS } from '../../src/types';
+import {
+  Player,
+  Ratings,
+  GameStats,
+  GAME_STAT_KEYS,
+  Meeting,
+  MEETING_TYPE_LABELS,
+  MeetingType,
+  SIGNING_STATUS_LABELS,
+  ChampionDataPlayerResponse,
+  ChampionDataStat,
+} from '../../src/types';
 import Card from '../../src/components/Card';
 import RatingBar from '../../src/components/RatingBar';
 import ProjectionBadge from '../../src/components/ProjectionBadge';
@@ -44,6 +55,20 @@ const MEETING_TYPE_COLORS: Record<MeetingType, string> = {
   REVIEW: Colors.green,
   OTHER: Colors.textSecondary,
 };
+
+function formatChampionValue(value: unknown, key: string): string {
+  if (value === null || value === undefined || value === '') return '—';
+
+  if (key === 'matchDate' && typeof value === 'string') {
+    return new Date(value).toLocaleDateString();
+  }
+
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, '');
+  }
+
+  return String(value);
+}
 
 function formatDateAU(iso: string): string {
   const d = new Date(iso);
@@ -347,6 +372,9 @@ export default function PlayerDetailScreen() {
   const [gameStatTotals, setGameStatTotals] = useState<GameStats | null>(null);
   const [gameStatAverages, setGameStatAverages] = useState<GameStats | null>(null);
   const [gamesWithStats, setGamesWithStats] = useState(0);
+  const [championColumns, setChampionColumns] = useState<Array<{ key: string; label: string }>>([]);
+  const [championStats, setChampionStats] = useState<ChampionDataStat[]>([]);
+  const [championSeasonAverages, setChampionSeasonAverages] = useState<Array<{ season: number | null; rows: number; averages: Record<string, number | null> }>>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   // Edit player state
@@ -366,13 +394,27 @@ export default function PlayerDetailScreen() {
 
   const load = useCallback(async () => {
     try {
-      const d = await api.get<{ player: Player; reports: any[]; averageRatings: Ratings; gameStatTotals: GameStats; gameStatAverages: GameStats; gamesWithStats: number }>(`/api/players/${id}`);
+      const [d, championData] = await Promise.all([
+        api.get<{ player: Player; reports: any[]; averageRatings: Ratings; gameStatTotals: GameStats; gameStatAverages: GameStats; gamesWithStats: number }>(`/api/players/${id}`),
+        api.get<ChampionDataPlayerResponse>(`/api/champion-data/player/${id}`).catch(() => null),
+      ]);
+
       setPlayer(d.player);
       setReports(d.reports);
       setAvgRatings(d.averageRatings);
       setGameStatTotals(d.gameStatTotals);
       setGameStatAverages(d.gameStatAverages);
       setGamesWithStats(d.gamesWithStats);
+
+      if (championData) {
+        setChampionColumns(championData.columns || []);
+        setChampionStats(championData.stats || []);
+        setChampionSeasonAverages(championData.seasonAverages || []);
+      } else {
+        setChampionColumns([]);
+        setChampionStats([]);
+        setChampionSeasonAverages([]);
+      }
     } catch {}
   }, [id]);
 
@@ -546,6 +588,11 @@ export default function PlayerDetailScreen() {
 
   if (!player) return null;
 
+  const championAverageColumns = championColumns.filter((column) => (
+    championSeasonAverages.length > 0
+      ? Object.prototype.hasOwnProperty.call(championSeasonAverages[0].averages, column.key)
+      : false
+  ));
   return (
     <>
       <Stack.Screen options={{ title: player.fullName, headerStyle: { backgroundColor: Colors.card }, headerTintColor: Colors.text }} />
@@ -751,6 +798,62 @@ export default function PlayerDetailScreen() {
           </Card>
         )}
 
+        <Card style={{ marginBottom: 16 }}>
+          <Text style={styles.sectionTitle}>Champion Data Stats</Text>
+          {championStats.length === 0 ? (
+            <Text style={styles.statsSubtitle}>No Champion Data imported for this player yet.</Text>
+          ) : (
+            <>
+              <Text style={styles.statsSubtitle}>{championStats.length} Champion Data row{championStats.length !== 1 ? 's' : ''}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator>
+                <View>
+                  <View style={[styles.championTableRow, styles.championHeaderRow]}>
+                    {championColumns.map((column) => (
+                      <Text key={column.key} style={[styles.championTableCell, styles.championHeaderCell]}>{column.label}</Text>
+                    ))}
+                  </View>
+                  {championStats.map((row) => (
+                    <View key={row.id} style={styles.championTableRow}>
+                      {championColumns.map((column) => (
+                        <Text key={`${row.id}-${column.key}`} style={styles.championTableCell}>
+                          {formatChampionValue((row as any)[column.key], column.key)}
+                        </Text>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+
+              {championSeasonAverages.length > 0 && (
+                <View style={styles.championAveragesWrap}>
+                  <Text style={styles.championAveragesTitle}>Season Averages</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator>
+                    <View>
+                      <View style={[styles.championTableRow, styles.championHeaderRow]}>
+                        <Text style={[styles.championTableCell, styles.championHeaderCell]}>Season</Text>
+                        <Text style={[styles.championTableCell, styles.championHeaderCell]}>Rows</Text>
+                        {championAverageColumns.map((column) => (
+                          <Text key={`avg-head-${column.key}`} style={[styles.championTableCell, styles.championHeaderCell]}>{column.label}</Text>
+                        ))}
+                      </View>
+                      {championSeasonAverages.map((row) => (
+                        <View key={`avg-${row.season ?? 'unknown'}`} style={styles.championTableRow}>
+                          <Text style={styles.championTableCell}>{row.season ?? 'Unknown'}</Text>
+                          <Text style={styles.championTableCell}>{row.rows}</Text>
+                          {championAverageColumns.map((column) => (
+                            <Text key={`avg-${row.season ?? 'unknown'}-${column.key}`} style={styles.championTableCell}>
+                              {formatChampionValue(row.averages[column.key], column.key)}
+                            </Text>
+                          ))}
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
+            </>
+          )}
+        </Card>
         <GradientButton title="+ Add Report for this Player" onPress={() => router.push(`/report/new?playerId=${id}`)} style={{ marginBottom: 16 }} />
 
         <Text style={styles.sectionTitle}>Reports ({reports.length})</Text>
@@ -1066,6 +1169,12 @@ const styles = StyleSheet.create({
   statViewLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 4, fontWeight: '600' },
   reportStatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   reportStatChip: { fontSize: 11, color: Colors.accent, backgroundColor: Colors.elevated, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontWeight: '600', overflow: 'hidden' },
+  championAveragesWrap: { marginTop: 14, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
+  championAveragesTitle: { fontSize: 14, fontWeight: '700', color: Colors.accent, marginBottom: 8, textTransform: 'uppercase' },
+  championTableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  championHeaderRow: { backgroundColor: Colors.elevated },
+  championTableCell: { minWidth: 96, paddingVertical: 8, paddingHorizontal: 10, color: Colors.textSecondary, fontSize: 12 },
+  championHeaderCell: { color: Colors.text, fontWeight: '700' },
   meta: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   backButton: {
     flexDirection: 'row',

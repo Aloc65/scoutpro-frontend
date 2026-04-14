@@ -77,6 +77,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="data-import"
+        options={{
+          title: 'Data Import',
+          tabBarIcon: ({ color, size }) => <Ionicons name="cloud-upload" size={size} color={color} />,
+          href: user?.role === 'ADMIN' ? '/(tabs)/data-import' : null,
+        }}
+      />
+      <Tabs.Screen
         name="users"
         options={{
           title: 'Users',

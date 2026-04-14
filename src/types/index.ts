@@ -78,6 +78,63 @@ export const GAME_STAT_KEYS: [keyof GameStats, string][] = [
   ['tackles', 'Tackles'], ['clearances', 'Clearances'], ['inside50s', 'Inside 50s'],
 ];
 
+
+export interface ChampionDataStat {
+  id: string;
+  playerId: string;
+  season: number | null;
+  sourceFile: string | null;
+  sourceSheet: string | null;
+  sourcePlayerName: string;
+  normalizedPlayerName: string;
+  roundLabel: string | null;
+  roundNumber: number | null;
+  isFinals: boolean | null;
+  matchDate: string | null;
+  opponent: string | null;
+  age: number | null;
+  position: string | null;
+  squad: string | null;
+  matchesPlayed: number | null;
+  rankingPoints: number | null;
+  disposals: number | null;
+  kicks: number | null;
+  handballs: number | null;
+  kickHandballRatio: number | null;
+  kickingEfficiency: number | null;
+  contestedPossessions: number | null;
+  uncontestedPossessions: number | null;
+  contestedPossessionRate: number | null;
+  marks: number | null;
+  interceptMarks: number | null;
+  inside50s: number | null;
+  clearances: number | null;
+  goals: number | null;
+  accuracy: number | null;
+  scoreAssists: number | null;
+  scoreInvolvements: number | null;
+  tackles: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChampionDataColumn {
+  key: string;
+  label: string;
+}
+
+export interface ChampionDataSeasonAverage {
+  season: number | null;
+  rows: number;
+  averages: Record<string, number | null>;
+}
+
+export interface ChampionDataPlayerResponse {
+  player: { id: string; fullName: string };
+  columns: ChampionDataColumn[];
+  stats: ChampionDataStat[];
+  seasonAverages: ChampionDataSeasonAverage[];
+}
 export interface FullReport {
   id: string;
   playerId: string;
