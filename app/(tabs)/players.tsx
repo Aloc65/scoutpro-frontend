@@ -86,7 +86,7 @@ export default function PlayersScreen() {
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
-  // Client-side filtering
+  // Client-side filtering + sort by surname (last word of fullName)
   const filteredPlayers = useMemo(() => {
     let result = players;
     if (competitionFilter !== 'All') {
@@ -96,7 +96,12 @@ export default function PlayersScreen() {
       const query = nameFilter.trim().toLowerCase();
       result = result.filter((p) => p.fullName.toLowerCase().includes(query));
     }
-    return result;
+    // Sort alphabetically by surname (last word in full name)
+    return [...result].sort((a, b) => {
+      const surnameA = (a.fullName || '').trim().split(/\s+/).pop()?.toLowerCase() || '';
+      const surnameB = (b.fullName || '').trim().split(/\s+/).pop()?.toLowerCase() || '';
+      return surnameA.localeCompare(surnameB);
+    });
   }, [players, competitionFilter, nameFilter]);
 
   const hasActiveFilters = competitionFilter !== 'All' || nameFilter.trim().length > 0;
