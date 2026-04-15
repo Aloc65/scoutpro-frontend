@@ -13,7 +13,6 @@ import {
   MeetingType,
   SIGNING_STATUS_LABELS,
   ChampionDataPlayerResponse,
-  ChampionDataStat,
 } from '../../src/types';
 import Card from '../../src/components/Card';
 import RatingBar from '../../src/components/RatingBar';
@@ -373,7 +372,6 @@ export default function PlayerDetailScreen() {
   const [gameStatAverages, setGameStatAverages] = useState<GameStats | null>(null);
   const [gamesWithStats, setGamesWithStats] = useState(0);
   const [championColumns, setChampionColumns] = useState<Array<{ key: string; label: string }>>([]);
-  const [championStats, setChampionStats] = useState<ChampionDataStat[]>([]);
   const [championSeasonAverages, setChampionSeasonAverages] = useState<Array<{ season: number | null; rows: number; averages: Record<string, number | null> }>>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -408,11 +406,9 @@ export default function PlayerDetailScreen() {
 
       if (championData) {
         setChampionColumns(championData.columns || []);
-        setChampionStats(championData.stats || []);
         setChampionSeasonAverages(championData.seasonAverages || []);
       } else {
         setChampionColumns([]);
-        setChampionStats([]);
         setChampionSeasonAverages([]);
       }
     } catch {}
@@ -799,59 +795,34 @@ export default function PlayerDetailScreen() {
         )}
 
         <Card style={{ marginBottom: 16 }}>
-          <Text style={styles.sectionTitle}>Champion Data Stats</Text>
-          {championStats.length === 0 ? (
-            <Text style={styles.statsSubtitle}>No Champion Data imported for this player yet.</Text>
+          <Text style={styles.sectionTitle}>Champion Data Stats - Season Averages</Text>
+          {championSeasonAverages.length === 0 || championAverageColumns.length === 0 ? (
+            <Text style={styles.statsSubtitle}>No Champion Data season averages imported for this player yet.</Text>
           ) : (
-            <>
-              <Text style={styles.statsSubtitle}>{championStats.length} Champion Data row{championStats.length !== 1 ? 's' : ''}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator>
-                <View>
-                  <View style={[styles.championTableRow, styles.championHeaderRow]}>
-                    {championColumns.map((column) => (
-                      <Text key={column.key} style={[styles.championTableCell, styles.championHeaderCell]}>{column.label}</Text>
-                    ))}
+            <View style={styles.championSeasonTableWrap}>
+              {championSeasonAverages.map((seasonRow) => (
+                <View key={`season-${seasonRow.season ?? 'unknown'}`} style={styles.championSeasonCard}>
+                  <Text style={styles.championSeasonHeading}>Season {seasonRow.season ?? 'Unknown'}</Text>
+
+                  <View style={styles.championMetricRow}>
+                    <Text style={[styles.championMetricLabel, styles.championMetricHeaderText]}>Metric</Text>
+                    <Text style={[styles.championMetricValue, styles.championMetricHeaderText]}>Average</Text>
                   </View>
-                  {championStats.map((row) => (
-                    <View key={row.id} style={styles.championTableRow}>
-                      {championColumns.map((column) => (
-                        <Text key={`${row.id}-${column.key}`} style={styles.championTableCell}>
-                          {formatChampionValue((row as any)[column.key], column.key)}
-                        </Text>
-                      ))}
+
+                  <View style={styles.championMetricRow}>
+                    <Text style={styles.championMetricLabel}>Rows</Text>
+                    <Text style={styles.championMetricValue}>{seasonRow.rows}</Text>
+                  </View>
+
+                  {championAverageColumns.map((column) => (
+                    <View key={`metric-${seasonRow.season ?? 'unknown'}-${column.key}`} style={styles.championMetricRow}>
+                      <Text style={styles.championMetricLabel}>{column.label}</Text>
+                      <Text style={styles.championMetricValue}>{formatChampionValue(seasonRow.averages[column.key], column.key)}</Text>
                     </View>
                   ))}
                 </View>
-              </ScrollView>
-
-              {championSeasonAverages.length > 0 && (
-                <View style={styles.championAveragesWrap}>
-                  <Text style={styles.championAveragesTitle}>Season Averages</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator>
-                    <View>
-                      <View style={[styles.championTableRow, styles.championHeaderRow]}>
-                        <Text style={[styles.championTableCell, styles.championHeaderCell]}>Season</Text>
-                        <Text style={[styles.championTableCell, styles.championHeaderCell]}>Rows</Text>
-                        {championAverageColumns.map((column) => (
-                          <Text key={`avg-head-${column.key}`} style={[styles.championTableCell, styles.championHeaderCell]}>{column.label}</Text>
-                        ))}
-                      </View>
-                      {championSeasonAverages.map((row) => (
-                        <View key={`avg-${row.season ?? 'unknown'}`} style={styles.championTableRow}>
-                          <Text style={styles.championTableCell}>{row.season ?? 'Unknown'}</Text>
-                          <Text style={styles.championTableCell}>{row.rows}</Text>
-                          {championAverageColumns.map((column) => (
-                            <Text key={`avg-${row.season ?? 'unknown'}-${column.key}`} style={styles.championTableCell}>
-                              {formatChampionValue(row.averages[column.key], column.key)}
-                            </Text>
-                          ))}
-                        </View>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </View>
-              )}
-            </>
+              ))}
+            </View>
           )}
         </Card>
         <GradientButton title="+ Add Report for this Player" onPress={() => router.push(`/report/new?playerId=${id}`)} style={{ marginBottom: 16 }} />
@@ -1169,12 +1140,51 @@ const styles = StyleSheet.create({
   statViewLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 4, fontWeight: '600' },
   reportStatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   reportStatChip: { fontSize: 11, color: Colors.accent, backgroundColor: Colors.elevated, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontWeight: '600', overflow: 'hidden' },
-  championAveragesWrap: { marginTop: 14, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
-  championAveragesTitle: { fontSize: 14, fontWeight: '700', color: Colors.accent, marginBottom: 8, textTransform: 'uppercase' },
-  championTableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border },
-  championHeaderRow: { backgroundColor: Colors.elevated },
-  championTableCell: { minWidth: 96, paddingVertical: 8, paddingHorizontal: 10, color: Colors.textSecondary, fontSize: 12 },
-  championHeaderCell: { color: Colors.text, fontWeight: '700' },
+  championSeasonTableWrap: {
+    gap: 12,
+  },
+  championSeasonCard: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: Colors.elevated,
+  },
+  championSeasonHeading: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  championMetricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  championMetricLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    paddingRight: 10,
+  },
+  championMetricValue: {
+    fontSize: 13,
+    color: Colors.text,
+    fontWeight: '700',
+  },
+  championMetricHeaderText: {
+    color: Colors.text,
+    textTransform: 'uppercase',
+    fontSize: 11,
+    letterSpacing: 0.4,
+  },
   meta: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   backButton: {
     flexDirection: 'row',
