@@ -804,22 +804,30 @@ export default function PlayerDetailScreen() {
                 <View key={`season-${seasonRow.season ?? 'unknown'}`} style={styles.championSeasonCard}>
                   <Text style={styles.championSeasonHeading}>Season {seasonRow.season ?? 'Unknown'}</Text>
 
-                  <View style={styles.championMetricRow}>
-                    <Text style={[styles.championMetricLabel, styles.championMetricHeaderText]}>Metric</Text>
-                    <Text style={[styles.championMetricValue, styles.championMetricHeaderText]}>Average</Text>
-                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator
+                    style={styles.championTableScroll}
+                    contentContainerStyle={styles.championTableContent}
+                  >
+                    <View style={styles.championTable}>
+                      <View style={[styles.championTableRow, styles.championTableHeaderRow]}>
+                        {championAverageColumns.map((column) => (
+                          <View key={`header-${seasonRow.season ?? 'unknown'}-${column.key}`} style={[styles.championTableCell, styles.championTableHeaderCell]}>
+                            <Text style={styles.championTableHeaderText}>{column.label}</Text>
+                          </View>
+                        ))}
+                      </View>
 
-                  <View style={styles.championMetricRow}>
-                    <Text style={styles.championMetricLabel}>Rows</Text>
-                    <Text style={styles.championMetricValue}>{seasonRow.rows}</Text>
-                  </View>
-
-                  {championAverageColumns.map((column) => (
-                    <View key={`metric-${seasonRow.season ?? 'unknown'}-${column.key}`} style={styles.championMetricRow}>
-                      <Text style={styles.championMetricLabel}>{column.label}</Text>
-                      <Text style={styles.championMetricValue}>{formatChampionValue(seasonRow.averages[column.key], column.key)}</Text>
+                      <View style={styles.championTableRow}>
+                        {championAverageColumns.map((column) => (
+                          <View key={`value-${seasonRow.season ?? 'unknown'}-${column.key}`} style={styles.championTableCell}>
+                            <Text style={styles.championTableValueText}>{formatChampionValue(seasonRow.averages[column.key], column.key)}</Text>
+                          </View>
+                        ))}
+                      </View>
                     </View>
-                  ))}
+                  </ScrollView>
                 </View>
               ))}
             </View>
@@ -1157,33 +1165,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: 'rgba(255,255,255,0.03)',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  championMetricRow: {
+  championTableScroll: {
+    width: '100%',
+  },
+  championTableContent: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  championTable: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  championTableRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    backgroundColor: Colors.elevated,
   },
-  championMetricLabel: {
-    flex: 1,
+  championTableHeaderRow: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  championTableCell: {
+    minWidth: 96,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRightWidth: 1,
+    borderRightColor: Colors.border,
+    justifyContent: 'center',
+  },
+  championTableHeaderCell: {
+    minHeight: 46,
+  },
+  championTableHeaderText: {
+    fontSize: 12,
+    color: Colors.text,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  championTableValueText: {
     fontSize: 13,
     color: Colors.textSecondary,
     fontWeight: '600',
-    paddingRight: 10,
-  },
-  championMetricValue: {
-    fontSize: 13,
-    color: Colors.text,
-    fontWeight: '700',
-  },
-  championMetricHeaderText: {
-    color: Colors.text,
-    textTransform: 'uppercase',
-    fontSize: 11,
-    letterSpacing: 0.4,
+    textAlign: 'center',
   },
   meta: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   backButton: {
