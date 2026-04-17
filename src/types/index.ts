@@ -8,6 +8,9 @@ export const SIGNING_STATUS_LABELS: Record<SigningStatus, string> = {
   NOT_SIGNED: 'Not Signed',
 };
 
+export const WATCH_LIST_SIGNED_STATUSES = ['Signed', 'Unsigned'] as const;
+export type SignedStatus = typeof WATCH_LIST_SIGNED_STATUSES[number];
+
 export interface User {
   id: string;
   email: string;
@@ -30,6 +33,23 @@ export interface Player {
   signingStatus: 'SIGNED' | 'NOT_SIGNED';
   notes: string | null;
   createdAt: string;
+}
+
+export interface WatchList {
+  id: string;
+  playerId: string;
+  signedStatus: SignedStatus;
+  aflTeamsInterested: string[];
+  createdAt: string;
+  updatedAt: string;
+  draftYear: number | null;
+  player: {
+    id: string;
+    fullName: string;
+    team: string | null;
+    dateOfBirth: string | null;
+    competition: string | null;
+  };
 }
 
 export interface Ratings {

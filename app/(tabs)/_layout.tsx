@@ -63,6 +63,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="watch-list"
+        options={{
+          title: 'Watch List',
+          tabBarIcon: ({ color, size }) => <Ionicons name="eye" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="reports"
         options={{
           title: 'Reports',

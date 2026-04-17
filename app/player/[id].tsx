@@ -13,6 +13,7 @@ import {
   MeetingType,
   SIGNING_STATUS_LABELS,
   ChampionDataPlayerResponse,
+  WatchList,
 } from '../../src/types';
 import Card from '../../src/components/Card';
 import RatingBar from '../../src/components/RatingBar';
@@ -390,11 +391,16 @@ export default function PlayerDetailScreen() {
   const [meetingFormVisible, setMeetingFormVisible] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
 
+  // Watch list state
+  const [watchListEntry, setWatchListEntry] = useState<WatchList | null>(null);
+  const [watchListLoading, setWatchListLoading] = useState(false);
+
   const load = useCallback(async () => {
     try {
-      const [d, championData] = await Promise.all([
+      const [d, championData, watchStatus] = await Promise.all([
         api.get<{ player: Player; reports: any[]; averageRatings: Ratings; gameStatTotals: GameStats; gameStatAverages: GameStats; gamesWithStats: number }>(`/api/players/${id}`),
         api.get<ChampionDataPlayerResponse>(`/api/champion-data/player/${id}`).catch(() => null),
+        api.get<{ inWatchList: boolean; entry: WatchList | null }>(`/api/watch-list/player/${id}`).catch(() => ({ inWatchList: false, entry: null })),
       ]);
 
       setPlayer(d.player);
@@ -403,6 +409,7 @@ export default function PlayerDetailScreen() {
       setGameStatTotals(d.gameStatTotals);
       setGameStatAverages(d.gameStatAverages);
       setGamesWithStats(d.gamesWithStats);
+      setWatchListEntry(watchStatus?.entry || null);
 
       if (championData) {
         setChampionColumns(championData.columns || []);
@@ -496,6 +503,33 @@ export default function PlayerDetailScreen() {
       window.alert(msg);
     } else {
       Alert.alert('Success', msg);
+    }
+  };
+
+  const toggleWatchList = async () => {
+    try {
+      setWatchListLoading(true);
+
+      if (watchListEntry) {
+        await api.delete(`/api/watch-list/${watchListEntry.id}`);
+        setWatchListEntry(null);
+      } else {
+        const created = await api.post<WatchList>('/api/watch-list', {
+          playerId: id,
+          signedStatus: 'Unsigned',
+          aflTeamsInterested: [],
+        });
+        setWatchListEntry(created);
+      }
+    } catch (e: any) {
+      const msg = e.message || 'Failed to update watch list';
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Error', msg);
+      }
+    } finally {
+      setWatchListLoading(false);
     }
   };
 
@@ -610,6 +644,28 @@ export default function PlayerDetailScreen() {
             </TouchableOpacity>
           </View>
           {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
+
+          <TouchableOpacity
+            style={watchListEntry ? styles.watchListBtnActive : styles.watchListBtn}
+            onPress={toggleWatchList}
+            activeOpacity={0.8}
+            disabled={watchListLoading}
+          >
+            {watchListLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons
+                  name={watchListEntry ? 'bookmark' : 'bookmark-outline'}
+                  size={16}
+                  color="#fff"
+                />
+                <Text style={styles.watchListBtnText}>
+                  {watchListEntry ? 'Remove from Watch List' : 'Add to Watch List'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
 
           {/* ── DOB / Age / Draft Year row ── */}
           <View style={styles.dobRow}>
@@ -993,6 +1049,31 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 13,
     fontWeight: '700',
+  },
+  watchListBtn: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  watchListBtnActive: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: Colors.orange,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  watchListBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   name: { fontSize: 22, fontWeight: '800', color: Colors.text },
   info: { fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
