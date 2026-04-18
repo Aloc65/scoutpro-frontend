@@ -57,6 +57,7 @@ export interface Ratings {
   kicking: number | null;
   handball: number | null;
   marking: number | null;
+  cleanBelowKnees: number | null;
   workRate: number | null;
   decisionMaking: number | null;
   composure: number | null;

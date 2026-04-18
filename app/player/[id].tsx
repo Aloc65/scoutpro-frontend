@@ -29,7 +29,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 const FUNDAMENTALS_LABELS: [keyof Ratings, string][] = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
-  ['contestWork', 'Contested Work'], ['speed', 'Speed'],
+  ['cleanBelowKnees', 'Clean Below Knees'], ['contestWork', 'Contested Work'], ['speed', 'Speed'],
 ];
 
 const TRAITS_LABELS: [keyof Ratings, string][] = [

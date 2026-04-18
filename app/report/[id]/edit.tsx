@@ -17,7 +17,7 @@ import { showAlert, showConfirm } from '../../../src/utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 const FUNDAMENTALS_KEYS = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
-  ['contestWork', 'Contested Work'], ['speed', 'Speed'],
+  ['cleanBelowKnees', 'Clean Below Knees'], ['contestWork', 'Contested Work'], ['speed', 'Speed'],
 ] as const;
 
 const TRAITS_KEYS = [

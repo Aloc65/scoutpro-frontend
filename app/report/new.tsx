@@ -13,7 +13,7 @@ import { OTHER_OPPONENT_OPTION, WAFL_TEAMS } from '../../src/constants/waflTeams
 import { showAlert } from '../../src/utils/alert';
 const FUNDAMENTALS_KEYS = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
-  ['contestWork', 'Contested Work'], ['speed', 'Speed'],
+  ['cleanBelowKnees', 'Clean Below Knees'], ['contestWork', 'Contested Work'], ['speed', 'Speed'],
 ] as const;
 
 const TRAITS_KEYS = [
@@ -93,7 +93,7 @@ export default function NewReportScreen() {
   const [developmentAreas, setDevelopmentAreas] = useState('');
   const [overallProjection, setOverallProjection] = useState('');
   const [ratings, setRatings] = useState<Record<string, number>>({
-    kicking: 3, handball: 3, marking: 3, workRate: 3, decisionMaking: 3,
+    kicking: 3, handball: 3, marking: 3, cleanBelowKnees: 3, workRate: 3, decisionMaking: 3,
     composure: 3, speed: 3, flexibility: 3, defensiveEffort: 3, contestWork: 3, gameAwareness: 3,
   });
   const [gameStats, setGameStats] = useState<Record<string, string>>({});
