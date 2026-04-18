@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, Alert, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors, ratingColor } from '../../src/theme/colors';
@@ -7,6 +7,8 @@ import { Player, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS } from '..
 import Input from '../../src/components/Input';
 import GradientButton from '../../src/components/GradientButton';
 import Card from '../../src/components/Card';
+import DatePicker from '../../src/components/DatePicker';
+import { OTHER_OPPONENT_OPTION, WAFL_TEAMS } from '../../src/constants/waflTeams';
 
 import { showAlert } from '../../src/utils/alert';
 const FUNDAMENTALS_KEYS = [
@@ -70,12 +72,16 @@ export default function NewReportScreen() {
   const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState(playerId || '');
-  // Match date as DD/MM/YYYY text input
-  const today = new Date();
-  const todayDDMMYYYY = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-  const [matchDate, setMatchDate] = useState(todayDDMMYYYY);
-  const [matchDateError, setMatchDateError] = useState<string | null>(null);
-  const [opponent, setOpponent] = useState('');
+  const [matchDate, setMatchDate] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [selectedOpponentOption, setSelectedOpponentOption] = useState('');
+  const [customOpponent, setCustomOpponent] = useState('');
+  const [showOpponentDropdown, setShowOpponentDropdown] = useState(false);
   const [venue, setVenue] = useState('');
   const [competition, setCompetition] = useState('');
 
@@ -96,25 +102,12 @@ export default function NewReportScreen() {
   const [fetchingStats, setFetchingStats] = useState(false);
   const [fetchMessage, setFetchMessage] = useState('');
 
-  const validateMatchDate = (val: string): string | null => {
-    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    const match = regex.exec(val);
-    if (!match) return 'Use DD/MM/YYYY format';
-    const day = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10);
-    const year = parseInt(match[3], 10);
-    if (month < 1 || month > 12) return 'Month must be 01-12';
-    if (day < 1 || day > 31) return 'Day must be 01-31';
-    if (year < 2020 || year > 2030) return 'Year must be 2020-2030';
-    const d = new Date(year, month - 1, day);
-    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return 'Invalid date';
-    return null;
-  };
-
-  const parseMatchDateToISO = (val: string): string => {
-    const [dd, mm, yyyy] = val.split('/');
-    return `${yyyy}-${mm}-${dd}`;
-  };
+  const opponent = useMemo(() => {
+    if (selectedOpponentOption === OTHER_OPPONENT_OPTION) {
+      return customOpponent.trim();
+    }
+    return selectedOpponentOption;
+  }, [selectedOpponentOption, customOpponent]);
 
   const fetchStatsFromWeb = async () => {
     const selectedPlayer = players.find((p) => p.id === selectedPlayerId);
@@ -123,22 +116,21 @@ export default function NewReportScreen() {
       return;
     }
     if (!opponent) {
-      showAlert('Missing Info', 'Please enter the opponent');
+      showAlert('Missing Info', 'Please select or enter the opponent');
       return;
     }
     if (!matchDate) {
-      showAlert('Missing Info', 'Please enter the match date');
+      showAlert('Missing Info', 'Please select the match date');
       return;
     }
     try {
       setFetchingStats(true);
       setFetchMessage('');
-      const matchDateISO = validateMatchDate(matchDate) ? matchDate : parseMatchDateToISO(matchDate);
       const result = await api.post<any>('/api/stats-fetcher/fetch', {
         playerName: selectedPlayer.fullName,
         team: selectedPlayer.team || undefined,
         opponent,
-        matchDate: matchDateISO,
+        matchDate,
       });
       if (result.error) {
         setFetchMessage(result.error);
@@ -190,12 +182,6 @@ export default function NewReportScreen() {
       showAlert('Validation', 'Please fill in all required fields (Player, Date, Opponent, Primary Position, Summary)');
       return;
     }
-    const dateErr = validateMatchDate(matchDate);
-    if (dateErr) {
-      setMatchDateError(dateErr);
-      showAlert('Validation', `Match Date: ${dateErr}`);
-      return;
-    }
     try {
       setSaving(true);
       const statsPayload: any = {};
@@ -203,10 +189,9 @@ export default function NewReportScreen() {
         const v = gameStats[key];
         if (v !== undefined && v !== '') statsPayload[key] = parseInt(v, 10);
       });
-      const matchDateISO = parseMatchDateToISO(matchDate);
       await api.post('/api/reports', {
         playerId: selectedPlayerId,
-        matchDate: new Date(matchDateISO).toISOString(),
+        matchDate: new Date(matchDate).toISOString(),
         opponent, venue: venue || undefined, competition: competition || undefined,
         positionsPlayed, primaryPosition, summary,
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
@@ -245,18 +230,42 @@ export default function NewReportScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <Text style={styles.fieldLabel}>Match Date (DD/MM/YYYY) *</Text>
-            <TextInput
-              style={[styles.matchDateInput, matchDateError ? styles.matchDateInputError : null]}
-              value={matchDate}
-              onChangeText={(val) => { setMatchDate(val); setMatchDateError(null); }}
-              placeholder="DD/MM/YYYY"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="numeric"
-              maxLength={10}
-            />
-            {matchDateError && <Text style={styles.matchDateErrorText}>{matchDateError}</Text>}
-            <Input label="Opponent *" value={opponent} onChangeText={setOpponent} />
+            <DatePicker label="Match Date *" value={matchDate} onChange={setMatchDate} />
+            <Text style={styles.fieldLabel}>Opponent *</Text>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => setShowOpponentDropdown((prev) => !prev)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dropdownText, !selectedOpponentOption && styles.dropdownPlaceholder]}>
+                {selectedOpponentOption || 'Select opponent'}
+              </Text>
+              <Text style={styles.dropdownArrow}>{showOpponentDropdown ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {showOpponentDropdown && (
+              <View style={styles.dropdownList}>
+                {[...WAFL_TEAMS, OTHER_OPPONENT_OPTION].map((team) => (
+                  <TouchableOpacity
+                    key={team}
+                    style={[styles.dropdownItem, selectedOpponentOption === team && styles.dropdownItemSelected]}
+                    onPress={() => {
+                      setSelectedOpponentOption(team);
+                      if (team !== OTHER_OPPONENT_OPTION) {
+                        setCustomOpponent('');
+                      }
+                      setShowOpponentDropdown(false);
+                    }}
+                  >
+                    <Text style={[styles.dropdownItemText, selectedOpponentOption === team && styles.dropdownItemTextSelected]}>
+                      {team}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {selectedOpponentOption === OTHER_OPPONENT_OPTION && (
+              <Input label="Other Opponent *" value={customOpponent} onChangeText={setCustomOpponent} />
+            )}
             <Input label="Venue" value={venue} onChangeText={setVenue} />
             <Text style={styles.fieldLabel}>Competition</Text>
             <View style={styles.chipRow}>
@@ -399,7 +408,35 @@ const styles = StyleSheet.create({
   ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
   backToMainBtn: { alignItems: 'center', padding: 14, borderRadius: 12, marginBottom: 16, backgroundColor: Colors.accent },
   backToMainText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  matchDateInput: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 14, color: Colors.text, fontSize: 15, borderWidth: 1, borderColor: Colors.border, marginBottom: 8 },
-  matchDateInputError: { borderColor: Colors.error },
-  matchDateErrorText: { color: Colors.error, fontSize: 12, marginBottom: 8, marginLeft: 4 },
+  dropdown: {
+    backgroundColor: Colors.elevated,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dropdownText: { fontSize: 15, color: Colors.text },
+  dropdownPlaceholder: { color: Colors.textMuted },
+  dropdownArrow: { color: Colors.textMuted, fontSize: 10 },
+  dropdownList: {
+    backgroundColor: Colors.elevated,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: -2,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  dropdownItemSelected: { backgroundColor: 'rgba(79, 70, 229, 0.15)' },
+  dropdownItemText: { fontSize: 15, color: Colors.text },
+  dropdownItemTextSelected: { color: Colors.primary, fontWeight: '700' },
 });
