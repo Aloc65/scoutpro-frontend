@@ -35,6 +35,7 @@ export default function WatchListScreen() {
   const [search, setSearch] = useState('');
   const [signedStatus, setSignedStatus] = useState<(typeof SIGNED_FILTER_OPTIONS)[number]>('All');
   const [draftYear, setDraftYear] = useState<string>('All');
+  const [availableDraftYears, setAvailableDraftYears] = useState<string[]>(['All']);
   const [sortBy, setSortBy] = useState<SortMode>('surname');
   const [exporting, setExporting] = useState(false);
 
@@ -58,7 +59,22 @@ export default function WatchListScreen() {
     try {
       const query = buildQueryString();
       const data = await api.get<{ items: WatchList[]; total: number }>(`/api/watch-list${query}`);
-      setItems(data.items || []);
+      const nextItems = data.items || [];
+      setItems(nextItems);
+
+      const nextYears = nextItems
+        .map((item) => item.draftYear)
+        .filter((value): value is number => typeof value === 'number')
+        .map(String);
+
+      if (nextYears.length > 0) {
+        setAvailableDraftYears((prev) => {
+          const merged = Array.from(new Set([...prev.filter((year) => year !== 'All'), ...nextYears])).sort(
+            (a, b) => Number(a) - Number(b)
+          );
+          return ['All', ...merged];
+        });
+      }
     } catch (e: any) {
       showAlert('Error', e.message || 'Failed to load watch list');
     } finally {
@@ -77,10 +93,16 @@ export default function WatchListScreen() {
   };
 
   const draftYearOptions = useMemo(() => {
-    const years = Array.from(new Set(items.map((item) => item.draftYear).filter((v): v is number => typeof v === 'number')));
-    years.sort((a, b) => a - b);
-    return ['All', ...years.map(String)];
-  }, [items]);
+    if (draftYear === 'All' || availableDraftYears.includes(draftYear)) {
+      return availableDraftYears;
+    }
+
+    const merged = Array.from(new Set([...availableDraftYears.filter((year) => year !== 'All'), draftYear])).sort(
+      (a, b) => Number(a) - Number(b)
+    );
+
+    return ['All', ...merged];
+  }, [availableDraftYears, draftYear]);
 
   const startEdit = (item: WatchList) => {
     setEditingItem(item);
@@ -171,16 +193,19 @@ export default function WatchListScreen() {
         </View>
 
         <Text style={styles.filterLabel}>Draft Year</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-          {draftYearOptions.map((year) => (
-            <TouchableOpacity
-              key={year}
-              style={[styles.chip, draftYear === year && styles.chipActive]}
-              onPress={() => setDraftYear(year)}
-            >
-              <Text style={[styles.chipText, draftYear === year && styles.chipTextActive]}>{year}</Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.draftYearTabsRow}>
+          {draftYearOptions.map((year) => {
+            const isActive = draftYear === year;
+            return (
+              <TouchableOpacity
+                key={year}
+                style={[styles.draftYearTab, isActive && styles.draftYearTabActive]}
+                onPress={() => setDraftYear(year)}
+              >
+                <Text style={[styles.draftYearTabText, isActive && styles.draftYearTabTextActive]}>{year}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
         <Text style={styles.filterLabel}>Signed Status</Text>
@@ -341,7 +366,32 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: Colors.text, paddingVertical: 10, marginLeft: 8 },
   filterLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 4 },
-  chipsRow: { gap: 8 },
+  draftYearTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+    paddingRight: 4,
+  },
+  draftYearTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  draftYearTabActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  draftYearTabText: {
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  draftYearTabTextActive: {
+    color: '#fff',
+  },
   inlineRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   filterTabsRow: { flexDirection: 'row', gap: 8 },
   filterTab: {
