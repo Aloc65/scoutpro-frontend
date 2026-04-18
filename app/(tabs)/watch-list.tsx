@@ -184,16 +184,19 @@ export default function WatchListScreen() {
         </ScrollView>
 
         <Text style={styles.filterLabel}>Signed Status</Text>
-        <View style={styles.inlineRow}>
-          {SIGNED_FILTER_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option}
-              style={[styles.chip, signedStatus === option && styles.chipActive]}
-              onPress={() => setSignedStatus(option)}
-            >
-              <Text style={[styles.chipText, signedStatus === option && styles.chipTextActive]}>{option}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.filterTabsRow}>
+          {SIGNED_FILTER_OPTIONS.map((option) => {
+            const isActive = signedStatus === option;
+            return (
+              <TouchableOpacity
+                key={option}
+                style={[styles.filterTab, isActive && styles.filterTabActive]}
+                onPress={() => setSignedStatus(option)}
+              >
+                <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>{option}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <Text style={styles.filterLabel}>Sort By</Text>
@@ -340,6 +343,25 @@ const styles = StyleSheet.create({
   filterLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 4 },
   chipsRow: { gap: 8 },
   inlineRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  filterTabsRow: { flexDirection: 'row', gap: 8 },
+  filterTab: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  filterTabActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterTabText: { color: Colors.textSecondary, fontWeight: '700', fontSize: 13 },
+  filterTabTextActive: { color: '#fff' },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 7,
