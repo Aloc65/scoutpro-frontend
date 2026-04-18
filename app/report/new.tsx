@@ -13,11 +13,11 @@ import { OTHER_OPPONENT_OPTION, WAFL_TEAMS } from '../../src/constants/waflTeams
 import { showAlert } from '../../src/utils/alert';
 const FUNDAMENTALS_KEYS = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
-  ['cleanBelowKnees', 'Clean Below Knees'], ['contestWork', 'Contested Work'], ['speed', 'Speed'],
+  ['cleanBelowKnees', 'Clean Below Knees'], ['workRate', 'Work Rate'], ['contestWork', 'Contested Work'], ['speed', 'Speed'],
 ] as const;
 
 const TRAITS_KEYS = [
-  ['workRate', 'Work Rate'], ['decisionMaking', 'Decision Making'], ['composure', 'Composure'],
+  ['decisionMaking', 'Decision Making'], ['composure', 'Composure'],
   ['flexibility', 'Flexibility'], ['defensiveEffort', 'Defensive Effort'],
   ['gameAwareness', 'Game Awareness'],
 ] as const;
