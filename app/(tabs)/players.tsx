@@ -34,7 +34,7 @@ export default function PlayersScreen() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' as SigningStatus });
+  const [form, setForm] = useState({ fullName: '', team: '', dateOfBirth: '', draftYear: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' as SigningStatus });
   const [saving, setSaving] = useState(false);
   const [dobError, setDobError] = useState<string | null>(null);
 
@@ -275,6 +275,7 @@ export default function PlayersScreen() {
         fullName: form.fullName,
         team: form.team || undefined,
         dateOfBirth: dobISO,
+        draftYear: form.draftYear ? parseInt(form.draftYear) : undefined,
         competition: form.competition || undefined,
         dominantFoot: form.dominantFoot || undefined,
         height: form.height ? parseFloat(form.height) : undefined,
@@ -283,7 +284,7 @@ export default function PlayersScreen() {
         signingStatus: form.signingStatus,
       });
       setModalOpen(false);
-      setForm({ fullName: '', team: '', dateOfBirth: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' });
+      setForm({ fullName: '', team: '', dateOfBirth: '', draftYear: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' });
       setDobError(null);
       load();
     } catch (e: any) {
@@ -489,6 +490,7 @@ export default function PlayersScreen() {
                 />
                 {dobError ? <Text style={styles.dobErrorText}>{dobError}</Text> : null}
               </View>
+              <Input label="Draft Year" value={form.draftYear} onChangeText={(t) => setForm({ ...form, draftYear: t })} keyboardType="numeric" placeholder="e.g. 2026" />
               <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 6, marginTop: 4 }}>Competition</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                 {COMPETITIONS.map((c) => (
