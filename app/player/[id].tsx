@@ -22,6 +22,7 @@ import GradientButton from '../../src/components/GradientButton';
 import EmptyState from '../../src/components/EmptyState';
 import MeetingForm from '../../src/components/MeetingForm';
 import EditPlayerForm from '../../src/components/EditPlayerForm';
+import PositionalAnalysis from '../../src/components/PositionalAnalysis';
 // DatePicker no longer used for DOB – using text input instead
 import { getMeetingsByPlayer, createMeeting, updateMeeting, deleteMeeting } from '../../src/api/meetings';
 import { useAuth } from '../../src/context/AuthContext';
@@ -889,6 +890,9 @@ export default function PlayerDetailScreen() {
             </View>
           )}
         </Card>
+
+        <PositionalAnalysis playerId={String(id ?? '')} isAdmin={!!isAdmin} />
+
         <GradientButton title="+ Add Report for this Player" onPress={() => router.push(`/report/new?playerId=${id}`)} style={{ marginBottom: 16 }} />
 
         <Text style={styles.sectionTitle}>Reports ({reports.length})</Text>
