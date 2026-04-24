@@ -23,6 +23,8 @@ export interface UploadResult {
   message: string;
   positionsUploaded: string[];
   count: number;
+  skippedRows?: number;
+  warnings?: string[];
 }
 
 export async function listPositions(): Promise<string[]> {

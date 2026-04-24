@@ -23,6 +23,7 @@ import EmptyState from '../../src/components/EmptyState';
 import MeetingForm from '../../src/components/MeetingForm';
 import EditPlayerForm from '../../src/components/EditPlayerForm';
 import PositionalAnalysis from '../../src/components/PositionalAnalysis';
+import AflPlayerComparison from '../../src/components/AflPlayerComparison';
 // DatePicker no longer used for DOB – using text input instead
 import { getMeetingsByPlayer, createMeeting, updateMeeting, deleteMeeting } from '../../src/api/meetings';
 import { useAuth } from '../../src/context/AuthContext';
@@ -892,6 +893,12 @@ export default function PlayerDetailScreen() {
         </Card>
 
         <PositionalAnalysis playerId={String(id ?? '')} isAdmin={!!isAdmin} />
+
+        <AflPlayerComparison
+          playerId={String(id ?? '')}
+          playerName={player?.fullName ?? ''}
+          isAdmin={!!isAdmin}
+        />
 
         <GradientButton title="+ Add Report for this Player" onPress={() => router.push(`/report/new?playerId=${id}`)} style={{ marginBottom: 16 }} />
 
