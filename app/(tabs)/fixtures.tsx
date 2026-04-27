@@ -92,14 +92,57 @@ const todayString = () => {
 };
 
 const formatDate = (isoDate: string) => {
-  const date = new Date(isoDate);
+  if (!isoDate) return 'Invalid date';
+
+  const isoMatch = isoDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const date = isoMatch
+    ? new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])))
+    : new Date(isoDate);
+
   if (Number.isNaN(date.getTime())) return 'Invalid date';
+
   return date.toLocaleDateString('en-AU', {
+    timeZone: 'UTC',
     weekday: 'short',
-    day: '2-digit',
-    month: 'short',
+    day: 'numeric',
+    month: 'long',
     year: 'numeric',
   });
+};
+
+const formatTime = (rawTime?: string | null) => {
+  if (!rawTime) return null;
+
+  const time = String(rawTime).trim();
+  if (!time) return null;
+
+  const hhmmMatch = time.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([aApP][mM])?$/);
+  if (hhmmMatch) {
+    let hours = Number(hhmmMatch[1]);
+    const minutes = Number(hhmmMatch[2]);
+    const meridiem = hhmmMatch[3]?.toLowerCase();
+
+    if (meridiem) {
+      if (meridiem === 'pm' && hours < 12) hours += 12;
+      if (meridiem === 'am' && hours === 12) hours = 0;
+    }
+
+    if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+  }
+
+  const parsed = new Date(time);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleTimeString('en-AU', {
+      timeZone: 'UTC',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+
+  return time;
 };
 
 const fixtureSort = (a: Fixture, b: Fixture) => {
@@ -114,14 +157,6 @@ export default function FixturesScreen() {
   const normalizedRole = (user?.role || '').toString().trim().toUpperCase();
   const isAdmin = normalizedRole === 'ADMIN';
 
-  useEffect(() => {
-    console.log('[Fixtures] Auth user debug:', user);
-    console.log('[Fixtures] Admin visibility debug:', {
-      rawRole: user?.role,
-      normalizedRole,
-      isAdmin,
-    });
-  }, [user, normalizedRole, isAdmin]);
 
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [loading, setLoading] = useState(true);
@@ -401,49 +436,43 @@ export default function FixturesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.debugPanel}>
-        <Text style={styles.debugPanelTitle}>DEBUG MODE: TEST - ADMIN BUTTONS (VISIBLE FOR ALL USERS)</Text>
-        <Text style={styles.debugPanelText}>User: {user?.email || 'unknown'}</Text>
-        <Text style={styles.debugPanelText}>Role: {user?.role || 'unknown'}</Text>
-        <Text style={styles.debugPanelText}>IsAdmin: {String(isAdmin)}</Text>
-      </View>
+      {isAdmin ? (
+        <View style={styles.topActionsWrap}>
+          <View style={styles.topActionsRow}>
+            <TouchableOpacity
+              style={[styles.topActionButton, styles.addFixtureButton]}
+              onPress={openAddFixtureModal}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Add Fixture"
+            >
+              <Ionicons name="add" size={16} color="#fff" style={styles.buttonIcon} />
+              <Text style={styles.topActionButtonText}>Add Fixture</Text>
+            </TouchableOpacity>
 
-      <View style={styles.topActionsWrap}>
-        <Text style={styles.topActionsLabel}>TEST - ADMIN BUTTONS</Text>
-        <View style={styles.topActionsRow}>
-          <TouchableOpacity
-            style={[styles.topActionButton, styles.addFixtureButton]}
-            onPress={openAddFixtureModal}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Add fixture"
-          >
-            <Ionicons name="add-circle-outline" size={24} color="#fff" style={styles.buttonIcon} />
-            <Text style={styles.topActionButtonText}>TEST - + ADD FIXTURE</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.topActionButton, styles.uploadButton]}
-            onPress={handleUploadFixtures}
-            activeOpacity={0.85}
-            disabled={uploadingFile}
-            accessibilityRole="button"
-            accessibilityLabel="Upload fixtures file"
-          >
-            {uploadingFile ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Ionicons name="cloud-upload-outline" size={24} color="#fff" style={styles.buttonIcon} />
-                <Text style={styles.topActionButtonText}>TEST - UPLOAD FIXTURES</Text>
-              </>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.topActionButton, styles.uploadButton]}
+              onPress={handleUploadFixtures}
+              activeOpacity={0.85}
+              disabled={uploadingFile}
+              accessibilityRole="button"
+              accessibilityLabel="Upload Excel"
+            >
+              {uploadingFile ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={16} color="#fff" style={styles.buttonIcon} />
+                  <Text style={styles.topActionButtonText}>Upload Excel</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.filtersWrap}>
-        <Text style={styles.heading}>🔴🔴🔴 TEST FIXTURES 🔴🔴🔴</Text>
+        <Text style={styles.heading}>FIXTURES</Text>
         <Text style={styles.subheading}>WAFL Colts fixture list and match schedule</Text>
 
         <View style={styles.filterRow}>
@@ -582,7 +611,10 @@ export default function FixturesScreen() {
                   <View style={styles.metaRow}>
                     <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
                     <Text style={styles.metaText}>{formatDate(fixture?.date ?? '')}</Text>
-                    {fixture?.time ? <Text style={styles.metaText}>• {fixture.time}</Text> : null}
+                    {(() => {
+                      const displayTime = formatTime(fixture?.time);
+                      return displayTime ? <Text style={styles.metaText}>• {displayTime}</Text> : null;
+                    })()}
                   </View>
 
                   <View style={styles.metaRow}>
@@ -752,43 +784,10 @@ export default function FixturesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  debugPanel: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#2A0000',
-    borderWidth: 2,
-    borderColor: '#FF3B30',
-  },
-  debugPanelTitle: {
-    color: '#FFDADA',
-    fontSize: 13,
-    fontWeight: '900',
-    marginBottom: 6,
-  },
-  debugPanelText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
   topActionsWrap: {
     marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 10,
-    borderWidth: 2,
-    borderRadius: 12,
-    borderColor: '#FF0000',
-    backgroundColor: '#3A0000',
-  },
-  topActionsLabel: {
-    color: '#FF5A5A',
-    fontSize: 16,
-    fontWeight: '900',
-    marginBottom: 8,
-    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 4,
   },
   filtersWrap: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
   heading: { color: Colors.text, fontSize: 24, fontWeight: '800' },
@@ -813,31 +812,23 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 16, paddingBottom: 24 },
   topActionsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-    marginBottom: 4,
+    gap: 8,
   },
   topActionButton: {
     flex: 1,
-    minHeight: 74,
-    borderRadius: 14,
+    height: 40,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 5,
     paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   topActionButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 0.3,
+    fontSize: 14,
+    fontWeight: '700',
     textAlign: 'center',
   },
   roundSection: { marginBottom: 16 },
@@ -898,13 +889,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   uploadButton: {
-    backgroundColor: '#FF4D4D',
+    backgroundColor: Colors.accent,
   },
   addFixtureButton: {
-    backgroundColor: '#E00000',
+    backgroundColor: Colors.primary,
   },
   buttonIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
   modalOverlay: {
     flex: 1,
