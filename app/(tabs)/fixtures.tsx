@@ -2,19 +2,31 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  LayoutAnimation,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Calendar, DateData } from 'react-native-calendars';
 import Card from '../../src/components/Card';
 import EmptyState from '../../src/components/EmptyState';
-import { api } from '../../src/api/client';
 import { Colors } from '../../src/theme/colors';
 import { showAlert } from '../../src/utils/alert';
-import { Fixture, FixtureListResponse } from '../../src/types';
+import { Fixture } from '../../src/types';
+import { listFixtures, getFixtureDates } from '../../src/api/fixtures';
+
+// Enable LayoutAnimation on Android
+if (
+  Platform.OS === 'android' &&
+  UIManager?.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const STATUS_LABELS: Record<Fixture['status'], string> = {
   SCHEDULED: 'Scheduled',
@@ -31,8 +43,15 @@ const STATUS_COLORS: Record<Fixture['status'], string> = {
 };
 
 const COMPETITION_OPTIONS = ['All', 'WAFL Colts'] as const;
-
 type CompetitionFilter = (typeof COMPETITION_OPTIONS)[number];
+
+const todayString = () => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 const formatDate = (isoDate: string) => {
   const date = new Date(isoDate);
@@ -46,10 +65,10 @@ const formatDate = (isoDate: string) => {
 };
 
 const fixtureSort = (a: Fixture, b: Fixture) => {
-  const dateA = new Date(a.date).getTime();
-  const dateB = new Date(b.date).getTime();
+  const dateA = new Date(a?.date ?? '').getTime();
+  const dateB = new Date(b?.date ?? '').getTime();
   if (dateA !== dateB) return dateA - dateB;
-  return (a.time || '').localeCompare(b.time || '');
+  return (a?.time || '').localeCompare(b?.time || '');
 };
 
 export default function FixturesScreen() {
@@ -57,24 +76,62 @@ export default function FixturesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [competition, setCompetition] = useState<CompetitionFilter>('WAFL Colts');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
+  const [fixtureDates, setFixtureDates] = useState<string[]>([]);
+  const [datesLoading, setDatesLoading] = useState(false);
 
+  const today = useMemo(() => todayString(), []);
+
+  // Fetch fixture dates for calendar dot markers
+  useEffect(() => {
+    let cancelled = false;
+    const loadDates = async () => {
+      setDatesLoading(true);
+      const comp = competition === 'All' ? undefined : competition;
+      const dates = await getFixtureDates(comp);
+      console.log('[Fixtures] Date markers response:', {
+        competition: comp,
+        datesCount: dates?.length ?? 0,
+      });
+      if (!cancelled) {
+        setFixtureDates(dates ?? []);
+        setDatesLoading(false);
+      }
+    };
+    loadDates();
+    return () => { cancelled = true; };
+  }, [competition]);
+
+  // Load fixtures
   const loadFixtures = useCallback(async () => {
     try {
-      const params = new URLSearchParams();
-      params.set('limit', '200');
-      if (competition !== 'All') params.set('competition', competition);
-      const query = params.toString();
-      const res = await api.get<FixtureListResponse>(`/api/fixtures${query ? `?${query}` : ''}`);
-      const sorted = [...(res.fixtures || [])].sort(fixtureSort);
+      const comp = competition === 'All' ? undefined : competition;
+      const params = {
+        competition: comp,
+        date: selectedDate ?? undefined,
+        limit: 200,
+      };
+      console.log('[Fixtures] Request params:', params);
+      const result = await listFixtures(params);
+      console.log('[Fixtures] API response:', {
+        total: result?.total,
+        count: result?.fixtures?.length ?? 0,
+        firstFixture: result?.fixtures?.[0],
+      });
+      const sorted = [...(result?.fixtures ?? [])].sort(fixtureSort);
       setFixtures(sorted);
-    } catch (e: any) {
-      showAlert('Error', e.message || 'Failed to load fixtures');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to load fixtures';
+      console.error('[Fixtures] Load failed:', e);
+      showAlert('Error', msg);
     } finally {
       setLoading(false);
     }
-  }, [competition]);
+  }, [competition, selectedDate]);
 
   useEffect(() => {
+    setLoading(true);
     loadFixtures();
   }, [loadFixtures]);
 
@@ -84,16 +141,76 @@ export default function FixturesScreen() {
     setRefreshing(false);
   };
 
+  // Build marked dates for calendar
+  const markedDates = useMemo(() => {
+    const marks: Record<string, {
+      marked?: boolean;
+      dotColor?: string;
+      selected?: boolean;
+      selectedColor?: string;
+      selectedTextColor?: string;
+    }> = {};
+
+    // Mark all dates that have fixtures
+    (fixtureDates ?? []).forEach((d) => {
+      marks[d] = {
+        marked: true,
+        dotColor: Colors.accent,
+      };
+    });
+
+    // Highlight selected date
+    if (selectedDate) {
+      marks[selectedDate] = {
+        ...(marks[selectedDate] ?? {}),
+        selected: true,
+        selectedColor: Colors.primary,
+        selectedTextColor: '#ffffff',
+      };
+    }
+
+    return marks;
+  }, [fixtureDates, selectedDate]);
+
+  const toggleCalendar = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCalendarExpanded((prev) => !prev);
+  };
+
+  const handleDayPress = (day: DateData) => {
+    const dateStr = day?.dateString;
+    if (!dateStr) return;
+    setSelectedDate(dateStr);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCalendarExpanded(false);
+  };
+
+  const clearDateFilter = () => {
+    setSelectedDate(null);
+    setCalendarExpanded(false);
+  };
+
   const groupedByRound = useMemo(() => {
     const grouped = new Map<string, Fixture[]>();
-    fixtures.forEach((fixture) => {
-      const key = fixture.round || 'Unassigned Round';
+    (fixtures ?? []).forEach((fixture) => {
+      const key = fixture?.round || 'Unassigned Round';
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(fixture);
     });
-
     return Array.from(grouped.entries()).map(([round, rows]) => ({ round, rows }));
   }, [fixtures]);
+
+  const fixtureCountText = selectedDate
+    ? `${fixtures?.length ?? 0} fixture${(fixtures?.length ?? 0) === 1 ? '' : 's'} on ${formatDate(selectedDate)}`
+    : `${fixtures?.length ?? 0} fixture${(fixtures?.length ?? 0) === 1 ? '' : 's'} found`;
+
+  const calendarToggleLabel = selectedDate
+    ? `Showing: ${formatDate(selectedDate)}`
+    : 'Select a date to filter';
+
+  const emptyMessage = selectedDate
+    ? `No fixtures on ${formatDate(selectedDate)}. Try a different date.`
+    : 'No fixtures found for this filter.';
 
   return (
     <View style={styles.container}>
@@ -108,61 +225,145 @@ export default function FixturesScreen() {
               <TouchableOpacity
                 key={option}
                 style={[styles.filterChip, active && styles.filterChipActive]}
-                onPress={() => setCompetition(option)}
+                onPress={() => {
+                  setCompetition(option);
+                  setSelectedDate(null);
+                }}
+                accessibilityLabel={`Filter by ${option}`}
               >
-                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{option}</Text>
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                  {option}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={styles.totalText}>{fixtures.length} fixture{fixtures.length === 1 ? '' : 's'} found</Text>
+        {/* Calendar Section */}
+        <View style={styles.calendarSection}>
+          <TouchableOpacity
+            style={styles.calendarToggle}
+            onPress={toggleCalendar}
+            accessibilityLabel="Toggle calendar date picker"
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name={calendarExpanded ? 'calendar' : 'calendar-outline'}
+              size={20}
+              color={Colors.accent}
+            />
+            <Text style={styles.calendarToggleText}>{calendarToggleLabel}</Text>
+            {datesLoading ? (
+              <ActivityIndicator size="small" color={Colors.accent} />
+            ) : (
+              <Ionicons
+                name={calendarExpanded ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={Colors.textMuted}
+              />
+            )}
+          </TouchableOpacity>
+
+          {calendarExpanded && (
+            <View style={styles.calendarWrapper}>
+              <Calendar
+                current={selectedDate || today}
+                onDayPress={handleDayPress}
+                markedDates={markedDates}
+                enableSwipeMonths
+                theme={{
+                  backgroundColor: Colors.elevated,
+                  calendarBackground: Colors.elevated,
+                  textSectionTitleColor: Colors.textSecondary,
+                  selectedDayBackgroundColor: Colors.primary,
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: Colors.accent,
+                  dayTextColor: Colors.text,
+                  textDisabledColor: Colors.textMuted,
+                  dotColor: Colors.accent,
+                  selectedDotColor: '#ffffff',
+                  arrowColor: Colors.accent,
+                  monthTextColor: Colors.text,
+                  textMonthFontWeight: 'bold',
+                  textDayFontSize: 14,
+                  textMonthFontSize: 16,
+                  textDayHeaderFontSize: 12,
+                }}
+              />
+            </View>
+          )}
+
+          {selectedDate ? (
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={clearDateFilter}
+              accessibilityLabel="Clear date filter"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle" size={16} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.clearButtonText}>Clear Date Filter</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <Text style={styles.totalText}>{fixtureCountText}</Text>
       </View>
 
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
-      ) : fixtures.length === 0 ? (
-        <EmptyState icon="calendar-outline" message="No fixtures found for this filter." />
+      ) : (fixtures?.length ?? 0) === 0 ? (
+        <EmptyState icon="calendar-outline" message={emptyMessage} />
       ) : (
         <FlatList
-          data={groupedByRound}
-          keyExtractor={(item) => item.round}
+          data={groupedByRound ?? []}
+          keyExtractor={(item) => item?.round ?? 'unknown'}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />
           }
           renderItem={({ item }) => (
             <View style={styles.roundSection}>
-              <Text style={styles.roundTitle}>{item.round}</Text>
-              {item.rows.map((fixture) => (
-                <Card key={fixture.id} style={styles.fixtureCard}>
+              <Text style={styles.roundTitle}>{item?.round ?? ''}</Text>
+              {(item?.rows ?? []).map((fixture) => (
+                <Card key={fixture?.id ?? Math.random().toString()} style={styles.fixtureCard}>
                   <View style={styles.rowTop}>
                     <Text style={styles.teamText}>
-                      {fixture.homeTeam} <Text style={styles.vs}>vs</Text> {fixture.awayTeam}
+                      {fixture?.homeTeam ?? 'TBC'} <Text style={styles.vs}>vs</Text> {fixture?.awayTeam ?? 'TBC'}
                     </Text>
-                    <View style={[styles.statusBadge, { backgroundColor: `${STATUS_COLORS[fixture.status]}33` }]}>
-                      <Text style={[styles.statusText, { color: STATUS_COLORS[fixture.status] }]}>
-                        {STATUS_LABELS[fixture.status]}
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: `${STATUS_COLORS[fixture?.status ?? 'SCHEDULED']}33` },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: STATUS_COLORS[fixture?.status ?? 'SCHEDULED'] },
+                        ]}
+                      >
+                        {STATUS_LABELS[fixture?.status ?? 'SCHEDULED']}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.metaRow}>
                     <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
-                    <Text style={styles.metaText}>{formatDate(fixture.date)}</Text>
-                    {fixture.time ? <Text style={styles.metaText}>• {fixture.time}</Text> : null}
+                    <Text style={styles.metaText}>{formatDate(fixture?.date ?? '')}</Text>
+                    {fixture?.time ? <Text style={styles.metaText}>• {fixture.time}</Text> : null}
                   </View>
 
                   <View style={styles.metaRow}>
                     <Ionicons name="location-outline" size={14} color={Colors.textMuted} />
-                    <Text style={styles.metaText}>{fixture.venue || 'Venue TBC'}</Text>
+                    <Text style={styles.metaText}>{fixture?.venue || 'Venue TBC'}</Text>
                   </View>
 
-                  {fixture.status === 'COMPLETED' && (fixture.homeScore || fixture.awayScore) ? (
+                  {fixture?.status === 'COMPLETED' && (fixture?.homeScore || fixture?.awayScore) ? (
                     <Text style={styles.scoreText}>
-                      Score: {fixture.homeTeam} {fixture.homeScore || '-'} - {fixture.awayTeam} {fixture.awayScore || '-'}
+                      Score: {fixture?.homeTeam ?? ''} {fixture?.homeScore || '-'} - {fixture?.awayTeam ?? ''}{' '}
+                      {fixture?.awayScore || '-'}
                     </Text>
                   ) : null}
                 </Card>
@@ -209,4 +410,50 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   metaText: { color: Colors.textSecondary, fontSize: 13 },
   scoreText: { color: Colors.text, marginTop: 10, fontSize: 13, fontWeight: '600' },
+  // Calendar styles
+  calendarSection: {
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  calendarToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: Colors.elevated,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  calendarToggleText: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  calendarWrapper: {
+    marginTop: 8,
+    borderRadius: 10,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.error,
+    borderRadius: 8,
+  },
+  clearButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
 });
