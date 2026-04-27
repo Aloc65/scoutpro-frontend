@@ -5,6 +5,24 @@ export interface FixtureDatesResponse {
   dates: string[];
 }
 
+export interface CreateFixturePayload {
+  competition: string;
+  round: string;
+  date: string; // YYYY-MM-DD
+  time?: string;
+  homeTeam: string;
+  awayTeam: string;
+  venue?: string;
+  status?: 'SCHEDULED' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED';
+}
+
+export interface FixtureUploadResponse {
+  success: boolean;
+  fixturesImported: number;
+  totalRows: number;
+  errors?: string[];
+}
+
 export async function listFixtures(params: {
   competition?: string;
   status?: string;
@@ -24,6 +42,14 @@ export async function listFixtures(params: {
   if (params?.offset) query.set('offset', params.offset.toString());
   const qs = query.toString();
   return api.get<FixtureListResponse>(`/api/fixtures${qs ? `?${qs}` : ''}`);
+}
+
+export async function createFixture(payload: CreateFixturePayload): Promise<Fixture> {
+  return api.post<Fixture>('/api/fixtures', payload);
+}
+
+export async function uploadFixturesExcel(file: any): Promise<FixtureUploadResponse> {
+  return api.upload<FixtureUploadResponse>('/api/fixtures/upload', file);
 }
 
 export async function getFixtureDates(competition?: string): Promise<string[]> {

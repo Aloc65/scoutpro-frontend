@@ -22,6 +22,18 @@ const AuthContext = createContext<AuthState>({
 
 export const useAuth = () => useContext(AuthContext);
 
+const normalizeUser = (incomingUser: User | null | undefined): User | null => {
+  if (!incomingUser) return null;
+
+  const normalizedRole = (incomingUser.role || '').toString().trim().toUpperCase();
+  const role = normalizedRole === 'ADMIN' ? 'ADMIN' : 'SCOUT';
+
+  return {
+    ...incomingUser,
+    role,
+  };
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = await getToken();
       if (!token) { setLoading(false); return; }
       const data = await api.get<{ user: User }>('/api/auth/me');
-      setUser(data.user);
+      const normalizedUser = normalizeUser(data.user);
+      console.log('[AuthContext] /api/auth/me user:', normalizedUser);
+      setUser(normalizedUser);
     } catch {
       await removeToken();
     } finally {
@@ -44,13 +58,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const data = await api.post<{ token: string; user: User }>('/api/auth/login', { email, password });
     await setToken(data.token);
-    setUser(data.user);
+    const normalizedUser = normalizeUser(data.user);
+    console.log('[AuthContext] /api/auth/login user:', normalizedUser);
+    setUser(normalizedUser);
   };
 
   const signup = async (name: string, email: string, password: string) => {
     const data = await api.post<{ token: string; user: User }>('/api/signup', { name, email, password });
     await setToken(data.token);
-    setUser(data.user);
+    const normalizedUser = normalizeUser(data.user);
+    console.log('[AuthContext] /api/signup user:', normalizedUser);
+    setUser(normalizedUser);
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
@@ -59,7 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       newPassword,
     });
     await setToken(data.token);
-    setUser(data.user);
+    const normalizedUser = normalizeUser(data.user);
+    console.log('[AuthContext] /api/auth/change-password user:', normalizedUser);
+    setUser(normalizedUser);
   };
 
   const logout = async () => {

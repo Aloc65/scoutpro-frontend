@@ -3,22 +3,29 @@ import {
   ActivityIndicator,
   FlatList,
   LayoutAnimation,
+  Modal,
   Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   UIManager,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar, DateData } from 'react-native-calendars';
+import * as DocumentPicker from 'expo-document-picker';
+import * as XLSX from 'xlsx';
 import Card from '../../src/components/Card';
+import DatePicker from '../../src/components/DatePicker';
 import EmptyState from '../../src/components/EmptyState';
 import { Colors } from '../../src/theme/colors';
 import { showAlert } from '../../src/utils/alert';
 import { Fixture } from '../../src/types';
-import { listFixtures, getFixtureDates } from '../../src/api/fixtures';
+import { useAuth } from '../../src/context/AuthContext';
+import { createFixture, listFixtures, getFixtureDates, uploadFixturesExcel } from '../../src/api/fixtures';
 
 // Enable LayoutAnimation on Android
 if (
@@ -44,6 +51,37 @@ const STATUS_COLORS: Record<Fixture['status'], string> = {
 
 const COMPETITION_OPTIONS = ['All', 'WAFL Colts'] as const;
 type CompetitionFilter = (typeof COMPETITION_OPTIONS)[number];
+
+type FixtureStatus = Fixture['status'];
+
+interface FixtureFormState {
+  competition: string;
+  round: string;
+  date: string;
+  time: string;
+  homeTeam: string;
+  awayTeam: string;
+  venue: string;
+  status: FixtureStatus;
+}
+
+const STATUS_OPTIONS: FixtureStatus[] = ['SCHEDULED', 'COMPLETED', 'POSTPONED', 'CANCELLED'];
+
+const EMPTY_FIXTURE_FORM: FixtureFormState = {
+  competition: 'WAFL Colts',
+  round: '',
+  date: '',
+  time: '',
+  homeTeam: '',
+  awayTeam: '',
+  venue: '',
+  status: 'SCHEDULED',
+};
+
+const EXCEL_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+];
 
 const todayString = () => {
   const d = new Date();
@@ -72,6 +110,19 @@ const fixtureSort = (a: Fixture, b: Fixture) => {
 };
 
 export default function FixturesScreen() {
+  const { user } = useAuth();
+  const normalizedRole = (user?.role || '').toString().trim().toUpperCase();
+  const isAdmin = normalizedRole === 'ADMIN';
+
+  useEffect(() => {
+    console.log('[Fixtures] Auth user debug:', user);
+    console.log('[Fixtures] Admin visibility debug:', {
+      rawRole: user?.role,
+      normalizedRole,
+      isAdmin,
+    });
+  }, [user, normalizedRole, isAdmin]);
+
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -81,7 +132,16 @@ export default function FixturesScreen() {
   const [fixtureDates, setFixtureDates] = useState<string[]>([]);
   const [datesLoading, setDatesLoading] = useState(false);
 
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [fixtureForm, setFixtureForm] = useState<FixtureFormState>(EMPTY_FIXTURE_FORM);
+  const [savingFixture, setSavingFixture] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
   const today = useMemo(() => todayString(), []);
+
+  const resetFixtureForm = () => {
+    setFixtureForm(EMPTY_FIXTURE_FORM);
+  };
 
   // Fetch fixture dates for calendar dot markers
   useEffect(() => {
@@ -139,6 +199,133 @@ export default function FixturesScreen() {
     setRefreshing(true);
     await loadFixtures();
     setRefreshing(false);
+  };
+
+  const refreshFixturesAndDates = async () => {
+    await loadFixtures();
+    const comp = competition === 'All' ? undefined : competition;
+    const dates = await getFixtureDates(comp);
+    setFixtureDates(dates ?? []);
+  };
+
+  const openAddFixtureModal = () => {
+    resetFixtureForm();
+    setAddModalVisible(true);
+  };
+
+  const closeAddFixtureModal = () => {
+    setAddModalVisible(false);
+    resetFixtureForm();
+  };
+
+  const validateFixtureForm = () => {
+    if (!fixtureForm.competition.trim()) return 'Competition is required.';
+    if (!fixtureForm.round.trim()) return 'Round is required.';
+    if (!fixtureForm.date.trim()) return 'Date is required.';
+    if (!fixtureForm.homeTeam.trim()) return 'Home team is required.';
+    if (!fixtureForm.awayTeam.trim()) return 'Away team is required.';
+    return null;
+  };
+
+  const handleCreateFixture = async () => {
+    const validationError = validateFixtureForm();
+    if (validationError) {
+      showAlert('Missing details', validationError);
+      return;
+    }
+
+    try {
+      setSavingFixture(true);
+      await createFixture({
+        competition: fixtureForm.competition.trim(),
+        round: fixtureForm.round.trim(),
+        date: fixtureForm.date,
+        time: fixtureForm.time.trim() || undefined,
+        homeTeam: fixtureForm.homeTeam.trim(),
+        awayTeam: fixtureForm.awayTeam.trim(),
+        venue: fixtureForm.venue.trim() || undefined,
+        status: fixtureForm.status,
+      });
+
+      closeAddFixtureModal();
+      await refreshFixturesAndDates();
+      showAlert('Success', 'Fixture added successfully.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to add fixture';
+      showAlert('Error', msg);
+    } finally {
+      setSavingFixture(false);
+    }
+  };
+
+  const handleUploadFixtures = async () => {
+    try {
+      setUploadingFile(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: EXCEL_MIME_TYPES,
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const selectedFile = result.assets?.[0];
+      if (!selectedFile?.uri) {
+        throw new Error('Unable to read selected file.');
+      }
+
+      const fileName = selectedFile.name || 'fixtures.xlsx';
+      if (!/\.xlsx?$/.test(fileName.toLowerCase())) {
+        throw new Error('Please choose a valid .xlsx or .xls file.');
+      }
+
+      // Parse workbook client-side for basic validation before upload
+      const fileResponse = await fetch(selectedFile.uri);
+      const arrayBuffer = await fileResponse.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames?.[0];
+      if (!firstSheetName) {
+        throw new Error('No worksheet found in the selected file.');
+      }
+      const firstSheet = workbook.Sheets[firstSheetName];
+      const parsedRows = XLSX.utils.sheet_to_json(firstSheet, { defval: null });
+      if (!parsedRows.length) {
+        throw new Error('The selected Excel file has no data rows.');
+      }
+
+      const mimeType = selectedFile.mimeType || EXCEL_MIME_TYPES[0];
+      let uploadFile: any;
+
+      if (Platform.OS === 'web' && typeof File !== 'undefined') {
+        const blob = new Blob([arrayBuffer], { type: mimeType });
+        uploadFile = new File([blob], fileName, { type: mimeType });
+      } else {
+        uploadFile = {
+          uri: selectedFile.uri,
+          name: fileName,
+          type: mimeType,
+        };
+      }
+
+      const uploadResult = await uploadFixturesExcel(uploadFile);
+      await refreshFixturesAndDates();
+
+      const warningText = uploadResult.errors?.length
+        ? `\n\nWarnings:\n${uploadResult.errors.slice(0, 5).join('\n')}`
+        : '';
+
+      showAlert(
+        'Upload complete',
+        `Imported ${uploadResult.fixturesImported} of ${uploadResult.totalRows} row(s).${warningText}`,
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Fixture upload failed';
+      showAlert('Upload failed', msg);
+    } finally {
+      setUploadingFile(false);
+    }
   };
 
   // Build marked dates for calendar
@@ -214,8 +401,49 @@ export default function FixturesScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.debugPanel}>
+        <Text style={styles.debugPanelTitle}>DEBUG MODE: TEST - ADMIN BUTTONS (VISIBLE FOR ALL USERS)</Text>
+        <Text style={styles.debugPanelText}>User: {user?.email || 'unknown'}</Text>
+        <Text style={styles.debugPanelText}>Role: {user?.role || 'unknown'}</Text>
+        <Text style={styles.debugPanelText}>IsAdmin: {String(isAdmin)}</Text>
+      </View>
+
+      <View style={styles.topActionsWrap}>
+        <Text style={styles.topActionsLabel}>TEST - ADMIN BUTTONS</Text>
+        <View style={styles.topActionsRow}>
+          <TouchableOpacity
+            style={[styles.topActionButton, styles.addFixtureButton]}
+            onPress={openAddFixtureModal}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Add fixture"
+          >
+            <Ionicons name="add-circle-outline" size={24} color="#fff" style={styles.buttonIcon} />
+            <Text style={styles.topActionButtonText}>TEST - + ADD FIXTURE</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.topActionButton, styles.uploadButton]}
+            onPress={handleUploadFixtures}
+            activeOpacity={0.85}
+            disabled={uploadingFile}
+            accessibilityRole="button"
+            accessibilityLabel="Upload fixtures file"
+          >
+            {uploadingFile ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="cloud-upload-outline" size={24} color="#fff" style={styles.buttonIcon} />
+                <Text style={styles.topActionButtonText}>TEST - UPLOAD FIXTURES</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={styles.filtersWrap}>
-        <Text style={styles.heading}>Fixtures</Text>
+        <Text style={styles.heading}>🔴🔴🔴 TEST FIXTURES 🔴🔴🔴</Text>
         <Text style={styles.subheading}>WAFL Colts fixture list and match schedule</Text>
 
         <View style={styles.filterRow}>
@@ -314,7 +542,9 @@ export default function FixturesScreen() {
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : (fixtures?.length ?? 0) === 0 ? (
-        <EmptyState icon="calendar-outline" message={emptyMessage} />
+        <View style={styles.centered}>
+          <EmptyState icon="calendar-outline" message={emptyMessage} />
+        </View>
       ) : (
         <FlatList
           data={groupedByRound ?? []}
@@ -372,13 +602,195 @@ export default function FixturesScreen() {
           )}
         />
       )}
+
+      <Modal
+        visible={addModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeAddFixtureModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Fixture</Text>
+              <TouchableOpacity onPress={closeAddFixtureModal}>
+                <Ionicons name="close" size={24} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Competition *</Text>
+                <TextInput
+                  value={fixtureForm.competition}
+                  onChangeText={(value) => setFixtureForm((prev) => ({ ...prev, competition: value }))}
+                  placeholder="WAFL Colts"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.formInput}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Round *</Text>
+                <TextInput
+                  value={fixtureForm.round}
+                  onChangeText={(value) => setFixtureForm((prev) => ({ ...prev, round: value }))}
+                  placeholder="Round 1"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.formInput}
+                />
+              </View>
+
+              <DatePicker
+                label="Date * (DD/MM/YYYY)"
+                value={fixtureForm.date}
+                onChange={(value) => setFixtureForm((prev) => ({ ...prev, date: value }))}
+              />
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Time</Text>
+                <TextInput
+                  value={fixtureForm.time}
+                  onChangeText={(value) => setFixtureForm((prev) => ({ ...prev, time: value }))}
+                  placeholder="14:30"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.formInput}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Home Team *</Text>
+                <TextInput
+                  value={fixtureForm.homeTeam}
+                  onChangeText={(value) => setFixtureForm((prev) => ({ ...prev, homeTeam: value }))}
+                  placeholder="Home team"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.formInput}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Away Team *</Text>
+                <TextInput
+                  value={fixtureForm.awayTeam}
+                  onChangeText={(value) => setFixtureForm((prev) => ({ ...prev, awayTeam: value }))}
+                  placeholder="Away team"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.formInput}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Venue</Text>
+                <TextInput
+                  value={fixtureForm.venue}
+                  onChangeText={(value) => setFixtureForm((prev) => ({ ...prev, venue: value }))}
+                  placeholder="Venue"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.formInput}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Status</Text>
+                <View style={styles.statusSelectorRow}>
+                  {STATUS_OPTIONS.map((statusOption) => {
+                    const active = fixtureForm.status === statusOption;
+                    return (
+                      <TouchableOpacity
+                        key={statusOption}
+                        onPress={() => setFixtureForm((prev) => ({ ...prev, status: statusOption }))}
+                        style={[
+                          styles.statusSelectorChip,
+                          active && {
+                            backgroundColor: `${STATUS_COLORS[statusOption]}22`,
+                            borderColor: STATUS_COLORS[statusOption],
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusSelectorText,
+                            active && { color: STATUS_COLORS[statusOption] },
+                          ]}
+                        >
+                          {STATUS_LABELS[statusOption]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={closeAddFixtureModal}
+                disabled={savingFixture}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitButton, savingFixture && styles.submitButtonDisabled]}
+                onPress={handleCreateFixture}
+                disabled={savingFixture}
+              >
+                {savingFixture ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Save Fixture</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  filtersWrap: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 },
+  debugPanel: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#2A0000',
+    borderWidth: 2,
+    borderColor: '#FF3B30',
+  },
+  debugPanelTitle: {
+    color: '#FFDADA',
+    fontSize: 13,
+    fontWeight: '900',
+    marginBottom: 6,
+  },
+  debugPanelText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  topActionsWrap: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 10,
+    borderWidth: 2,
+    borderRadius: 12,
+    borderColor: '#FF0000',
+    backgroundColor: '#3A0000',
+  },
+  topActionsLabel: {
+    color: '#FF5A5A',
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  filtersWrap: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
   heading: { color: Colors.text, fontSize: 24, fontWeight: '800' },
   subheading: { color: Colors.textSecondary, marginTop: 4, marginBottom: 10, fontSize: 13 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -399,6 +811,35 @@ const styles = StyleSheet.create({
   totalText: { color: Colors.textMuted, fontSize: 12, marginTop: 10 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  topActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  topActionButton: {
+    flex: 1,
+    minHeight: 74,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+    paddingHorizontal: 10,
+  },
+  topActionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+  },
   roundSection: { marginBottom: 16 },
   roundTitle: { color: Colors.accent, fontWeight: '800', fontSize: 14, marginBottom: 8, textTransform: 'uppercase' },
   fixtureCard: { marginBottom: 10 },
@@ -455,5 +896,122 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 14,
+  },
+  uploadButton: {
+    backgroundColor: '#FF4D4D',
+  },
+  addFixtureButton: {
+    backgroundColor: '#E00000',
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    maxHeight: '90%',
+    backgroundColor: Colors.card,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  modalBody: {
+    padding: 16,
+    paddingBottom: 12,
+  },
+  formGroup: {
+    marginBottom: 12,
+  },
+  formLabel: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  formInput: {
+    backgroundColor: Colors.elevated,
+    borderColor: Colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    color: Colors.text,
+    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  statusSelectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusSelectorChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  statusSelectorText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  cancelButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  submitButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
