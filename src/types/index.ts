@@ -81,6 +81,29 @@ export interface ReportListItem {
   createdAt: string;
 }
 
+export interface Fixture {
+  id: string;
+  competition: string;
+  round: string;
+  date: string;
+  time: string | null;
+  homeTeam: string;
+  awayTeam: string;
+  venue: string | null;
+  status: 'SCHEDULED' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED';
+  notes: string | null;
+  homeScore: string | null;
+  awayScore: string | null;
+  createdById: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FixtureListResponse {
+  fixtures: Fixture[];
+  total: number;
+}
+
 export interface GameStats {
   goals: number | null;
   behinds: number | null;
