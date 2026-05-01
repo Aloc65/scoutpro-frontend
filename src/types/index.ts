@@ -8,6 +8,13 @@ export const SIGNING_STATUS_LABELS: Record<SigningStatus, string> = {
   NOT_SIGNED: 'Not Signed',
 };
 
+export const REPORT_VIEWING_METHODS = ['LIVE', 'OFF_VISION'] as const;
+export type ReportViewingMethod = typeof REPORT_VIEWING_METHODS[number];
+export const REPORT_VIEWING_METHOD_LABELS: Record<ReportViewingMethod, string> = {
+  LIVE: 'Live',
+  OFF_VISION: 'Off Vision',
+};
+
 export const WATCH_LIST_SIGNED_STATUSES = ['Signed', 'Unsigned'] as const;
 export type SignedStatus = typeof WATCH_LIST_SIGNED_STATUSES[number];
 
@@ -78,6 +85,7 @@ export interface ReportListItem {
   scoutName: string;
   overallProjection: string | null;
   primaryPosition: string;
+  viewingMethod: ReportViewingMethod;
   createdAt: string;
 }
 
@@ -194,6 +202,7 @@ export interface FullReport {
   minutesPlayed: number | null;
   positionsPlayed: string[];
   primaryPosition: string;
+  viewingMethod: ReportViewingMethod;
   summary: string;
   strengths: string | null;
   weaknesses: string | null;

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api/client';
 import { Colors } from '../../src/theme/colors';
-import { ReportListItem } from '../../src/types';
+import { ReportListItem, ReportViewingMethod, REPORT_VIEWING_METHOD_LABELS } from '../../src/types';
 import Card from '../../src/components/Card';
 import ProjectionBadge from '../../src/components/ProjectionBadge';
 import EmptyState from '../../src/components/EmptyState';
@@ -24,6 +24,14 @@ export default function ReportsScreen() {
 
   useEffect(() => { load(); }, [load]);
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+
+  const getViewingBadgeColor = (method: ReportViewingMethod) => (
+    method === 'LIVE' ? Colors.green : Colors.primary
+  );
+
+  const getViewingBadgeIcon = (method: ReportViewingMethod) => (
+    method === 'LIVE' ? '🎥' : '📹'
+  );
 
   return (
     <View style={styles.container}>
@@ -51,6 +59,12 @@ export default function ReportsScreen() {
                 <Text style={styles.name}>{item.playerName}</Text>
                 <Text style={styles.meta}>vs {item.opponent} • {new Date(item.matchDate).toLocaleDateString()}</Text>
                 <Text style={styles.meta}>{item.scoutName} • {item.primaryPosition}</Text>
+                <View style={[styles.viewingBadge, { backgroundColor: `${getViewingBadgeColor(item.viewingMethod)}22`, borderColor: `${getViewingBadgeColor(item.viewingMethod)}66` }]}>
+                  <Text style={styles.viewingBadgeEmoji}>{getViewingBadgeIcon(item.viewingMethod)}</Text>
+                  <Text style={[styles.viewingBadgeText, { color: getViewingBadgeColor(item.viewingMethod) }]}>
+                    {REPORT_VIEWING_METHOD_LABELS[item.viewingMethod]}
+                  </Text>
+                </View>
               </View>
               <ProjectionBadge value={item.overallProjection} />
             </View>
@@ -68,4 +82,22 @@ const styles = StyleSheet.create({
   reportCard: { marginBottom: 10 },
   name: { fontSize: 16, fontWeight: '700', color: Colors.text },
   meta: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  viewingBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewingBadgeEmoji: {
+    fontSize: 12,
+  },
+  viewingBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });

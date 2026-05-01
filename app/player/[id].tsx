@@ -80,6 +80,31 @@ function formatDateAU(iso: string): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+function calculateAgeFromDateOfBirth(dateOfBirth: string | null): number | null {
+  if (!dateOfBirth) return null;
+
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return null;
+
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+
+  return age;
+}
+
+function getViewingMethodMeta(viewingMethod?: string | null): { label: string; icon: string; color: string } {
+  if (viewingMethod === 'OFF_VISION') {
+    return { label: 'Off Vision', icon: '📹', color: Colors.primary };
+  }
+
+  return { label: 'Live', icon: '🎥', color: Colors.green };
+}
+
 /* ═══════════ General Notes Inline Editor ═══════════ */
 function GeneralNotesSection({ player, playerId, isAdmin, onUpdated }: {
   player: Player;
@@ -620,6 +645,8 @@ export default function PlayerDetailScreen() {
 
   if (!player) return null;
 
+  const dynamicAge = calculateAgeFromDateOfBirth(player.dateOfBirth);
+
   const championAverageColumns = championColumns.filter((column) => (
     championSeasonAverages.length > 0
       ? Object.prototype.hasOwnProperty.call(championSeasonAverages[0].averages, column.key)
@@ -725,13 +752,13 @@ export default function PlayerDetailScreen() {
                 </Text>
               </View>
             )}
-            {player.age != null && (
+            {dynamicAge != null && (
               <>
                 <View style={styles.dobDivider} />
                 <View style={styles.dobItem}>
                   <Ionicons name="person-outline" size={14} color={Colors.accent} />
                   <Text style={styles.dobLabel}>Age</Text>
-                  <Text style={styles.dobValue}>{player.age}yo</Text>
+                  <Text style={styles.dobValue}>{dynamicAge}</Text>
                 </View>
               </>
             )}
@@ -904,24 +931,32 @@ export default function PlayerDetailScreen() {
 
         <Text style={styles.sectionTitle}>Reports ({reports.length})</Text>
         {reports.length === 0 && <EmptyState icon="document-text-outline" message="No reports yet" />}
-        {reports.map((r: any) => (
-          <Card key={r.id} onPress={() => router.push(`/report/${r.id}/edit`)} style={{ marginBottom: 10 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.meta}>vs {r.opponent} • {new Date(r.matchDate).toLocaleDateString()}</Text>
-                <Text style={styles.meta}>{r.scoutName} • {r.primaryPosition}</Text>
+        {reports.map((r: any) => {
+          const viewingMethodMeta = getViewingMethodMeta(r.viewingMethod);
+
+          return (
+            <Card key={r.id} onPress={() => router.push(`/report/${r.id}/edit`)} style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.meta}>vs {r.opponent} • {new Date(r.matchDate).toLocaleDateString()}</Text>
+                  <Text style={styles.meta}>{r.scoutName} • {r.primaryPosition}</Text>
+                  <View style={[styles.viewingBadge, { backgroundColor: `${viewingMethodMeta.color}22`, borderColor: `${viewingMethodMeta.color}66` }]}>
+                    <Text style={styles.viewingBadgeEmoji}>{viewingMethodMeta.icon}</Text>
+                    <Text style={[styles.viewingBadgeText, { color: viewingMethodMeta.color }]}>{viewingMethodMeta.label}</Text>
+                  </View>
+                </View>
+                <ProjectionBadge value={r.overallProjection} />
               </View>
-              <ProjectionBadge value={r.overallProjection} />
-            </View>
-            {GAME_STAT_KEYS.some(([key]) => (r as any)[key] != null) && (
-              <View style={styles.reportStatsRow}>
-                {GAME_STAT_KEYS.filter(([key]) => (r as any)[key] != null).map(([key, label]) => (
-                  <Text key={key} style={styles.reportStatChip}>{label}: {(r as any)[key]}</Text>
-                ))}
-              </View>
-            )}
-          </Card>
-        ))}
+              {GAME_STAT_KEYS.some(([key]) => (r as any)[key] != null) && (
+                <View style={styles.reportStatsRow}>
+                  {GAME_STAT_KEYS.filter(([key]) => (r as any)[key] != null).map(([key, label]) => (
+                    <Text key={key} style={styles.reportStatChip}>{label}: {(r as any)[key]}</Text>
+                  ))}
+                </View>
+              )}
+            </Card>
+          );
+        })}
 
         {/* ═══════════ MEETINGS SECTION ═══════════ */}
         <View style={styles.meetingsSectionHeader}>
@@ -1240,6 +1275,24 @@ const styles = StyleSheet.create({
   statViewLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 4, fontWeight: '600' },
   reportStatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   reportStatChip: { fontSize: 11, color: Colors.accent, backgroundColor: Colors.elevated, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontWeight: '600', overflow: 'hidden' },
+  viewingBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewingBadgeEmoji: {
+    fontSize: 12,
+  },
+  viewingBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   championSeasonTableWrap: {
     gap: 12,
   },

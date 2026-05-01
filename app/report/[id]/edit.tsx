@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../../src/api/client';
 import { useAuth } from '../../../src/context/AuthContext';
 import { Colors, ratingColor } from '../../../src/theme/colors';
-import { FullReport, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, Player, SIGNING_STATUS_LABELS, SigningStatus } from '../../../src/types';
+import { FullReport, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, Player, SIGNING_STATUS_LABELS, SigningStatus, ReportViewingMethod, REPORT_VIEWING_METHODS, REPORT_VIEWING_METHOD_LABELS } from '../../../src/types';
 import Input from '../../../src/components/Input';
 import GradientButton from '../../../src/components/GradientButton';
 import Card from '../../../src/components/Card';
@@ -78,6 +78,7 @@ export default function EditReportScreen() {
   const [showOpponentDropdown, setShowOpponentDropdown] = useState(false);
   const [venue, setVenue] = useState('');
   const [competition, setCompetition] = useState('');
+  const [viewingMethod, setViewingMethod] = useState<ReportViewingMethod>('LIVE');
 
   const [positionsPlayed, setPositionsPlayed] = useState<string[]>([]);
   const [primaryPosition, setPrimaryPosition] = useState('');
@@ -182,6 +183,7 @@ export default function EditReportScreen() {
       setShowOpponentDropdown(false);
       setVenue(r.venue || '');
       setCompetition(r.competition || '');
+      setViewingMethod(r.viewingMethod || 'LIVE');
       setPositionsPlayed(r.positionsPlayed);
       setPrimaryPosition(r.primaryPosition);
       setSummary(r.summary);
@@ -226,7 +228,7 @@ export default function EditReportScreen() {
       await api.patch(`/api/reports/${id}`, {
         matchDate: new Date(matchDate).toISOString(),
         opponent, venue: venue || undefined, competition: competition || undefined,
-        positionsPlayed, primaryPosition, summary,
+        positionsPlayed, primaryPosition, viewingMethod, summary,
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
         developmentAreas: developmentAreas || undefined,
         overallProjection: overallProjection || undefined,
@@ -261,6 +263,12 @@ export default function EditReportScreen() {
             <Text style={styles.title}>{report.playerName}</Text>
             <Text style={styles.meta}>vs {report.opponent} • {isoToDDMMYYYY(report.matchDate)}</Text>
             <Text style={styles.meta}>Scout: {report.scoutName} • {report.primaryPosition}</Text>
+            <View style={[styles.viewingBadge, { backgroundColor: `${report.viewingMethod === 'LIVE' ? Colors.green : Colors.primary}22`, borderColor: `${report.viewingMethod === 'LIVE' ? Colors.green : Colors.primary}66` }] }>
+              <Text style={styles.viewingBadgeEmoji}>{report.viewingMethod === 'LIVE' ? '🎥' : '📹'}</Text>
+              <Text style={[styles.viewingBadgeText, { color: report.viewingMethod === 'LIVE' ? Colors.green : Colors.primary }]}>
+                {REPORT_VIEWING_METHOD_LABELS[report.viewingMethod]}
+              </Text>
+            </View>
             {report.venue && <Text style={styles.meta}>📍 {report.venue}</Text>}
             {report.result && <Text style={styles.meta}>Result: {report.result}</Text>}
             {report.minutesPlayed && <Text style={styles.meta}>Minutes: {report.minutesPlayed}</Text>}
@@ -384,6 +392,35 @@ export default function EditReportScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <View style={styles.deployMarkerBox}>
+              <Text style={styles.deployMarkerText}>🔴 NEW FEATURE: Select Viewing Method</Text>
+            </View>
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Report Type</Text>
+            <Text style={styles.helperText}>Choose how this report was completed: live at the ground or from video/replay.</Text>
+            <View style={styles.chipRow}>
+              {REPORT_VIEWING_METHODS.map((method) => {
+                const isSelected = viewingMethod === method;
+                const color = method === 'LIVE' ? Colors.green : Colors.primary;
+                const icon = method === 'LIVE' ? '🎥' : '📹';
+
+                return (
+                  <TouchableOpacity
+                    key={method}
+                    onPress={() => setViewingMethod(method)}
+                    style={[
+                      styles.viewingMethodChip,
+                      isSelected && { backgroundColor: `${color}22`, borderColor: color },
+                    ]}
+                  >
+                    <Text style={styles.viewingMethodChipIcon}>{icon}</Text>
+                    <Text style={[styles.viewingMethodChipText, isSelected && { color }]}>
+                      {REPORT_VIEWING_METHOD_LABELS[method]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </Card>
 
           <Text style={styles.section}>Positions</Text>
@@ -495,8 +532,45 @@ const styles = StyleSheet.create({
   body: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
   section: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 8 },
   fieldLabel: { color: Colors.textSecondary, fontSize: 13, marginBottom: 6 },
+  helperText: { color: Colors.textMuted, fontSize: 12, marginBottom: 8 },
+  deployMarkerBox: {
+    backgroundColor: '#3A0000',
+    borderColor: '#FF3B30',
+    borderWidth: 2,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  deployMarkerText: {
+    color: '#FF7B7B',
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border },
+  viewingMethodChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewingMethodChipIcon: {
+    fontSize: 12,
+  },
+  viewingMethodChipText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
   statsViewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -518,6 +592,24 @@ const styles = StyleSheet.create({
   deleteText: { color: '#fff', fontWeight: '700' },
   backToMainBtn: { alignItems: 'center', padding: 14, borderRadius: 12, marginTop: 12, backgroundColor: Colors.accent },
   backToMainText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  viewingBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewingBadgeEmoji: {
+    fontSize: 12,
+  },
+  viewingBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   signingBadgeSigned: {
     flexDirection: 'row',
     alignItems: 'center',

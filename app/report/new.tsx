@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingV
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors, ratingColor } from '../../src/theme/colors';
-import { Player, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS } from '../../src/types';
+import { Player, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, REPORT_VIEWING_METHODS, REPORT_VIEWING_METHOD_LABELS, ReportViewingMethod } from '../../src/types';
 import Input from '../../src/components/Input';
 import GradientButton from '../../src/components/GradientButton';
 import Card from '../../src/components/Card';
@@ -84,6 +84,7 @@ export default function NewReportScreen() {
   const [showOpponentDropdown, setShowOpponentDropdown] = useState(false);
   const [venue, setVenue] = useState('');
   const [competition, setCompetition] = useState('');
+  const [viewingMethod, setViewingMethod] = useState<ReportViewingMethod>('LIVE');
 
   const [positionsPlayed, setPositionsPlayed] = useState<string[]>([]);
   const [primaryPosition, setPrimaryPosition] = useState('');
@@ -193,7 +194,7 @@ export default function NewReportScreen() {
         playerId: selectedPlayerId,
         matchDate: new Date(matchDate).toISOString(),
         opponent, venue: venue || undefined, competition: competition || undefined,
-        positionsPlayed, primaryPosition, summary,
+        positionsPlayed, primaryPosition, viewingMethod, summary,
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
         developmentAreas: developmentAreas || undefined,
         overallProjection: overallProjection || undefined,
@@ -275,6 +276,35 @@ export default function NewReportScreen() {
                   <Text style={[styles.chipText, competition === c && { color: '#fff' }]}>{c}</Text>
                 </TouchableOpacity>
               ))}
+            </View>
+
+            <View style={styles.deployMarkerBox}>
+              <Text style={styles.deployMarkerText}>🔴 NEW FEATURE: Select Viewing Method</Text>
+            </View>
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Report Type</Text>
+            <Text style={styles.helperText}>Choose how this report was completed: live at the ground or from video/replay.</Text>
+            <View style={styles.chipRow}>
+              {REPORT_VIEWING_METHODS.map((method) => {
+                const isSelected = viewingMethod === method;
+                const color = method === 'LIVE' ? Colors.green : Colors.primary;
+                const icon = method === 'LIVE' ? '🎥' : '📹';
+
+                return (
+                  <TouchableOpacity
+                    key={method}
+                    onPress={() => setViewingMethod(method)}
+                    style={[
+                      styles.viewingMethodChip,
+                      isSelected && { backgroundColor: `${color}22`, borderColor: color },
+                    ]}
+                  >
+                    <Text style={styles.viewingMethodChipIcon}>{icon}</Text>
+                    <Text style={[styles.viewingMethodChipText, isSelected && { color }]}>
+                      {REPORT_VIEWING_METHOD_LABELS[method]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </Card>
 
@@ -391,8 +421,45 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   section: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 8 },
   fieldLabel: { color: Colors.textSecondary, fontSize: 13, marginBottom: 6 },
+  helperText: { color: Colors.textMuted, fontSize: 12, marginBottom: 8 },
+  deployMarkerBox: {
+    backgroundColor: '#3A0000',
+    borderColor: '#FF3B30',
+    borderWidth: 2,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  deployMarkerText: {
+    color: '#FF7B7B',
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border },
+  viewingMethodChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewingMethodChipIcon: {
+    fontSize: 12,
+  },
+  viewingMethodChipText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
