@@ -67,6 +67,8 @@ export default function LoginScreen() {
               Don't have an account? <Text style={{ color: Colors.accent }}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
+
+          <Text style={styles.copyrightText}>© 2026 FFS Scouting. All rights reserved.</Text>
         </View>
 
       </ScrollView>
@@ -148,6 +150,12 @@ const styles = StyleSheet.create({
   forgotLinkText: { color: Colors.accent, fontSize: 13, fontWeight: '500' },
   link: { marginTop: 10, alignItems: 'center' },
   linkText: { color: Colors.textSecondary, fontSize: 13 },
+  copyrightText: {
+    marginTop: 14,
+    color: Colors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+  },
   /* ---- Forgot Password Modal ---- */
   modalOverlay: {
     flex: 1,

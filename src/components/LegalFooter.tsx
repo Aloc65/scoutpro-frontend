@@ -6,7 +6,8 @@ export default function LegalFooter() {
   return (
     <View pointerEvents="none" style={styles.container}>
       <Text style={styles.text}>
-        © 2026 FFS Scouting. All rights reserved. ScoutPro® is proprietary software.
+        © 2026 FFS Scouting. All rights reserved.{"\n"}
+        ScoutPro® is proprietary software. Unauthorized use prohibited.
       </Text>
     </View>
   );

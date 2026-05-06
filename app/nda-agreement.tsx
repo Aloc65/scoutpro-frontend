@@ -3,48 +3,47 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingV
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
 import { Colors } from '../src/theme/colors';
-import { showConfirm } from '../src/utils/alert';
+
 
 const NDA_VERSION = '1.0';
 
-const NDA_TEXT = `FFS Scouting – ScoutPro Confidentiality & Non-Disclosure Agreement (NDA)
+const NDA_TEXT = `NON-DISCLOSURE AND CONFIDENTIALITY AGREEMENT
 Version ${NDA_VERSION}
 
-1. Proprietary Software Notice
-ScoutPro® and all associated software, interface designs, workflows, source code, reports, data structures, and documentation are proprietary to FFS Scouting and protected by copyright, trademark, and trade secret laws.
+By using ScoutPro, you agree to the following terms:
 
-2. Confidential Information
-By accessing ScoutPro®, you may view confidential information, including player reports, scouting notes, performance analysis, internal assessments, benchmarking data, strategic insights, and communication records. All such information is strictly confidential.
+1. PROPRIETARY SOFTWARE
+ScoutPro is proprietary software owned by FFS Scouting. All rights reserved.
 
-3. Trade Secret Protection
-FFS Scouting’s scouting methodology, evaluation framework, analytics models, benchmarking systems, and AI-assisted report processes are valuable trade secrets and must be protected from unauthorised disclosure or use.
+2. CONFIDENTIAL INFORMATION
+All player data, scouting reports, statistics, analysis, and information accessed through ScoutPro is strictly confidential and proprietary to FFS Scouting.
 
-4. Non-Disclosure Obligations
+3. NON-DISCLOSURE OBLIGATIONS
 You agree to:
-• keep all ScoutPro® information confidential;
-• use information solely for authorised FFS Scouting business purposes;
-• not disclose, forward, copy, publish, or discuss ScoutPro® content with any unauthorised person.
+- Keep all information strictly confidential
+- Not disclose any data to competitors or third parties
+- Not share analysis methods or trade secrets
+- Protect login credentials and access
 
-5. Restrictions on Use
-You must not, directly or indirectly:
-• copy, reproduce, scrape, export, or redistribute ScoutPro® content except as expressly authorised;
-• reverse engineer, decompile, disassemble, or attempt to derive software logic or source code;
-• use ScoutPro® outputs to support competitors, third-party products, or external organisations.
+4. TRADE SECRETS
+The analytical methods, AI algorithms, rating systems, and proprietary processes used in ScoutPro are trade secrets of FFS Scouting.
 
-6. Intellectual Property Ownership
-All rights, title, and interest in ScoutPro®, including all derivative outputs, remain exclusively owned by FFS Scouting. Access is a limited, revocable licence and does not transfer ownership rights.
+5. NO COPYING OR REVERSE ENGINEERING
+You may not copy, reproduce, reverse engineer, or create derivative works based on ScoutPro.
 
-7. Security and Account Responsibility
-You are responsible for maintaining the security of your account credentials and for activity under your account. Suspected unauthorised access must be reported immediately.
+6. INTELLECTUAL PROPERTY
+All content, software, data, and materials are owned by FFS Scouting. FFS® is a registered trademark.
 
-8. Breach and Remedies
-Any breach of this agreement may result in immediate suspension or termination of access, disciplinary action, and legal remedies available to FFS Scouting.
+7. TERMINATION
+This agreement remains in effect for the duration of your access to ScoutPro and continues after termination of access.
 
-9. Acknowledgment
-By selecting “I have read and agree to these terms” and pressing Accept, you acknowledge that you have read, understood, and agree to be legally bound by this NDA.`;
+8. CONSEQUENCES OF BREACH
+Breach of this agreement may result in immediate termination of access and legal action.
+
+By clicking "I Accept", you acknowledge that you have read, understood, and agree to be bound by these terms.`;
 
 export default function NdaAgreementScreen() {
-  const { acceptNda, logout } = useAuth();
+  const { acceptNda } = useAuth();
   const [checked, setChecked] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState('');
@@ -66,13 +65,6 @@ export default function NdaAgreementScreen() {
     }
   };
 
-  const handleDecline = () => {
-    showConfirm(
-      'Decline NDA',
-      'You must accept this NDA to access ScoutPro®. If you decline, you will be logged out.',
-      () => logout(),
-    );
-  };
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -81,8 +73,8 @@ export default function NdaAgreementScreen() {
           <View style={styles.iconWrap}>
             <Ionicons name="shield-checkmark" size={40} color={Colors.primary} />
           </View>
-          <Text style={styles.title}>NDA Agreement Required</Text>
-          <Text style={styles.subtitle}>You must accept this agreement before using ScoutPro®.</Text>
+          <Text style={styles.title}>FFS Scouting</Text>
+          <Text style={styles.subtitle}>ScoutPro® access requires NDA acceptance before continuing.</Text>
         </View>
 
         <View style={styles.card}>
@@ -103,21 +95,18 @@ export default function NdaAgreementScreen() {
               size={22}
               color={checked ? Colors.accent : Colors.textMuted}
             />
-            <Text style={styles.checkboxLabel}>I have read and agree to these terms</Text>
+            <Text style={styles.checkboxLabel}>I have read and agree to the Non-Disclosure and Confidentiality Agreement</Text>
           </TouchableOpacity>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
-              <Text style={styles.declineText}>Decline</Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.acceptBtn, (!checked || accepting) && styles.acceptBtnDisabled]}
               onPress={handleAccept}
               disabled={!checked || accepting}
             >
-              <Text style={styles.acceptText}>{accepting ? 'Accepting...' : 'Accept & Continue'}</Text>
+              <Text style={styles.acceptText}>{accepting ? 'Submitting...' : 'I Accept'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -163,8 +152,6 @@ const styles = StyleSheet.create({
   checkboxLabel: { flex: 1, color: Colors.text, fontSize: 14, lineHeight: 20, fontWeight: '600' },
   errorText: { marginTop: 10, color: Colors.error, fontSize: 13, fontWeight: '500' },
   actions: { marginTop: 14, flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
-  declineBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, backgroundColor: Colors.elevated },
-  declineText: { color: Colors.textSecondary, fontWeight: '600' },
   acceptBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, backgroundColor: Colors.primary },
   acceptBtnDisabled: { opacity: 0.5 },
   acceptText: { color: '#fff', fontWeight: '700' },

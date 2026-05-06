@@ -83,9 +83,9 @@ export default function UsersScreen() {
   const [resetError, setResetError] = useState('');
   const [resetting, setResetting] = useState(false);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (status: 'all' | 'accepted' | 'not_accepted' = ndaFilter) => {
     try {
-      const data = await api.get<{ users: UserItem[] }>('/api/users');
+      const data = await api.get<{ users: UserItem[] }>(`/api/users?ndaStatus=${status}`);
       setUsers(data.users);
     } catch (e: any) {
       setError(e.message || 'Failed to fetch users');
@@ -93,19 +93,11 @@ export default function UsersScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [ndaFilter]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => { fetchUsers(ndaFilter); }, [fetchUsers, ndaFilter]);
 
-  const filteredUsers = useMemo(() => {
-    if (ndaFilter === 'accepted') {
-      return users.filter((item) => !!item.acceptedNdaAt);
-    }
-    if (ndaFilter === 'not_accepted') {
-      return users.filter((item) => !item.acceptedNdaAt);
-    }
-    return users;
-  }, [users, ndaFilter]);
+  const filteredUsers = useMemo(() => users, [users]);
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
