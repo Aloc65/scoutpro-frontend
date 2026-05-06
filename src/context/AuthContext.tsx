@@ -9,6 +9,7 @@ interface AuthState {
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  acceptNda: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthState>({
   signup: async () => {},
   logout: async () => {},
   changePassword: async () => {},
+  acceptNda: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -82,13 +84,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(normalizedUser);
   };
 
+  const acceptNda = async () => {
+    const data = await api.post<{ success: boolean; user: User }>('/api/auth/accept-nda');
+    const normalizedUser = normalizeUser(data.user);
+    console.log('[AuthContext] /api/auth/accept-nda user:', normalizedUser);
+    setUser(normalizedUser);
+  };
+
   const logout = async () => {
     await removeToken();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, changePassword }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, changePassword, acceptNda }}>
       {children}
     </AuthContext.Provider>
   );

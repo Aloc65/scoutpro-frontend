@@ -16,13 +16,15 @@ interface UserItem {
   role: 'ADMIN' | 'SCOUT';
   createdAt: string;
   lastLoginAt: string | null;
+  acceptedNdaAt: string | null;
+  ndaVersion?: string | null;
 }
 
 /** Format lastLoginAt for display */
-function formatLastLogin(dateStr: string | null | undefined): string {
-  if (!dateStr) return 'Never';
+function formatDateTime(dateStr: string | null | undefined, fallback = 'Never'): string {
+  if (!dateStr) return fallback;
   const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return 'Never';
+  if (isNaN(date.getTime())) return fallback;
 
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -35,7 +37,6 @@ function formatLastLogin(dateStr: string | null | undefined): string {
   else if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
   else if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
 
-  // Older than 24 hours – show formatted date
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
@@ -44,6 +45,13 @@ function formatLastLogin(dateStr: string | null | undefined): string {
   const ampm = hours >= 12 ? 'PM' : 'AM';
   const h12 = hours % 12 || 12;
   return `${day}/${month}/${year} ${h12}:${mins} ${ampm}`;
+}
+
+function formatNdaStatus(item: UserItem): string {
+  if (!item.acceptedNdaAt) return 'No';
+  const acceptedAt = formatDateTime(item.acceptedNdaAt, 'Unknown date');
+  const version = item.ndaVersion || '1.0';
+  return `Yes (${acceptedAt}, v${version})`;
 }
 
 interface UserForm {
@@ -240,9 +248,20 @@ export default function UsersScreen() {
             <View style={styles.lastLoginContainer}>
               <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
               <Text style={[styles.lastLoginText, !item.lastLoginAt && styles.lastLoginNever]}>
-                {formatLastLogin(item.lastLoginAt)}
+                {formatDateTime(item.lastLoginAt)}
               </Text>
             </View>
+          </View>
+
+          <View style={styles.ndaContainer}>
+            <Ionicons
+              name={item.acceptedNdaAt ? 'shield-checkmark-outline' : 'shield-outline'}
+              size={12}
+              color={item.acceptedNdaAt ? Colors.green : Colors.amber}
+            />
+            <Text style={[styles.ndaText, !item.acceptedNdaAt && styles.ndaPendingText]}>
+              NDA Accepted: {formatNdaStatus(item)}
+            </Text>
           </View>
         </View>
       </View>
@@ -509,6 +528,21 @@ const styles = StyleSheet.create({
   },
   lastLoginNever: {
     fontStyle: 'italic', color: Colors.textMuted,
+  },
+  ndaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  ndaText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  ndaPendingText: {
+    color: Colors.amber,
+    fontWeight: '600',
   },
   userActions: { flexDirection: 'row', gap: 8 },
   actionBtn: {

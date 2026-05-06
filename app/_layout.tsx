@@ -18,11 +18,23 @@ function RootGuard() {
     if (!user && !inAuth) {
       // Not logged in, redirect to login
       router.replace('/auth/login');
-    } else if (user && user.mustChangePassword && !onChangePassword) {
-      // Logged in but must change password - redirect to change password screen
+      return;
+    }
+
+    if (!user) {
+      return;
+    }
+
+    const requiresPasswordChange = !!user.mustChangePassword;
+    const requiresNdaAcceptance = !user.acceptedNdaAt;
+
+    if ((requiresPasswordChange || requiresNdaAcceptance) && !onChangePassword) {
       router.replace('/auth/change-password');
-    } else if (user && !user.mustChangePassword && inAuth) {
-      // Logged in with no password change needed, but on auth screen - go to dashboard
+      return;
+    }
+
+    if (!requiresPasswordChange && !requiresNdaAcceptance && inAuth) {
+      // Logged in and fully onboarded, but on auth screen - go to dashboard
       router.replace('/(tabs)/dashboard');
     }
   }, [user, loading, segments]);

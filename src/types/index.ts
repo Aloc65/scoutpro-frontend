@@ -24,6 +24,8 @@ export interface User {
   name: string;
   role: 'ADMIN' | 'SCOUT';
   mustChangePassword?: boolean;
+  acceptedNdaAt?: string | null;
+  ndaVersion?: string;
 }
 
 export interface Player {
