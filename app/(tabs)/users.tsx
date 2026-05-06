@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Modal,
   TextInput, Alert, ActivityIndicator, RefreshControl, Platform, ScrollView,
@@ -74,6 +74,7 @@ export default function UsersScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [ndaFilter, setNdaFilter] = useState<'all' | 'accepted' | 'not_accepted'>('all');
 
   // Reset password modal state
   const [resetModalVisible, setResetModalVisible] = useState(false);
@@ -95,6 +96,16 @@ export default function UsersScreen() {
   }, []);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  const filteredUsers = useMemo(() => {
+    if (ndaFilter === 'accepted') {
+      return users.filter((item) => !!item.acceptedNdaAt);
+    }
+    if (ndaFilter === 'not_accepted') {
+      return users.filter((item) => !item.acceptedNdaAt);
+    }
+    return users;
+  }, [users, ndaFilter]);
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -298,10 +309,31 @@ export default function UsersScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.subtitle}>{users.length} user{users.length !== 1 ? 's' : ''} total</Text>
+      <Text style={styles.subtitle}>{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} shown ({users.length} total)</Text>
+
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[styles.filterChip, ndaFilter === 'all' && styles.filterChipActive]}
+          onPress={() => setNdaFilter('all')}
+        >
+          <Text style={[styles.filterChipText, ndaFilter === 'all' && styles.filterChipTextActive]}>All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterChip, ndaFilter === 'accepted' && styles.filterChipAcceptedActive]}
+          onPress={() => setNdaFilter('accepted')}
+        >
+          <Text style={[styles.filterChipText, ndaFilter === 'accepted' && styles.filterChipTextActive]}>NDA Accepted</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterChip, ndaFilter === 'not_accepted' && styles.filterChipNotAcceptedActive]}
+          onPress={() => setNdaFilter('not_accepted')}
+        >
+          <Text style={[styles.filterChipText, ndaFilter === 'not_accepted' && styles.filterChipTextActive]}>Not Accepted</Text>
+        </TouchableOpacity>
+      </View>
 
       <FlatList
-        data={users}
+        data={filteredUsers}
         keyExtractor={(item) => item.id}
         renderItem={renderUser}
         contentContainerStyle={styles.listContent}
@@ -489,6 +521,41 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '700', color: Colors.text },
   subtitle: { fontSize: 13, color: Colors.textSecondary, paddingHorizontal: 16, marginBottom: 8 },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.elevated,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  filterChipActive: {
+    backgroundColor: 'rgba(6, 182, 212, 0.2)',
+    borderColor: Colors.accent,
+  },
+  filterChipAcceptedActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: Colors.green,
+  },
+  filterChipNotAcceptedActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderColor: Colors.amber,
+  },
+  filterChipText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: Colors.text,
+  },
   addButton: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary,
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 4,

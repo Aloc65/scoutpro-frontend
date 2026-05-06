@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { Colors } from '../src/theme/colors';
+import LegalFooter from '../src/components/LegalFooter';
 
 function RootGuard() {
   const { user, loading } = useAuth();
@@ -12,11 +13,12 @@ function RootGuard() {
 
   useEffect(() => {
     if (loading) return;
+
     const inAuth = segments[0] === 'auth';
-    const onChangePassword = segments[0] === 'auth' && segments[1] === 'change-password';
+    const onChangePassword = inAuth && segments[1] === 'change-password';
+    const onNdaAgreement = segments[0] === 'nda-agreement';
 
     if (!user && !inAuth) {
-      // Not logged in, redirect to login
       router.replace('/auth/login');
       return;
     }
@@ -28,16 +30,20 @@ function RootGuard() {
     const requiresPasswordChange = !!user.mustChangePassword;
     const requiresNdaAcceptance = !user.acceptedNdaAt;
 
-    if ((requiresPasswordChange || requiresNdaAcceptance) && !onChangePassword) {
+    if (requiresPasswordChange && !onChangePassword) {
       router.replace('/auth/change-password');
       return;
     }
 
-    if (!requiresPasswordChange && !requiresNdaAcceptance && inAuth) {
-      // Logged in and fully onboarded, but on auth screen - go to dashboard
+    if (!requiresPasswordChange && requiresNdaAcceptance && !onNdaAgreement) {
+      router.replace('/nda-agreement');
+      return;
+    }
+
+    if (!requiresPasswordChange && !requiresNdaAcceptance && (inAuth || onNdaAgreement)) {
       router.replace('/(tabs)/dashboard');
     }
-  }, [user, loading, segments]);
+  }, [user, loading, segments, router]);
 
   if (loading) {
     return (
@@ -55,6 +61,7 @@ export default function RootLayout() {
     <AuthProvider>
       <StatusBar style="light" />
       <RootGuard />
+      <LegalFooter />
     </AuthProvider>
   );
 }

@@ -109,11 +109,6 @@ export default function TabLayout() {
         />
       </Tabs>
 
-      <View pointerEvents="none" style={styles.copyrightContainer}>
-        <Text style={styles.copyrightText}>
-          © 2026 FFS Scouting. All rights reserved. ScoutPro is proprietary software.
-        </Text>
-      </View>
     </View>
   );
 }
@@ -124,23 +119,4 @@ const styles = StyleSheet.create({
   role: { color: Colors.accent, fontSize: 12, fontWeight: '600', marginRight: 10, textTransform: 'uppercase' },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', padding: 6, gap: 4, borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.12)' },
   logoutText: { color: Colors.error || '#ef4444', fontSize: 12, fontWeight: '600' },
-  copyrightContainer: {
-    position: 'absolute',
-    bottom: 60,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  copyrightText: {
-    color: Colors.textMuted,
-    fontSize: 10,
-    textAlign: 'center',
-    lineHeight: 13,
-    backgroundColor: 'rgba(13, 13, 18, 0.75)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
 });

@@ -69,9 +69,6 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.loginCopyright}>
-          © 2026 FFS Scouting. All rights reserved. ScoutPro is proprietary software.
-        </Text>
       </ScrollView>
 
       {/* Forgot Password Modal */}
@@ -151,15 +148,6 @@ const styles = StyleSheet.create({
   forgotLinkText: { color: Colors.accent, fontSize: 13, fontWeight: '500' },
   link: { marginTop: 10, alignItems: 'center' },
   linkText: { color: Colors.textSecondary, fontSize: 13 },
-  loginCopyright: {
-    marginTop: 16,
-    color: Colors.textMuted,
-    fontSize: 11,
-    textAlign: 'center',
-    lineHeight: 16,
-    maxWidth: 520,
-    alignSelf: 'center',
-  },
   /* ---- Forgot Password Modal ---- */
   modalOverlay: {
     flex: 1,
