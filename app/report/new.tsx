@@ -404,7 +404,7 @@ export default function NewReportScreen() {
             </View>
           </Card>
 
-          <TouchableOpacity onPress={() => router.replace('/(tabs)/dashboard')} style={styles.backToMainBtn}>
+          <TouchableOpacity onPress={() => router.replace('/dashboard')} style={styles.backToMainBtn}>
             <Text style={styles.backToMainText}>← Back to Main Page</Text>
           </TouchableOpacity>
         </ScrollView>

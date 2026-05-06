@@ -1,10 +1,11 @@
-import { Tabs } from 'expo-router';
+import { Stack } from 'expo-router';
+import { Image, Text, TouchableOpacity, View, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
 import { useAuth } from '../../src/context/AuthContext';
-import { TouchableOpacity, Text, View, StyleSheet, Alert, Platform } from 'react-native';
+import NavigationMenu from '../../src/components/NavigationMenu';
 
-export default function TabLayout() {
+export default function AppLayout() {
   const { user, logout } = useAuth();
 
   const confirmLogout = () => {
@@ -14,109 +15,81 @@ export default function TabLayout() {
       }
       return;
     }
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: () => logout() },
-      ],
-    );
+
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: () => logout() },
+    ]);
   };
 
   return (
-    <View style={styles.container}>
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: Colors.accent,
-          tabBarInactiveTintColor: Colors.textMuted,
-          tabBarStyle: {
-            backgroundColor: Colors.card,
-            borderTopColor: Colors.border,
-            height: 60,
-            paddingBottom: 8,
-          },
-          headerStyle: { backgroundColor: Colors.card },
-          headerTintColor: Colors.text,
-          headerRight: () => (
-            <View style={styles.headerRight}>
-              <Text style={styles.role}>{user?.role}</Text>
-              <TouchableOpacity onPress={confirmLogout} style={styles.logoutBtn}>
-                <Ionicons name="log-out-outline" size={22} color={Colors.error || '#ef4444'} />
-                <Text style={styles.logoutText}>Logout</Text>
-              </TouchableOpacity>
-            </View>
-          ),
-        }}
-      >
-        <Tabs.Screen
-          name="dashboard"
-          options={{
-            title: 'Dashboard',
-            tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="players"
-          options={{
-            title: 'Players',
-            tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="watch-list"
-          options={{
-            title: 'Watch List',
-            tabBarIcon: ({ color, size }) => <Ionicons name="eye" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="fixtures"
-          options={{
-            title: 'Fixtures',
-            tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="reports"
-          options={{
-            title: 'Reports',
-            tabBarIcon: ({ color, size }) => <Ionicons name="document-text" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="export"
-          options={{
-            title: 'Export',
-            tabBarIcon: ({ color, size }) => <Ionicons name="download" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="data-import"
-          options={{
-            title: 'Data Import',
-            tabBarIcon: ({ color, size }) => <Ionicons name="cloud-upload" size={size} color={color} />,
-            href: user?.role === 'ADMIN' ? '/(tabs)/data-import' : null,
-          }}
-        />
-        <Tabs.Screen
-          name="users"
-          options={{
-            title: 'Users',
-            tabBarIcon: ({ color, size }) => <Ionicons name="person-add" size={size} color={color} />,
-            href: user?.role === 'ADMIN' ? '/(tabs)/users' : null,
-          }}
-        />
-      </Tabs>
-
-    </View>
+    <Stack
+      screenOptions={{
+        contentStyle: { backgroundColor: Colors.background },
+        headerStyle: { backgroundColor: Colors.card },
+        headerTintColor: Colors.text,
+        headerTitle: () => (
+          <View style={styles.headerBrand}>
+            <Image source={require('../../assets/ffs-scouting-logo.jpeg')} style={styles.logo} resizeMode="contain" />
+          </View>
+        ),
+        headerTitleAlign: 'left',
+        headerRight: () => (
+          <View style={styles.headerRight}>
+            <NavigationMenu isAdmin={user?.role === 'ADMIN'} />
+            <TouchableOpacity onPress={confirmLogout} style={styles.logoutBtn}>
+              <Ionicons name="log-out-outline" size={18} color={Colors.error} />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        ),
+      }}
+    >
+      <Stack.Screen name="dashboard" options={{ title: 'Dashboard' }} />
+      <Stack.Screen name="reports" options={{ title: 'Reports' }} />
+      <Stack.Screen name="players" options={{ title: 'Players' }} />
+      <Stack.Screen name="watch-list" options={{ title: 'Watch List' }} />
+      <Stack.Screen name="watch-lists" options={{ title: 'Watch Lists' }} />
+      <Stack.Screen name="fixtures" options={{ title: 'Fixtures' }} />
+      <Stack.Screen name="export" options={{ title: 'Export' }} />
+      <Stack.Screen name="data-import" options={{ title: 'Data Import' }} />
+      <Stack.Screen name="users" options={{ title: 'Users' }} />
+    </Stack>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', marginRight: 12 },
-  role: { color: Colors.accent, fontSize: 12, fontWeight: '600', marginRight: 10, textTransform: 'uppercase' },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', padding: 6, gap: 4, borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.12)' },
-  logoutText: { color: Colors.error || '#ef4444', fontSize: 12, fontWeight: '600' },
+  headerBrand: {
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    minWidth: 120,
+  },
+  logo: {
+    width: 106,
+    height: 34,
+    borderRadius: 4,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 10,
+    maxWidth: 380,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.35)',
+    backgroundColor: 'rgba(239,68,68,0.12)',
+  },
+  logoutText: {
+    color: Colors.error,
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });

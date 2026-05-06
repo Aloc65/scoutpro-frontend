@@ -1045,7 +1045,7 @@ export default function PlayerDetailScreen() {
         {/* Return to Main Menu */}
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.replace('/(tabs)/dashboard')}
+          onPress={() => router.replace('/dashboard')}
           activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={18} color="#fff" />

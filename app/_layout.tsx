@@ -41,7 +41,7 @@ function RootGuard() {
     }
 
     if (!requiresPasswordChange && !requiresNdaAcceptance && (inAuth || onNdaAgreement)) {
-      router.replace('/(tabs)/dashboard');
+      router.replace('/dashboard');
     }
   }, [user, loading, segments, router]);
 
