@@ -34,6 +34,7 @@ const PRIMARY_ITEMS: MenuItem[] = [
 ];
 
 const SECONDARY_ITEMS: MenuItem[] = [
+  { key: 'live-scouting', label: 'Live Scouting', icon: 'recording-outline', href: '/live-scouting/sessions' },
   { key: 'fixtures', label: 'Fixtures', icon: 'calendar-outline', href: '/fixtures' },
   { key: 'export', label: 'Export', icon: 'download-outline', href: '/export' },
   { key: 'data-import', label: 'Data Import', icon: 'cloud-upload-outline', href: '/data-import', adminOnly: true },
@@ -53,6 +54,10 @@ const getIsActive = (pathname: string, item: MenuItem): boolean => {
   }
 
   if (item.href === '/watch-lists' && pathname.startsWith('/watch-list')) {
+    return true;
+  }
+
+  if (item.href === '/live-scouting/sessions' && pathname.startsWith('/live-scouting')) {
     return true;
   }
 

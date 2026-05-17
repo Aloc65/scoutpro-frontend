@@ -254,3 +254,14 @@ export interface DashboardData {
   myReports: number;
   recentReports: ReportListItem[];
 }
+
+// ─── Live Scouting Types ─────────────────────────────────────────────
+
+export const SCOUTING_TRAITS = [
+  'Kick', 'HB', 'Marks', 'Clean GBG', 'Work Rate',
+  'Contest', 'Def', 'Speed', 'Composure',
+] as const;
+
+export type ScoutingTrait = typeof SCOUTING_TRAITS[number];
+
+export type LiveScoutingStatus = 'ACTIVE' | 'COMPLETED' | 'ABANDONED';
