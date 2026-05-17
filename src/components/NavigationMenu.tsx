@@ -27,6 +27,7 @@ type MenuItem = {
 
 const PRIMARY_ITEMS: MenuItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'home-outline', href: '/dashboard' },
+  { key: 'live-scouting', label: 'Live Scouting', icon: 'radio-outline', href: '/live-scouting/sessions' },
   { key: 'reports', label: 'Reports', icon: 'document-text-outline', href: '/reports' },
   { key: 'players', label: 'Players', icon: 'people-outline', href: '/players' },
   { key: 'watch-lists', label: 'Watch Lists', icon: 'eye-outline', href: '/watch-lists' },
@@ -34,7 +35,6 @@ const PRIMARY_ITEMS: MenuItem[] = [
 ];
 
 const SECONDARY_ITEMS: MenuItem[] = [
-  { key: 'live-scouting', label: 'Live Scouting', icon: 'recording-outline', href: '/live-scouting/sessions' },
   { key: 'fixtures', label: 'Fixtures', icon: 'calendar-outline', href: '/fixtures' },
   { key: 'export', label: 'Export', icon: 'download-outline', href: '/export' },
   { key: 'data-import', label: 'Data Import', icon: 'cloud-upload-outline', href: '/data-import', adminOnly: true },
