@@ -27,7 +27,7 @@ type MenuItem = {
 
 const PRIMARY_ITEMS: MenuItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'home-outline', href: '/dashboard' },
-  { key: 'live-scouting', label: 'Live Scouting', icon: 'recording-outline', href: '/live-scouting/sessions' },
+  { key: 'live-scouting', label: 'Live Scouting', icon: 'american-football-outline', href: '/live-scouting/sessions' },
   { key: 'reports', label: 'Reports', icon: 'document-text-outline', href: '/reports' },
   { key: 'players', label: 'Players', icon: 'people-outline', href: '/players' },
   { key: 'watch-lists', label: 'Watch Lists', icon: 'eye-outline', href: '/watch-lists' },
