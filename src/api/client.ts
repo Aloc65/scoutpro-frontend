@@ -14,8 +14,8 @@ const getBaseUrl = () => {
     if (host.includes('preview.abacusai.app')) {
       return 'https://aa50c4e62.na105.preview.abacusai.app';
     }
-    // Local development
-    return 'http://localhost:3000';
+    // Local development or any other web host — always use Railway backend
+    return RAILWAY_BACKEND_URL;
   }
   // Native / fallback
   return RAILWAY_BACKEND_URL;

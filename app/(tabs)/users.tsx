@@ -18,6 +18,8 @@ interface UserItem {
   lastLoginAt: string | null;
   acceptedNdaAt: string | null;
   ndaVersion?: string | null;
+  isActive?: boolean;
+  deactivatedAt?: string | null;
 }
 
 /** Format lastLoginAt for display */
@@ -176,6 +178,35 @@ export default function UsersScreen() {
     );
   };
 
+  // ---- Deactivate / Reactivate handlers ----
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const handleToggleActive = (u: UserItem) => {
+    if (u.id === user?.id) {
+      showAlert('Error', 'You cannot deactivate your own account');
+      return;
+    }
+    const isCurrentlyActive = u.isActive !== false;
+    const action = isCurrentlyActive ? 'Deactivate' : 'Reactivate';
+    const msg = isCurrentlyActive
+      ? `Deactivate "${u.name}"? They will be immediately logged out and unable to access ScoutPro until reactivated.`
+      : `Reactivate "${u.name}"? They will be able to log in and use ScoutPro again.`;
+
+    showConfirm(`${action} User`, msg, async () => {
+      setTogglingId(u.id);
+      try {
+        const endpoint = isCurrentlyActive ? 'deactivate' : 'reactivate';
+        await api.post(`/api/users/${u.id}/${endpoint}`);
+        showSuccess(`"${u.name}" has been ${isCurrentlyActive ? 'deactivated' : 'reactivated'}`);
+        fetchUsers();
+      } catch (e: any) {
+        showAlert('Error', e.message || `Failed to ${action.toLowerCase()} user`);
+      } finally {
+        setTogglingId(null);
+      }
+    });
+  };
+
   // ---- Reset Password handlers ----
   const openResetModal = (u: UserItem) => {
     setResetUser(u);
@@ -233,54 +264,86 @@ export default function UsersScreen() {
     );
   }
 
-  const renderUser = ({ item }: { item: UserItem }) => (
-    <View style={styles.userCard}>
-      <View style={styles.userInfo}>
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-        </View>
-        <View style={styles.userDetails}>
-          <Text style={styles.userName}>{item.name}</Text>
-          <Text style={styles.userEmail}>{item.email}</Text>
-          <View style={styles.roleBadgeRow}>
-            <View style={[styles.roleBadge, item.role === 'ADMIN' ? styles.roleBadgeAdmin : styles.roleBadgeScout]}>
-              <Text style={[styles.roleBadgeText, item.role === 'ADMIN' ? styles.roleBadgeTextAdmin : styles.roleBadgeTextScout]}>
-                {item.role}
-              </Text>
-            </View>
-            <View style={styles.lastLoginContainer}>
-              <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
-              <Text style={[styles.lastLoginText, !item.lastLoginAt && styles.lastLoginNever]}>
-                {formatDateTime(item.lastLoginAt)}
-              </Text>
-            </View>
-          </View>
+  const renderUser = ({ item }: { item: UserItem }) => {
+    const isCurrentlyActive = item.isActive !== false;
+    const isToggling = togglingId === item.id;
+    const isSelf = item.id === user?.id;
 
-          <View style={styles.ndaContainer}>
-            <Ionicons
-              name={item.acceptedNdaAt ? 'shield-checkmark-outline' : 'shield-outline'}
-              size={12}
-              color={item.acceptedNdaAt ? Colors.green : Colors.amber}
-            />
-            <Text style={[styles.ndaText, !item.acceptedNdaAt && styles.ndaPendingText]}>
-              NDA Accepted: {formatNdaStatus(item)}
-            </Text>
+    return (
+      <View style={[styles.userCard, !isCurrentlyActive && styles.userCardInactive]}>
+        <View style={styles.userInfo}>
+          <View style={[styles.avatarContainer, !isCurrentlyActive && styles.avatarInactive]}>
+            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={styles.userDetails}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.userName, !isCurrentlyActive && styles.userNameInactive]}>{item.name}</Text>
+              {!isCurrentlyActive && (
+                <View style={styles.inactiveBadge}>
+                  <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.userEmail}>{item.email}</Text>
+            <View style={styles.roleBadgeRow}>
+              <View style={[styles.roleBadge, item.role === 'ADMIN' ? styles.roleBadgeAdmin : styles.roleBadgeScout]}>
+                <Text style={[styles.roleBadgeText, item.role === 'ADMIN' ? styles.roleBadgeTextAdmin : styles.roleBadgeTextScout]}>
+                  {item.role}
+                </Text>
+              </View>
+              <View style={styles.lastLoginContainer}>
+                <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
+                <Text style={[styles.lastLoginText, !item.lastLoginAt && styles.lastLoginNever]}>
+                  {formatDateTime(item.lastLoginAt)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.ndaContainer}>
+              <Ionicons
+                name={item.acceptedNdaAt ? 'shield-checkmark-outline' : 'shield-outline'}
+                size={12}
+                color={item.acceptedNdaAt ? Colors.green : Colors.amber}
+              />
+              <Text style={[styles.ndaText, !item.acceptedNdaAt && styles.ndaPendingText]}>
+                NDA Accepted: {formatNdaStatus(item)}
+              </Text>
+            </View>
           </View>
         </View>
+        <View style={styles.userActions}>
+          {/* Deactivate / Reactivate toggle */}
+          {!isSelf && (
+            <TouchableOpacity
+              onPress={() => handleToggleActive(item)}
+              style={[styles.actionBtn, isCurrentlyActive ? styles.actionBtnDeactivate : styles.actionBtnReactivate]}
+              accessibilityLabel={isCurrentlyActive ? 'Deactivate user' : 'Reactivate user'}
+              disabled={isToggling}
+            >
+              {isToggling ? (
+                <ActivityIndicator size="small" color={isCurrentlyActive ? Colors.amber : Colors.green} />
+              ) : (
+                <Ionicons
+                  name={isCurrentlyActive ? 'pause-circle-outline' : 'play-circle-outline'}
+                  size={20}
+                  color={isCurrentlyActive ? Colors.amber : Colors.green}
+                />
+              )}
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => openResetModal(item)} style={styles.actionBtn} accessibilityLabel="Reset password">
+            <Ionicons name="key-outline" size={20} color={Colors.amber} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => openEditModal(item)} style={styles.actionBtn} accessibilityLabel="Edit user">
+            <Ionicons name="create-outline" size={20} color={Colors.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionBtn} accessibilityLabel="Delete user">
+            <Ionicons name="trash-outline" size={20} color={Colors.error} />
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.userActions}>
-        <TouchableOpacity onPress={() => openResetModal(item)} style={styles.actionBtn} accessibilityLabel="Reset password">
-          <Ionicons name="key-outline" size={20} color={Colors.amber} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => openEditModal(item)} style={styles.actionBtn} accessibilityLabel="Edit user">
-          <Ionicons name="create-outline" size={20} color={Colors.accent} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionBtn} accessibilityLabel="Delete user">
-          <Ionicons name="trash-outline" size={20} color={Colors.error} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -322,6 +385,14 @@ export default function UsersScreen() {
         >
           <Text style={[styles.filterChipText, ndaFilter === 'not_accepted' && styles.filterChipTextActive]}>Not Accepted</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Active status legend */}
+      <View style={styles.legendRow}>
+        <Ionicons name="information-circle-outline" size={14} color={Colors.textMuted} />
+        <Text style={styles.legendText}>
+          <Ionicons name="pause-circle-outline" size={12} color={Colors.amber} /> = Deactivate  ·  <Ionicons name="play-circle-outline" size={12} color={Colors.green} /> = Reactivate
+        </Text>
       </View>
 
       <FlatList
@@ -603,10 +674,49 @@ const styles = StyleSheet.create({
     color: Colors.amber,
     fontWeight: '600',
   },
+  userCardInactive: {
+    opacity: 0.7,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  avatarInactive: {
+    backgroundColor: Colors.textMuted,
+  },
+  userNameInactive: {
+    textDecorationLine: 'line-through',
+    color: Colors.textMuted,
+  },
+  inactiveBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  inactiveBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: Colors.error,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  legendText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
   userActions: { flexDirection: 'row', gap: 8 },
   actionBtn: {
     width: 36, height: 36, borderRadius: 8, backgroundColor: Colors.elevated,
     justifyContent: 'center', alignItems: 'center',
+  },
+  actionBtnDeactivate: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
+  actionBtnReactivate: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
   // Success / Error banners
   successBanner: {

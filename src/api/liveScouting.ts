@@ -174,4 +174,9 @@ export const liveScoutingApi = {
 
   applyProfileUpdate: (playerId: string, field: string, value: any) =>
     api.patch(`/api/live-scouting/players/${playerId}/apply-suggestion`, { field, value }),
+
+  // ─── Admin APIs ───────────────────────────────────────────────────
+
+  deleteSession: (id: string) =>
+    api.delete(`/api/live-scouting/sessions/${id}`),
 };

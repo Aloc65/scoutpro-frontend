@@ -7,17 +7,24 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
 import { liveScoutingApi, LiveScoutingSession } from '../../src/api/liveScouting';
+import { useAuth } from '../../src/context/AuthContext';
+import { showAlert, showConfirm } from '../../src/utils/alert';
 
 export default function SessionsListScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [sessions, setSessions] = useState<LiveScoutingSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -28,6 +35,26 @@ export default function SessionsListScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleDeleteSession = (session: LiveScoutingSession) => {
+    const playerCount = session.sessionPlayers?.length || 0;
+    const msg = playerCount > 0
+      ? `Delete "${session.gameTitle}" with ${playerCount} player${playerCount !== 1 ? 's' : ''} and all tracking data? This cannot be undone.`
+      : `Delete "${session.gameTitle}"? This session has no players or data.`;
+
+    showConfirm('Delete Session', msg, async () => {
+      setDeletingId(session.id);
+      try {
+        await liveScoutingApi.deleteSession(session.id);
+        setSessions((prev) => prev.filter((s) => s.id !== session.id));
+        showAlert('Deleted', `"${session.gameTitle}" has been deleted.`);
+      } catch (e: any) {
+        showAlert('Error', e.message || 'Failed to delete session');
+      } finally {
+        setDeletingId(null);
+      }
+    });
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -51,8 +78,9 @@ export default function SessionsListScreen() {
   const renderSession = ({ item }: { item: LiveScoutingSession }) => {
     const playerCount = item.sessionPlayers?.length || 0;
     const isActive = item.status === 'ACTIVE';
+    const isDeleting = deletingId === item.id;
     return (
-      <TouchableOpacity style={styles.sessionCard} onPress={() => openSession(item)}>
+      <TouchableOpacity style={styles.sessionCard} onPress={() => openSession(item)} disabled={isDeleting}>
         <View style={styles.sessionHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.sessionTitle}>{item.gameTitle}</Text>
@@ -60,11 +88,27 @@ export default function SessionsListScreen() {
               {[item.competition, item.venue].filter(Boolean).join(' · ')}
             </Text>
           </View>
-          <View style={[styles.statusBadge, isActive ? styles.statusActive : styles.statusCompleted]}>
-            <View style={[styles.statusDot, { backgroundColor: isActive ? Colors.accent : Colors.green }]} />
-            <Text style={[styles.statusText, { color: isActive ? Colors.accent : Colors.green }]}>
-              {item.status}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={[styles.statusBadge, isActive ? styles.statusActive : styles.statusCompleted]}>
+              <View style={[styles.statusDot, { backgroundColor: isActive ? Colors.accent : Colors.green }]} />
+              <Text style={[styles.statusText, { color: isActive ? Colors.accent : Colors.green }]}>
+                {item.status}
+              </Text>
+            </View>
+            {isAdmin && (
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => handleDeleteSession(item)}
+                disabled={isDeleting}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color={Colors.error} />
+                ) : (
+                  <Ionicons name="trash-outline" size={18} color={Colors.error} />
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         <View style={styles.sessionFooter}>
@@ -194,6 +238,15 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
   },
   resumeText: { color: Colors.accent, fontSize: 13, fontWeight: '600' },
+
+  deleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyTitle: { color: Colors.text, fontSize: 18, fontWeight: '700', marginTop: 16 },
