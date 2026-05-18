@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 const ADMIN_EMAIL = 'lockyer4@bigpond.net.au';
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, sessionExpired } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,6 +50,15 @@ export default function LoginScreen() {
         {/* Compact login card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Sign In</Text>
+
+          {sessionExpired ? (
+            <View style={styles.sessionExpiredBanner}>
+              <Ionicons name="time-outline" size={16} color={Colors.amber} />
+              <Text style={styles.sessionExpiredText}>
+                Your session has expired. Please log in again.
+              </Text>
+            </View>
+          ) : null}
 
           <Input label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
           <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry />
@@ -146,6 +155,19 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   error: { color: Colors.error, fontSize: 13, textAlign: 'center', marginBottom: 6 },
+  sessionExpiredBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(245,158,11,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.35)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  sessionExpiredText: { color: Colors.amber, fontSize: 12, fontWeight: '600', flex: 1 },
   forgotLink: { marginTop: 12, alignItems: 'center' },
   forgotLinkText: { color: Colors.accent, fontSize: 13, fontWeight: '500' },
   link: { marginTop: 10, alignItems: 'center' },

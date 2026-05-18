@@ -7,7 +7,7 @@ import { Colors } from '../src/theme/colors';
 import LegalFooter from '../src/components/LegalFooter';
 
 function RootGuard() {
-  const { user, loading } = useAuth();
+  const { user, loading, consumeIntendedRoute } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -41,9 +41,17 @@ function RootGuard() {
     }
 
     if (!requiresPasswordChange && !requiresNdaAcceptance && (inAuth || onNdaAgreement)) {
-      router.replace('/dashboard');
+      // If the user was redirected to login because their session
+      // expired mid-flow, return them to the route they were on.
+      consumeIntendedRoute().then((intended) => {
+        if (intended) {
+          router.replace(intended as any);
+        } else {
+          router.replace('/dashboard');
+        }
+      });
     }
-  }, [user, loading, segments, router]);
+  }, [user, loading, segments, router, consumeIntendedRoute]);
 
   if (loading) {
     return (

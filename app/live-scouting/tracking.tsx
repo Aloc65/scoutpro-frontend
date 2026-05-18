@@ -21,26 +21,48 @@ import {
   QuarterData,
   TRAITS,
 } from '../../src/api/liveScouting';
+import { isSessionExpiredError } from '../../src/api/client';
 
 const QUARTERS = [1, 2, 3, 4];
+
+type LoadErrorKind = 'session_expired' | 'generic' | null;
 
 export default function TrackingScreen() {
   const router = useRouter();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const [session, setSession] = useState<LiveScoutingSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<LoadErrorKind>(null);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string>('');
   const [activePlayerIdx, setActivePlayerIdx] = useState(0);
   const [activeQuarter, setActiveQuarter] = useState(1);
   const [updating, setUpdating] = useState<string | null>(null);
 
   const loadSession = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      setLoading(false);
+      setLoadError('generic');
+      setLoadErrorMessage('No session id provided.');
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    setLoadErrorMessage('');
     try {
       const s = await liveScoutingApi.getSession(sessionId);
       setSession(s);
     } catch (err: any) {
-      const msg = err?.message || 'Failed to load session';
-      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+      if (isSessionExpiredError(err)) {
+        // AuthContext will also clear state and redirect; we render an
+        // inline message in case the redirect hasn't happened yet so the
+        // screen never just sits blank.
+        setLoadError('session_expired');
+        setLoadErrorMessage('Your session has expired. Please log in again.');
+      } else {
+        const msg = err?.message || 'Failed to load session.';
+        setLoadError('generic');
+        setLoadErrorMessage(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -50,11 +72,70 @@ export default function TrackingScreen() {
     loadSession();
   }, [loadSession]);
 
-  if (loading || !session) {
+  // NOTE: All hooks must be called unconditionally — keep them above any
+  // early `return`. The original implementation called useWindowDimensions
+  // and a follow-up useEffect AFTER conditional returns, which is a
+  // rules-of-hooks violation. Moved up here.
+  const { width: screenWidth } = useWindowDimensions();
+  const isWide = screenWidth >= 768;
+  useEffect(() => {
+    if (isWide && session && session.sessionPlayers.length > 1) {
+      // On tablets/desktop, suggest grid view
+    }
+  }, [isWide, session]);
+
+  if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.accent} />
         <Text style={styles.loadingText}>Loading session...</Text>
+      </View>
+    );
+  }
+
+  if (loadError === 'session_expired') {
+    return (
+      <View style={styles.center}>
+        <View style={styles.errorCard}>
+          <View style={styles.errorIconWrap}>
+            <Ionicons name="time-outline" size={36} color={Colors.amber} />
+          </View>
+          <Text style={styles.errorTitle}>Session expired</Text>
+          <Text style={styles.errorMessage}>{loadErrorMessage}</Text>
+          <TouchableOpacity
+            style={styles.errorPrimaryBtn}
+            onPress={() => router.replace('/auth/login')}
+          >
+            <Ionicons name="log-in-outline" size={18} color="#fff" />
+            <Text style={styles.errorPrimaryBtnText}>Go to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (loadError === 'generic' || !session) {
+    return (
+      <View style={styles.center}>
+        <View style={styles.errorCard}>
+          <View style={[styles.errorIconWrap, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
+            <Ionicons name="alert-circle-outline" size={36} color={Colors.error} />
+          </View>
+          <Text style={styles.errorTitle}>Couldn't load session</Text>
+          <Text style={styles.errorMessage}>
+            {loadErrorMessage || 'Something went wrong while loading this scouting session.'}
+          </Text>
+          <View style={styles.errorBtnRow}>
+            <TouchableOpacity style={styles.errorSecondaryBtn} onPress={() => router.replace('/dashboard' as any)}>
+              <Ionicons name="home-outline" size={18} color={Colors.accent} />
+              <Text style={styles.errorSecondaryBtnText}>Dashboard</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.errorPrimaryBtn} onPress={loadSession}>
+              <Ionicons name="refresh" size={18} color="#fff" />
+              <Text style={styles.errorPrimaryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   }
@@ -100,7 +181,14 @@ export default function TrackingScreen() {
         return { ...prev, sessionPlayers: newPlayers };
       });
     } catch (err: any) {
-      console.error('Stat update failed:', err);
+      if (isSessionExpiredError(err)) {
+        // Surface the expired-session UI inline. The AuthContext handler
+        // is already redirecting to /auth/login.
+        setLoadError('session_expired');
+        setLoadErrorMessage('Your session has expired. Please log in again.');
+      } else {
+        console.error('Stat update failed:', err);
+      }
     } finally {
       setUpdating(null);
     }
@@ -126,16 +214,6 @@ export default function TrackingScreen() {
     if (!currentQD) return 0;
     return (currentQD as any)[field] || 0;
   };
-
-  const { width: screenWidth } = useWindowDimensions();
-  const isWide = screenWidth >= 768;
-
-  // Auto-redirect to grid view on wide screens
-  useEffect(() => {
-    if (isWide && session && session.sessionPlayers.length > 1) {
-      // On tablets/desktop, suggest grid view
-    }
-  }, [isWide, session]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -282,6 +360,72 @@ const styles = StyleSheet.create({
   content: { padding: 16, maxWidth: 600, alignSelf: 'center', width: '100%', paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
   loadingText: { color: Colors.textSecondary, marginTop: 12, fontSize: 14 },
+
+  /* ---- Error / session-expired card ---- */
+  errorCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 24,
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+  },
+  errorIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  errorTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  errorBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  errorPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  errorPrimaryBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  errorSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    backgroundColor: 'rgba(6,182,212,0.08)',
+  },
+  errorSecondaryBtnText: { color: Colors.accent, fontSize: 14, fontWeight: '700' },
+
 
   gameHeader: { alignItems: 'center', marginBottom: 12 },
   gameTitle: { color: Colors.text, fontSize: 18, fontWeight: '800' },
