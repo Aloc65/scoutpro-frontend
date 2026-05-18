@@ -68,12 +68,12 @@ export default function AddPlayersScreen() {
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await api.get<{ players: SearchPlayer[] }>(
+        const results = await api.get<{ items: SearchPlayer[]; total: number }>(
           `/api/players?search=${encodeURIComponent(search.trim())}&limit=10`,
         );
         // Filter out already added players
         const addedIds = new Set(sessionPlayers.map((sp) => sp.playerId));
-        setSearchResults((results.players || []).filter((p) => !addedIds.has(p.id)));
+        setSearchResults((results.items || []).filter((p) => !addedIds.has(p.id)));
       } catch {
         setSearchResults([]);
       } finally {
