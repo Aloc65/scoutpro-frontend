@@ -258,8 +258,8 @@ export interface DashboardData {
 // ─── Live Scouting Types ─────────────────────────────────────────────
 
 export const SCOUTING_TRAITS = [
-  'Kick', 'HB', 'Marks', 'Clean GBG', 'Work Rate',
-  'Contest', 'Def', 'Speed', 'Composure',
+  'Kicking', 'Marking', 'GBG', 'Handballing', 'Work Rate',
+  'Decision Making', 'Composure', 'Contest Work', 'Defensive Effort',
 ] as const;
 
 export type ScoutingTrait = typeof SCOUTING_TRAITS[number];

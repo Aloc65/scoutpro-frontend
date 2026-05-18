@@ -1,45 +1,55 @@
 import { api } from './client';
 
-// ─── Types ───────────────────────────────────────────────────────────
+// ─── Trait definitions ──────────────────────────────────────────────
 
 export const TRAITS = [
-  { key: 'kickCount', ratingKey: 'kickRating', label: 'Kick', icon: '🦶' },
-  { key: 'handballCount', ratingKey: 'handballRating', label: 'HB', icon: '🤾' },
-  { key: 'markCount', ratingKey: 'markRating', label: 'Marks', icon: '🙌' },
-  { key: 'cleanGbgCount', ratingKey: 'cleanGbgRating', label: 'Clean GBG', icon: '💪' },
-  { key: 'workRateCount', ratingKey: 'workRateRating', label: 'Work Rate', icon: '🏃' },
-  { key: 'contestCount', ratingKey: 'contestRating', label: 'Contest', icon: '⚔️' },
-  { key: 'defCount', ratingKey: 'defRating', label: 'Def', icon: '🛡️' },
-  { key: 'speedCount', ratingKey: 'speedRating', label: 'Speed', icon: '⚡' },
-  { key: 'composureCount', ratingKey: 'composureRating', label: 'Composure', icon: '🧠' },
+  { posKey: 'kickingPositive', negKey: 'kickingNegative', label: 'Kicking', icon: '🦶' },
+  { posKey: 'markingPositive', negKey: 'markingNegative', label: 'Marking', icon: '🙌' },
+  { posKey: 'gbgPositive', negKey: 'gbgNegative', label: 'GBG', icon: '💪' },
+  { posKey: 'handballingPositive', negKey: 'handballingNegative', label: 'Handballing', icon: '🤾' },
+  { posKey: 'workRatePositive', negKey: 'workRateNegative', label: 'Work Rate', icon: '🏃' },
+  { posKey: 'decisionMakingPositive', negKey: 'decisionMakingNegative', label: 'Decision Making', icon: '🧭' },
+  { posKey: 'composurePositive', negKey: 'composureNegative', label: 'Composure', icon: '🧠' },
+  { posKey: 'contestWorkPositive', negKey: 'contestWorkNegative', label: 'Contest Work', icon: '⚔️' },
+  { posKey: 'defensiveEffortPositive', negKey: 'defensiveEffortNegative', label: 'Defensive Effort', icon: '🛡️' },
 ] as const;
 
-export type TraitKey = typeof TRAITS[number]['key'];
-export type RatingKey = typeof TRAITS[number]['ratingKey'];
+export type TraitPosKey = typeof TRAITS[number]['posKey'];
+export type TraitNegKey = typeof TRAITS[number]['negKey'];
+
+/** Calculate trait rating: 1 + 4*(pos/(pos+neg)), rounded to 1dp. Returns null if no observations. */
+export function calcTraitRating(pos: number, neg: number): number | null {
+  const total = pos + neg;
+  if (total === 0) return null;
+  return Math.round((1 + 4 * (pos / total)) * 10) / 10;
+}
+
+// ─── Types ───────────────────────────────────────────────────────────
 
 export interface QuarterData {
   id: string;
   sessionPlayerId: string;
   quarter: number;
   goals: number;
-  kickCount: number;
-  handballCount: number;
-  markCount: number;
-  cleanGbgCount: number;
-  workRateCount: number;
-  contestCount: number;
-  defCount: number;
-  speedCount: number;
-  composureCount: number;
-  kickRating: number | null;
-  handballRating: number | null;
-  markRating: number | null;
-  cleanGbgRating: number | null;
-  workRateRating: number | null;
-  contestRating: number | null;
-  defRating: number | null;
-  speedRating: number | null;
-  composureRating: number | null;
+  behinds: number;
+  kickingPositive: number;
+  kickingNegative: number;
+  markingPositive: number;
+  markingNegative: number;
+  gbgPositive: number;
+  gbgNegative: number;
+  handballingPositive: number;
+  handballingNegative: number;
+  workRatePositive: number;
+  workRateNegative: number;
+  decisionMakingPositive: number;
+  decisionMakingNegative: number;
+  composurePositive: number;
+  composureNegative: number;
+  contestWorkPositive: number;
+  contestWorkNegative: number;
+  defensiveEffortPositive: number;
+  defensiveEffortNegative: number;
   notes: string | null;
   reviewCompleted: boolean;
 }
@@ -139,10 +149,10 @@ export const liveScoutingApi = {
       { field, delta },
     ),
 
-  saveReview: (sessionId: string, playerId: string, quarter: number, ratings: Record<string, number>) =>
+  saveReview: (sessionId: string, playerId: string, quarter: number, data: Record<string, any>) =>
     api.post<QuarterData>(
       `/api/live-scouting/sessions/${sessionId}/players/${playerId}/quarters/${quarter}/review`,
-      ratings,
+      data,
     ),
 
   saveNotes: (sessionId: string, playerId: string, quarter: number, notes: string) =>

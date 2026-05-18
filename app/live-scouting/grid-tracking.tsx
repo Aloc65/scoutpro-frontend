@@ -16,6 +16,7 @@ import {
   liveScoutingApi,
   LiveScoutingSession,
   TRAITS,
+  calcTraitRating,
 } from '../../src/api/liveScouting';
 
 const QUARTERS = [1, 2, 3, 4];
@@ -85,15 +86,10 @@ export default function GridTrackingScreen() {
     return (qd as any)[field] || 0;
   };
 
-  const getRating = (sp: any, ratingKey: string): number | null => {
-    const qd = sp.quarterData.find((q: any) => q.quarter === activeQuarter);
-    if (!qd) return null;
-    return (qd as any)[ratingKey] ?? null;
-  };
-
-  const allTraitRows = [
-    { key: 'goals', label: '⚽ Goals', ratingKey: null },
-    ...TRAITS.map((t) => ({ key: t.key, label: `${t.icon} ${t.label}`, ratingKey: t.ratingKey })),
+  // Build rows: scoring rows + trait rows (each trait = 1 row showing +/- for each player)
+  const scoringRows = [
+    { field: 'goals', label: '⚽ Goals' },
+    { field: 'behinds', label: '🥅 Behinds' },
   ];
 
   return (
@@ -159,21 +155,20 @@ export default function GridTrackingScreen() {
             ))}
           </View>
 
-          {/* Data rows */}
-          {allTraitRows.map((trait, idx) => (
-            <View key={trait.key} style={[styles.gridRow, idx % 2 === 0 ? styles.gridRowEven : null]}>
+          {/* Scoring rows (goals, behinds) — simple +/- counters */}
+          {scoringRows.map((row, idx) => (
+            <View key={row.field} style={[styles.gridRow, idx % 2 === 0 ? styles.gridRowEven : null]}>
               <View style={styles.gridLabelCell}>
-                <Text style={styles.gridTraitLabel}>{trait.label}</Text>
+                <Text style={styles.gridTraitLabel}>{row.label}</Text>
               </View>
               {players.map((sp) => {
-                const val = getVal(sp, trait.key);
-                const rating = trait.ratingKey ? getRating(sp, trait.ratingKey) : null;
+                const val = getVal(sp, row.field);
                 return (
                   <View key={sp.id} style={styles.gridDataCell}>
                     <View style={styles.gridCellRow}>
                       <TouchableOpacity
                         style={styles.gridMinus}
-                        onPress={() => handleStatUpdate(sp.playerId, trait.key, -1)}
+                        onPress={() => handleStatUpdate(sp.playerId, row.field, -1)}
                         disabled={!!updating}
                       >
                         <Text style={styles.gridMinusText}>−</Text>
@@ -181,17 +176,58 @@ export default function GridTrackingScreen() {
                       <Text style={styles.gridCellValue}>{val}</Text>
                       <TouchableOpacity
                         style={styles.gridPlus}
-                        onPress={() => handleStatUpdate(sp.playerId, trait.key, 1)}
+                        onPress={() => handleStatUpdate(sp.playerId, row.field, 1)}
                         disabled={!!updating}
                       >
                         <Text style={styles.gridPlusText}>+</Text>
                       </TouchableOpacity>
                     </View>
-                    {rating != null && (
-                      <Text style={[styles.gridRating, { color: rating >= 4 ? Colors.green : rating <= 2 ? Colors.error : Colors.amber }]}>
-                        ★{rating}
-                      </Text>
-                    )}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+
+          {/* Trait rows — show +pos / -neg with rating */}
+          {TRAITS.map((trait, idx) => (
+            <View key={trait.posKey} style={[styles.gridRow, (idx + scoringRows.length) % 2 === 0 ? styles.gridRowEven : null]}>
+              <View style={styles.gridLabelCell}>
+                <Text style={styles.gridTraitLabel}>{trait.icon} {trait.label}</Text>
+              </View>
+              {players.map((sp) => {
+                const pos = getVal(sp, trait.posKey);
+                const neg = getVal(sp, trait.negKey);
+                const rating = calcTraitRating(pos, neg);
+                return (
+                  <View key={sp.id} style={styles.gridDataCell}>
+                    <View style={styles.gridCellRow}>
+                      <TouchableOpacity
+                        style={styles.gridPlus}
+                        onPress={() => handleStatUpdate(sp.playerId, trait.posKey, 1)}
+                        disabled={!!updating}
+                      >
+                        <Text style={styles.gridPlusText}>+</Text>
+                      </TouchableOpacity>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={styles.gridTraitScore}>
+                          <Text style={{ color: '#10B981' }}>+{pos}</Text>
+                          <Text style={{ color: Colors.textMuted }}>/</Text>
+                          <Text style={{ color: '#EF4444' }}>-{neg}</Text>
+                        </Text>
+                        {rating != null && (
+                          <Text style={[styles.gridRating, { color: rating >= 4 ? Colors.green : rating <= 2 ? Colors.error : Colors.amber }]}>
+                            ★{rating.toFixed(1)}
+                          </Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.gridMinus}
+                        onPress={() => handleStatUpdate(sp.playerId, trait.negKey, 1)}
+                        disabled={!!updating}
+                      >
+                        <Text style={styles.gridMinusText}>−</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 );
               })}
@@ -246,7 +282,7 @@ export default function GridTrackingScreen() {
                     color={qd?.reviewCompleted ? Colors.green : Colors.amber}
                   />
                   <Text style={styles.gridReviewText}>
-                    {qd?.reviewCompleted ? 'Done' : 'Rate'}
+                    {qd?.reviewCompleted ? 'Done' : 'Review'}
                   </Text>
                 </TouchableOpacity>
               );
@@ -264,13 +300,8 @@ const styles = StyleSheet.create({
   loadingText: { color: Colors.textSecondary, marginTop: 12 },
 
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.card,
+    flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10,
+    borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.card,
   },
   backBtn: {
     width: 36, height: 36, borderRadius: 10,
@@ -286,9 +317,8 @@ const styles = StyleSheet.create({
   switchText: { color: Colors.accent, fontSize: 12, fontWeight: '700' },
 
   quarterRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    padding: 10, backgroundColor: Colors.card,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10,
+    backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   qTab: {
     paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8,
@@ -312,7 +342,7 @@ const styles = StyleSheet.create({
   gridRowEven: { backgroundColor: 'rgba(255,255,255,0.02)' },
 
   gridLabelCell: {
-    width: 120, paddingHorizontal: 10, paddingVertical: 10,
+    width: 130, paddingHorizontal: 10, paddingVertical: 10,
     justifyContent: 'center', borderRightWidth: 1, borderRightColor: Colors.border,
     backgroundColor: Colors.card,
   },
@@ -320,7 +350,7 @@ const styles = StyleSheet.create({
   gridTraitLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700' },
 
   gridHeaderCell: {
-    width: 140, paddingHorizontal: 8, paddingVertical: 10,
+    width: 150, paddingHorizontal: 8, paddingVertical: 10,
     alignItems: 'center', borderRightWidth: 1, borderRightColor: Colors.border,
     backgroundColor: Colors.elevated,
   },
@@ -330,7 +360,7 @@ const styles = StyleSheet.create({
   gridNewText: { color: '#fff', fontSize: 7, fontWeight: '800' },
 
   gridDataCell: {
-    width: 140, paddingVertical: 6, paddingHorizontal: 4,
+    width: 150, paddingVertical: 6, paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
     borderRightWidth: 1, borderRightColor: Colors.border,
   },
@@ -348,16 +378,17 @@ const styles = StyleSheet.create({
   },
   gridPlusText: { fontSize: 18, fontWeight: '700', color: Colors.green },
   gridCellValue: { fontSize: 18, fontWeight: '800', color: Colors.text, minWidth: 24, textAlign: 'center' },
+  gridTraitScore: { fontSize: 12, fontWeight: '700' },
   gridRating: { fontSize: 10, fontWeight: '700', marginTop: 2 },
 
   gridNotesCell: {
-    width: 140, paddingHorizontal: 8, paddingVertical: 10,
+    width: 150, paddingHorizontal: 8, paddingVertical: 10,
     justifyContent: 'center', borderRightWidth: 1, borderRightColor: Colors.border,
   },
   gridNotesText: { color: Colors.textMuted, fontSize: 11, fontStyle: 'italic' },
 
   gridReviewCell: {
-    width: 140, paddingVertical: 10,
+    width: 150, paddingVertical: 10,
     alignItems: 'center', justifyContent: 'center',
     borderRightWidth: 1, borderRightColor: Colors.border,
   },

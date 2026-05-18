@@ -5,10 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
-  Platform,
   ActivityIndicator,
-  Dimensions,
   useWindowDimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -17,8 +14,6 @@ import { Colors } from '../../src/theme/colors';
 import {
   liveScoutingApi,
   LiveScoutingSession,
-  SessionPlayerData,
-  QuarterData,
   TRAITS,
 } from '../../src/api/liveScouting';
 import { isSessionExpiredError } from '../../src/api/client';
@@ -53,9 +48,6 @@ export default function TrackingScreen() {
       setSession(s);
     } catch (err: any) {
       if (isSessionExpiredError(err)) {
-        // AuthContext will also clear state and redirect; we render an
-        // inline message in case the redirect hasn't happened yet so the
-        // screen never just sits blank.
         setLoadError('session_expired');
         setLoadErrorMessage('Your session has expired. Please log in again.');
       } else {
@@ -72,10 +64,7 @@ export default function TrackingScreen() {
     loadSession();
   }, [loadSession]);
 
-  // NOTE: All hooks must be called unconditionally — keep them above any
-  // early `return`. The original implementation called useWindowDimensions
-  // and a follow-up useEffect AFTER conditional returns, which is a
-  // rules-of-hooks violation. Moved up here.
+  // All hooks must be called unconditionally
   const { width: screenWidth } = useWindowDimensions();
   const isWide = screenWidth >= 768;
   useEffect(() => {
@@ -164,7 +153,6 @@ export default function TrackingScreen() {
         field,
         delta,
       );
-      // Update local state
       setSession((prev) => {
         if (!prev) return prev;
         const newPlayers = prev.sessionPlayers.map((sp) => {
@@ -172,7 +160,6 @@ export default function TrackingScreen() {
           const newQD = sp.quarterData.map((q) =>
             q.quarter === activeQuarter ? { ...q, ...updatedQD } : q,
           );
-          // If quarter didn't exist yet, add it
           if (!sp.quarterData.find((q) => q.quarter === activeQuarter)) {
             newQD.push(updatedQD);
           }
@@ -182,8 +169,6 @@ export default function TrackingScreen() {
       });
     } catch (err: any) {
       if (isSessionExpiredError(err)) {
-        // Surface the expired-session UI inline. The AuthContext handler
-        // is already redirecting to /auth/login.
         setLoadError('session_expired');
         setLoadErrorMessage('Your session has expired. Please log in again.');
       } else {
@@ -210,7 +195,7 @@ export default function TrackingScreen() {
     router.push(`/live-scouting/session-summary?sessionId=${sessionId}` as any);
   };
 
-  const getValue = (field: string): number => {
+  const getVal = (field: string): number => {
     if (!currentQD) return 0;
     return (currentQD as any)[field] || 0;
   };
@@ -224,7 +209,6 @@ export default function TrackingScreen() {
           {session.competition ? `${session.competition} · ` : ''}
           {session.venue || 'No venue'}
         </Text>
-        {/* Grid view switch for wider screens */}
         {players.length > 1 && (
           <TouchableOpacity
             style={styles.gridSwitchBtn}
@@ -270,7 +254,10 @@ export default function TrackingScreen() {
       <View style={styles.quarterRow}>
         {QUARTERS.map((q) => {
           const qd = currentPlayer.quarterData.find((qd) => qd.quarter === q);
-          const hasData = qd && (qd.goals > 0 || qd.kickCount > 0 || qd.handballCount > 0);
+          const hasData = qd && (
+            qd.goals > 0 || qd.behinds > 0 ||
+            TRAITS.some((t) => ((qd as any)[t.posKey] || 0) + ((qd as any)[t.negKey] || 0) > 0)
+          );
           return (
             <TouchableOpacity
               key={q}
@@ -284,55 +271,87 @@ export default function TrackingScreen() {
         })}
       </View>
 
-      {/* Goals counter */}
-      <View style={styles.goalsCard}>
-        <Text style={styles.goalsLabel}>⚽ Goals</Text>
-        <View style={styles.counterRow}>
-          <TouchableOpacity
-            style={styles.counterBtnMinus}
-            onPress={() => handleStatUpdate('goals', -1)}
-            disabled={!!updating}
-          >
-            <Text style={styles.counterBtnText}>−</Text>
-          </TouchableOpacity>
-          <Text style={styles.goalsValue}>{getValue('goals')}</Text>
-          <TouchableOpacity
-            style={styles.counterBtnPlus}
-            onPress={() => handleStatUpdate('goals', 1)}
-            disabled={!!updating}
-          >
-            <Text style={styles.counterBtnText}>+</Text>
-          </TouchableOpacity>
+      {/* Goals & Behinds row */}
+      <View style={styles.scoringRow}>
+        <View style={styles.scoringCard}>
+          <Text style={styles.scoringLabel}>⚽ Goals</Text>
+          <View style={styles.counterRow}>
+            <TouchableOpacity
+              style={styles.counterBtnMinus}
+              onPress={() => handleStatUpdate('goals', -1)}
+              disabled={!!updating}
+            >
+              <Text style={styles.counterBtnText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.scoringValue}>{getVal('goals')}</Text>
+            <TouchableOpacity
+              style={styles.counterBtnPlus}
+              onPress={() => handleStatUpdate('goals', 1)}
+              disabled={!!updating}
+            >
+              <Text style={styles.counterBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.scoringCard}>
+          <Text style={styles.scoringLabel}>🥅 Behinds</Text>
+          <View style={styles.counterRow}>
+            <TouchableOpacity
+              style={styles.counterBtnMinus}
+              onPress={() => handleStatUpdate('behinds', -1)}
+              disabled={!!updating}
+            >
+              <Text style={styles.counterBtnText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.scoringValue}>{getVal('behinds')}</Text>
+            <TouchableOpacity
+              style={styles.counterBtnPlus}
+              onPress={() => handleStatUpdate('behinds', 1)}
+              disabled={!!updating}
+            >
+              <Text style={styles.counterBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
-      {/* Traits grid */}
-      <View style={styles.traitsGrid}>
-        {TRAITS.map((trait) => (
-          <View key={trait.key} style={styles.traitCard}>
-            <Text style={styles.traitLabel}>
-              {trait.icon} {trait.label}
-            </Text>
-            <View style={styles.traitCounterRow}>
-              <TouchableOpacity
-                style={styles.traitBtnMinus}
-                onPress={() => handleStatUpdate(trait.key, -1)}
-                disabled={!!updating}
-              >
-                <Text style={styles.traitBtnText}>−</Text>
-              </TouchableOpacity>
-              <Text style={styles.traitValue}>{getValue(trait.key)}</Text>
+      {/* Trait observation section */}
+      <Text style={styles.sectionTitle}>Trait Observations</Text>
+      <Text style={styles.sectionHint}>Tap + for good observations, − for poor</Text>
+
+      {TRAITS.map((trait) => {
+        const pos = getVal(trait.posKey);
+        const neg = getVal(trait.negKey);
+        return (
+          <View key={trait.posKey} style={styles.traitRow}>
+            <View style={styles.traitLabelWrap}>
+              <Text style={styles.traitIcon}>{trait.icon}</Text>
+              <Text style={styles.traitLabel}>{trait.label}</Text>
+            </View>
+            <View style={styles.traitControls}>
               <TouchableOpacity
                 style={styles.traitBtnPlus}
-                onPress={() => handleStatUpdate(trait.key, 1)}
+                onPress={() => handleStatUpdate(trait.posKey, 1)}
                 disabled={!!updating}
               >
-                <Text style={styles.traitBtnText}>+</Text>
+                <Text style={styles.plusText}>+</Text>
+              </TouchableOpacity>
+              <View style={styles.traitScoreWrap}>
+                <Text style={styles.traitScorePos}>+{pos}</Text>
+                <Text style={styles.traitScoreSep}>/</Text>
+                <Text style={styles.traitScoreNeg}>-{neg}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.traitBtnMinus}
+                onPress={() => handleStatUpdate(trait.negKey, 1)}
+                disabled={!!updating}
+              >
+                <Text style={styles.minusText}>−</Text>
               </TouchableOpacity>
             </View>
           </View>
-        ))}
-      </View>
+        );
+      })}
 
       {/* Action buttons */}
       <View style={styles.actionRow}>
@@ -342,7 +361,7 @@ export default function TrackingScreen() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.reviewBtn} onPress={goToReview}>
           <Ionicons name="star-outline" size={18} color={Colors.amber} />
-          <Text style={styles.reviewBtnText}>End Quarter Review</Text>
+          <Text style={styles.reviewBtnText}>Quarter Review</Text>
         </TouchableOpacity>
       </View>
 
@@ -361,71 +380,29 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
   loadingText: { color: Colors.textSecondary, marginTop: 12, fontSize: 14 },
 
-  /* ---- Error / session-expired card ---- */
+  /* Error / session-expired card */
   errorCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 24,
-    width: '100%',
-    maxWidth: 380,
-    alignItems: 'center',
+    backgroundColor: Colors.card, borderRadius: 16, borderWidth: 1,
+    borderColor: Colors.border, padding: 24, width: '100%', maxWidth: 380, alignItems: 'center',
   },
   errorIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(245,158,11,0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: 'rgba(245,158,11,0.12)', justifyContent: 'center', alignItems: 'center', marginBottom: 14,
   },
-  errorTitle: {
-    color: Colors.text,
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  errorBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
-    width: '100%',
-    justifyContent: 'center',
-  },
+  errorTitle: { color: Colors.text, fontSize: 18, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
+  errorMessage: { color: Colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  errorBtnRow: { flexDirection: 'row', gap: 10, width: '100%', justifyContent: 'center' },
   errorPrimaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.primary, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10,
   },
   errorPrimaryBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   errorSecondaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    backgroundColor: 'rgba(6,182,212,0.08)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingHorizontal: 18, paddingVertical: 12, borderRadius: 10, borderWidth: 1,
+    borderColor: Colors.accent, backgroundColor: 'rgba(6,182,212,0.08)',
   },
   errorSecondaryBtnText: { color: Colors.accent, fontSize: 14, fontWeight: '700' },
-
 
   gameHeader: { alignItems: 'center', marginBottom: 12 },
   gameTitle: { color: Colors.text, fontSize: 18, fontWeight: '800' },
@@ -440,14 +417,8 @@ const styles = StyleSheet.create({
 
   playerTabs: { marginBottom: 12, maxHeight: 42 },
   playerTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.elevated,
-    marginRight: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: Colors.elevated, marginRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
   },
   playerTabActive: { backgroundColor: 'rgba(6,182,212,0.2)', borderWidth: 1, borderColor: Colors.accent },
   playerTabText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '700' },
@@ -461,140 +432,83 @@ const styles = StyleSheet.create({
 
   quarterRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 },
   quarterTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.elevated,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10,
+    backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border, alignItems: 'center',
   },
   quarterTabActive: { backgroundColor: 'rgba(79,70,229,0.2)', borderColor: Colors.primary },
   quarterTabText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '700' },
   quarterTabTextActive: { color: Colors.primary },
-  quarterDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.green,
-    marginTop: 4,
-  },
+  quarterDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, marginTop: 4 },
 
-  // Goals
-  goalsCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    marginBottom: 16,
+  // Scoring
+  scoringRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  scoringCard: {
+    flex: 1, backgroundColor: Colors.card, borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: Colors.border, alignItems: 'center',
   },
-  goalsLabel: { color: Colors.text, fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  scoringLabel: { color: Colors.text, fontSize: 15, fontWeight: '700', marginBottom: 8 },
+  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   counterBtnMinus: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: 'rgba(239,68,68,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 48, height: 48, borderRadius: 12,
+    backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
+    justifyContent: 'center', alignItems: 'center',
   },
   counterBtnPlus: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: 'rgba(16,185,129,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 48, height: 48, borderRadius: 12,
+    backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  counterBtnText: { fontSize: 28, fontWeight: '700', color: Colors.text },
-  goalsValue: { fontSize: 36, fontWeight: '800', color: Colors.text, minWidth: 50, textAlign: 'center' },
+  counterBtnText: { fontSize: 26, fontWeight: '700', color: Colors.text },
+  scoringValue: { fontSize: 30, fontWeight: '800', color: Colors.text, minWidth: 40, textAlign: 'center' },
 
-  // Traits
-  traitsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
+  // Section
+  sectionTitle: { color: Colors.text, fontSize: 16, fontWeight: '800', marginBottom: 4 },
+  sectionHint: { color: Colors.textMuted, fontSize: 12, marginBottom: 12 },
+
+  // Trait rows
+  traitRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: Colors.card, borderRadius: 12, padding: 12,
+    borderWidth: 1, borderColor: Colors.border, marginBottom: 8,
   },
-  traitCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    width: '48%' as any,
-    minWidth: 155,
-    flexGrow: 1,
-    alignItems: 'center',
-  },
-  traitLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 8 },
-  traitCounterRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  traitBtnMinus: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  traitLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  traitIcon: { fontSize: 18 },
+  traitLabel: { color: Colors.text, fontSize: 14, fontWeight: '700' },
+  traitControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   traitBtnPlus: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: 'rgba(16,185,129,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1.5, borderColor: 'rgba(16,185,129,0.4)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  traitBtnText: { fontSize: 22, fontWeight: '700', color: Colors.text },
-  traitValue: { fontSize: 22, fontWeight: '800', color: Colors.text, minWidth: 30, textAlign: 'center' },
+  traitBtnMinus: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1.5, borderColor: 'rgba(239,68,68,0.4)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  plusText: { fontSize: 24, fontWeight: '800', color: '#10B981' },
+  minusText: { fontSize: 24, fontWeight: '800', color: '#EF4444' },
+  traitScoreWrap: { flexDirection: 'row', alignItems: 'center', minWidth: 70, justifyContent: 'center' },
+  traitScorePos: { color: '#10B981', fontSize: 15, fontWeight: '800' },
+  traitScoreSep: { color: Colors.textMuted, fontSize: 13, marginHorizontal: 2 },
+  traitScoreNeg: { color: '#EF4444', fontSize: 15, fontWeight: '800' },
 
   // Actions
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 16 },
   notesBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.accent,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.accent,
     backgroundColor: 'rgba(6,182,212,0.08)',
   },
   notesBtnText: { color: Colors.accent, fontSize: 14, fontWeight: '700' },
   reviewBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.amber,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.amber,
     backgroundColor: 'rgba(245,158,11,0.08)',
   },
   reviewBtnText: { color: Colors.amber, fontSize: 14, fontWeight: '700' },
   completeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 40,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 12, marginBottom: 40,
   },
   completeBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

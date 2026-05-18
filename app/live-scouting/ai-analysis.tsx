@@ -188,12 +188,16 @@ export default function AiAnalysisScreen() {
                 <Text style={[styles.sectionTitle, { color: Colors.amber }]}>Suggested Ratings</Text>
               </View>
               <View style={styles.ratingsGrid}>
-                {TRAITS.map((t) => {
-                  const val = analysis.suggestedRatings[t.ratingKey];
+                {Object.entries(analysis.suggestedRatings).map(([key, val]) => {
                   if (val == null) return null;
+                  // Find matching trait label
+                  const trait = TRAITS.find(
+                    (t) => t.label.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, ''),
+                  );
+                  const label = trait ? `${trait.icon} ${trait.label}` : key;
                   return (
-                    <View key={t.ratingKey} style={styles.ratingItem}>
-                      <Text style={styles.ratingLabel}>{t.icon} {t.label}</Text>
+                    <View key={key} style={styles.ratingItem}>
+                      <Text style={styles.ratingLabel}>{label}</Text>
                       <Text style={[styles.ratingValue, { color: ratingColor(val) }]}>{val}</Text>
                     </View>
                   );

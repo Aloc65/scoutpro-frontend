@@ -13,7 +13,12 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
-import { liveScoutingApi, LiveScoutingSession, TRAITS } from '../../src/api/liveScouting';
+import {
+  liveScoutingApi,
+  LiveScoutingSession,
+  TRAITS,
+  calcTraitRating,
+} from '../../src/api/liveScouting';
 import { getToken } from '../../src/api/client';
 import SyncStatusBadge from '../../src/components/SyncStatusBadge';
 
@@ -81,8 +86,6 @@ export default function SessionSummaryScreen() {
     );
   }
 
-  const ratingColor = (v: number) => (v <= 2 ? Colors.error : v <= 3 ? Colors.amber : Colors.green);
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -131,6 +134,8 @@ export default function SessionSummaryScreen() {
       {/* Per-player summary */}
       {session.sessionPlayers.map((sp) => {
         const totalGoals = sp.quarterData.reduce((sum, q) => sum + q.goals, 0);
+        const totalBehinds = sp.quarterData.reduce((sum, q) => sum + q.behinds, 0);
+
         return (
           <View key={sp.id} style={styles.playerCard}>
             <View style={styles.playerHeader}>
@@ -147,48 +152,72 @@ export default function SessionSummaryScreen() {
                   {[sp.position, sp.player.team].filter(Boolean).join(' · ')}
                 </Text>
               </View>
-              <View style={styles.goalsDisplay}>
-                <Text style={styles.goalsValue}>{totalGoals}</Text>
-                <Text style={styles.goalsLabel}>Goals</Text>
+              <View style={styles.scoringDisplay}>
+                <Text style={styles.scoringValue}>{totalGoals}.{totalBehinds}</Text>
+                <Text style={styles.scoringLabel}>G.B</Text>
               </View>
+            </View>
+
+            {/* Aggregated trait ratings */}
+            <Text style={styles.traitSectionTitle}>Trait Ratings (All Quarters)</Text>
+            <View style={styles.traitGrid}>
+              {TRAITS.map((trait) => {
+                const totalPos = sp.quarterData.reduce((s, q) => s + ((q as any)[trait.posKey] || 0), 0);
+                const totalNeg = sp.quarterData.reduce((s, q) => s + ((q as any)[trait.negKey] || 0), 0);
+                const rating = calcTraitRating(totalPos, totalNeg);
+
+                return (
+                  <View key={trait.posKey} style={styles.traitChip}>
+                    <Text style={styles.traitChipIcon}>{trait.icon}</Text>
+                    <Text style={styles.traitChipLabel}>{trait.label}</Text>
+                    <View style={styles.traitChipData}>
+                      <Text style={styles.traitChipCounts}>
+                        <Text style={{ color: '#10B981' }}>+{totalPos}</Text>
+                        {' / '}
+                        <Text style={{ color: '#EF4444' }}>-{totalNeg}</Text>
+                      </Text>
+                      {rating !== null ? (
+                        <Text style={[styles.traitChipRating, { color: ratingColor(rating) }]}>
+                          {rating.toFixed(1)}★
+                        </Text>
+                      ) : (
+                        <Text style={styles.traitChipNoData}>—</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
 
             {/* Quarter breakdown */}
             {sp.quarterData
-              .filter((qd) => qd.goals > 0 || TRAITS.some((t) => (qd as any)[t.key] > 0) || qd.notes)
+              .filter((qd) => {
+                const hasTraitData = TRAITS.some((t) =>
+                  ((qd as any)[t.posKey] || 0) + ((qd as any)[t.negKey] || 0) > 0,
+                );
+                return qd.goals > 0 || qd.behinds > 0 || hasTraitData || qd.notes;
+              })
               .map((qd) => (
                 <View key={qd.id} style={styles.quarterBlock}>
-                  <Text style={styles.quarterTitle}>Quarter {qd.quarter}</Text>
+                  <Text style={styles.quarterTitle}>
+                    Quarter {qd.quarter}
+                    {qd.goals > 0 || qd.behinds > 0 ? ` — ${qd.goals}.${qd.behinds}` : ''}
+                  </Text>
 
-                  {/* Counters */}
+                  {/* Trait observation chips */}
                   <View style={styles.countersRow}>
-                    {qd.goals > 0 && <Text style={styles.counterChip}>⚽ {qd.goals}</Text>}
                     {TRAITS.map((t) => {
-                      const val = (qd as any)[t.key];
-                      return val > 0 ? (
-                        <Text key={t.key} style={styles.counterChip}>
-                          {t.icon} {val}
+                      const pos = (qd as any)[t.posKey] || 0;
+                      const neg = (qd as any)[t.negKey] || 0;
+                      if (pos + neg === 0) return null;
+                      return (
+                        <Text key={t.posKey} style={styles.counterChip}>
+                          {t.icon} +{pos}/-{neg}
                         </Text>
-                      ) : null;
+                      );
                     })}
                   </View>
 
-                  {/* Ratings */}
-                  {qd.reviewCompleted && (
-                    <View style={styles.ratingsRow}>
-                      {TRAITS.map((t) => {
-                        const val = (qd as any)[t.ratingKey];
-                        return val != null ? (
-                          <View key={t.ratingKey} style={styles.ratingChip}>
-                            <Text style={styles.ratingLabel}>{t.label}</Text>
-                            <Text style={[styles.ratingValue, { color: ratingColor(val) }]}>{val}</Text>
-                          </View>
-                        ) : null;
-                      })}
-                    </View>
-                  )}
-
-                  {/* Notes */}
                   {qd.notes ? (
                     <Text style={styles.notesText}>📝 {qd.notes}</Text>
                   ) : null}
@@ -256,13 +285,11 @@ export default function SessionSummaryScreen() {
                 const token = await getToken();
                 const url = liveScoutingApi.exportPdfUrl(sessionId);
                 if (Platform.OS === 'web') {
-                  // Open PDF in new tab with auth
                   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
                   const blob = await res.blob();
                   const blobUrl = URL.createObjectURL(blob);
                   window.open(blobUrl, '_blank');
                 } else {
-                  // On native, use Linking
                   await Linking.openURL(url);
                 }
               } catch (err: any) {
@@ -301,7 +328,6 @@ export default function SessionSummaryScreen() {
                   const msg = `Created ${result.playerCount} report(s) successfully!`;
                   Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Success', msg);
                 }
-                // Reload to show linked report
                 loadSession();
               } catch (err: any) {
                 const msg = err?.message || 'Conversion failed';
@@ -345,6 +371,10 @@ export default function SessionSummaryScreen() {
   );
 }
 
+function ratingColor(v: number) {
+  return v >= 4 ? '#10B981' : v >= 3 ? '#F59E0B' : '#EF4444';
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, maxWidth: 650, alignSelf: 'center', width: '100%', paddingBottom: 40 },
@@ -352,23 +382,15 @@ const styles = StyleSheet.create({
 
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: Colors.elevated, justifyContent: 'center', alignItems: 'center',
   },
   title: { color: Colors.text, fontSize: 20, fontWeight: '800' },
   subtitle: { color: Colors.accent, fontSize: 14, fontWeight: '600', marginTop: 2 },
 
   card: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 16,
+    backgroundColor: Colors.card, borderRadius: 14, padding: 16,
+    borderWidth: 1, borderColor: Colors.border, marginBottom: 16,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   infoText: { color: Colors.text, fontSize: 14 },
@@ -380,71 +402,52 @@ const styles = StyleSheet.create({
   playerCount: { color: Colors.textSecondary, fontSize: 13 },
 
   playerCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 12,
+    backgroundColor: Colors.card, borderRadius: 14, padding: 16,
+    borderWidth: 1, borderColor: Colors.border, marginBottom: 12,
   },
   playerHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   playerName: { color: Colors.text, fontSize: 16, fontWeight: '800' },
   playerMeta: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
   newBadge: { backgroundColor: Colors.green, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
   newBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
-  goalsDisplay: { alignItems: 'center' },
-  goalsValue: { color: Colors.text, fontSize: 24, fontWeight: '800' },
-  goalsLabel: { color: Colors.textMuted, fontSize: 10, fontWeight: '600' },
+  scoringDisplay: { alignItems: 'center' },
+  scoringValue: { color: Colors.text, fontSize: 24, fontWeight: '800' },
+  scoringLabel: { color: Colors.textMuted, fontSize: 10, fontWeight: '600' },
+
+  // Trait ratings section
+  traitSectionTitle: { color: Colors.accent, fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  traitGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  traitChip: {
+    backgroundColor: Colors.elevated, borderRadius: 10, padding: 10,
+    width: '48%' as any, minWidth: 140, flexGrow: 1,
+  },
+  traitChipIcon: { fontSize: 16, marginBottom: 2 },
+  traitChipLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700' },
+  traitChipData: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  traitChipCounts: { fontSize: 12, fontWeight: '700', color: Colors.text },
+  traitChipRating: { fontSize: 14, fontWeight: '800' },
+  traitChipNoData: { color: Colors.textMuted, fontSize: 12 },
 
   quarterBlock: { borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10, marginTop: 8 },
   quarterTitle: { color: Colors.accent, fontSize: 13, fontWeight: '700', marginBottom: 6 },
   countersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   counterChip: {
-    color: Colors.text,
-    fontSize: 12,
-    backgroundColor: Colors.elevated,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    overflow: 'hidden',
+    color: Colors.text, fontSize: 12,
+    backgroundColor: Colors.elevated, paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 6, overflow: 'hidden',
   },
-  ratingsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-  ratingChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.elevated,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  ratingLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '600' },
-  ratingValue: { fontSize: 13, fontWeight: '800' },
   notesText: { color: Colors.textSecondary, fontSize: 13, fontStyle: 'italic', marginTop: 4 },
 
   backToTrackingBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    backgroundColor: 'rgba(6,182,212,0.08)',
-    marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.accent,
+    backgroundColor: 'rgba(6,182,212,0.08)', marginBottom: 12,
   },
   backToTrackingText: { color: Colors.accent, fontSize: 15, fontWeight: '700' },
 
   completeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.green,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 40,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.green, paddingVertical: 16, borderRadius: 12, marginBottom: 40,
   },
   completeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
@@ -452,15 +455,9 @@ const styles = StyleSheet.create({
   phase2Actions: { marginTop: 16, marginBottom: 40 },
   phase2Title: { color: Colors.text, fontSize: 16, fontWeight: '800', marginBottom: 12 },
   actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.card, borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: Colors.border, marginBottom: 10,
   },
   actionBtnTitle: { color: Colors.text, fontSize: 14, fontWeight: '700' },
   actionBtnDesc: { color: Colors.textSecondary, fontSize: 12, marginTop: 1 },
