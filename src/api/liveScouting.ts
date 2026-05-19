@@ -71,8 +71,21 @@ export interface SessionPlayerData {
   quarterData: QuarterData[];
 }
 
+export interface AiAnalysisPlayer {
+  playerName: string;
+  playerId: string;
+  position: string | null;
+  performanceSummary: string;
+  keyStrengths: Array<{ title: string; detail: string }>;
+  areasForDevelopment: Array<{ title: string; detail: string }>;
+  traitAnalysis: Array<{ trait: string; rating: number; analysis: string }>;
+  recommendations: string[];
+  overallRating: number;
+}
+
 export interface AiAnalysis {
   summary: string;
+  players: AiAnalysisPlayer[];
   strengths: Array<{ trait: string; evidence: string; rating: number }>;
   weaknesses: Array<{ trait: string; evidence: string; rating: number }>;
   suggestedRatings: Record<string, number>;
@@ -108,6 +121,7 @@ export interface LiveScoutingSession {
   aiStrengths?: any[] | null;
   aiWeaknesses?: any[] | null;
   aiSuggestedRatings?: Record<string, number> | null;
+  aiPlayers?: AiAnalysisPlayer[] | null;
   aiAnalyzedAt?: string | null;
   convertedReportId?: string | null;
   scout?: { id: string; name: string; email: string };
