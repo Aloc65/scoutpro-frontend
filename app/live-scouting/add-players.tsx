@@ -168,6 +168,32 @@ export default function AddPlayersScreen() {
           placeholderTextColor={Colors.textMuted}
         />
         {searching && <ActivityIndicator style={{ marginTop: 8 }} color={Colors.accent} />}
+
+        {/* Position picker for existing players – shown when there are search results */}
+        {searchResults.length > 0 && (
+          <View style={styles.existingPosSection}>
+            <Text style={styles.existingPosLabel}>📍 Select Position Before Adding</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+              <View style={{ flexDirection: 'row', gap: 6, paddingRight: 8 }}>
+                {POSITIONS.map((pos) => (
+                  <TouchableOpacity
+                    key={pos}
+                    style={[styles.posChip, selectedPosition === pos && styles.posChipActive]}
+                    onPress={() => setSelectedPosition(selectedPosition === pos ? '' : pos)}
+                  >
+                    <Text style={[styles.posChipText, selectedPosition === pos && styles.posChipTextActive]}>{pos}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            {selectedPosition ? (
+              <Text style={styles.existingPosSelected}>✓ Position: {selectedPosition}</Text>
+            ) : (
+              <Text style={styles.existingPosHint}>Tap a position chip, then tap a player to add them</Text>
+            )}
+          </View>
+        )}
+
         {searchResults.map((p) => (
           <TouchableOpacity key={p.id} style={styles.searchResult} onPress={() => addExistingPlayer(p)}>
             <View style={{ flex: 1 }}>
@@ -176,7 +202,12 @@ export default function AddPlayersScreen() {
                 {[p.team, p.draftYear ? `Draft ${p.draftYear}` : null].filter(Boolean).join(' · ')}
               </Text>
             </View>
-            <Ionicons name="add-circle" size={24} color={Colors.green} />
+            <View style={{ alignItems: 'center' }}>
+              <Ionicons name="add-circle" size={24} color={Colors.green} />
+              {selectedPosition ? (
+                <Text style={{ color: Colors.accent, fontSize: 9, fontWeight: '700', marginTop: 2 }}>{selectedPosition}</Text>
+              ) : null}
+            </View>
           </TouchableOpacity>
         ))}
         {search.trim().length >= 2 && !searching && searchResults.length === 0 && (
@@ -410,6 +441,18 @@ const styles = StyleSheet.create({
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   modalTitle: { color: Colors.text, fontSize: 18, fontWeight: '800' },
+  existingPosSection: {
+    backgroundColor: 'rgba(99,102,241,0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.2)',
+  },
+  existingPosLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  existingPosSelected: { color: Colors.accent, fontSize: 12, fontWeight: '700', marginTop: 8 },
+  existingPosHint: { color: Colors.textMuted, fontSize: 11, marginTop: 6, fontStyle: 'italic' },
   posChip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
