@@ -130,21 +130,19 @@ export default function QuarterReviewScreen() {
             Changed from session default: {sessionPosition}
           </Text>
         )}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.positionScroll}>
-          <View style={styles.positionChips}>
-            {POSITIONS.map((pos) => (
-              <TouchableOpacity
-                key={pos}
-                style={[styles.positionChip, position === pos && styles.positionChipActive]}
-                onPress={() => setPosition(pos)}
-              >
-                <Text style={[styles.positionChipText, position === pos && styles.positionChipTextActive]}>
-                  {pos}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
+        <View style={styles.positionGrid}>
+          {POSITIONS.map((pos) => (
+            <TouchableOpacity
+              key={pos}
+              style={[styles.positionChip, position === pos && styles.positionChipActive]}
+              onPress={() => setPosition(pos)}
+            >
+              <Text style={[styles.positionChipText, position === pos && styles.positionChipTextActive]}>
+                {pos}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {/* Scoring summary */}
@@ -284,11 +282,13 @@ const styles = StyleSheet.create({
   },
   positionLabel: { color: Colors.text, fontSize: 14, fontWeight: '700', marginBottom: 4 },
   positionChanged: { color: Colors.amber, fontSize: 11, fontWeight: '600', marginBottom: 6 },
-  positionScroll: { marginTop: 6 },
-  positionChips: { flexDirection: 'row', gap: 6, paddingRight: 8 },
+  positionGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6,
+  },
   positionChip: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16,
     backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border,
+    minWidth: 52, alignItems: 'center',
   },
   positionChipActive: {
     backgroundColor: 'rgba(99,102,241,0.15)', borderColor: Colors.accent,

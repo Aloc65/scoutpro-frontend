@@ -173,19 +173,17 @@ export default function AddPlayersScreen() {
         {searchResults.length > 0 && (
           <View style={styles.existingPosSection}>
             <Text style={styles.existingPosLabel}>📍 Select Position Before Adding</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-              <View style={{ flexDirection: 'row', gap: 6, paddingRight: 8 }}>
-                {POSITIONS.map((pos) => (
-                  <TouchableOpacity
-                    key={pos}
-                    style={[styles.posChip, selectedPosition === pos && styles.posChipActive]}
-                    onPress={() => setSelectedPosition(selectedPosition === pos ? '' : pos)}
-                  >
-                    <Text style={[styles.posChipText, selectedPosition === pos && styles.posChipTextActive]}>{pos}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <View style={styles.posGrid}>
+              {POSITIONS.map((pos) => (
+                <TouchableOpacity
+                  key={pos}
+                  style={[styles.posChip, selectedPosition === pos && styles.posChipActive]}
+                  onPress={() => setSelectedPosition(selectedPosition === pos ? '' : pos)}
+                >
+                  <Text style={[styles.posChipText, selectedPosition === pos && styles.posChipTextActive]}>{pos}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             {selectedPosition ? (
               <Text style={styles.existingPosSelected}>✓ Position: {selectedPosition}</Text>
             ) : (
@@ -309,7 +307,7 @@ export default function AddPlayersScreen() {
             />
 
             <Text style={styles.label}>Position</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+            <View style={styles.posGrid}>
               {POSITIONS.map((pos) => (
                 <TouchableOpacity
                   key={pos}
@@ -319,7 +317,7 @@ export default function AddPlayersScreen() {
                   <Text style={[styles.posChipText, newPosition === pos && styles.posChipTextActive]}>{pos}</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
 
             <TouchableOpacity
               style={[styles.createBtn, (!newFirst.trim() || !newLast.trim()) && styles.createBtnDisabled]}
@@ -453,14 +451,21 @@ const styles = StyleSheet.create({
   existingPosLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
   existingPosSelected: { color: Colors.accent, fontSize: 12, fontWeight: '700', marginTop: 8 },
   existingPosHint: { color: Colors.textMuted, fontSize: 11, marginTop: 6, fontStyle: 'italic' },
+  posGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
   posChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 8,
     backgroundColor: Colors.elevated,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginRight: 8,
+    minWidth: 52,
+    alignItems: 'center',
   },
   posChipActive: { backgroundColor: 'rgba(6,182,212,0.15)', borderColor: Colors.accent },
   posChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
