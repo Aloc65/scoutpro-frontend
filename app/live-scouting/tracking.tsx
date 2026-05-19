@@ -244,10 +244,18 @@ export default function TrackingScreen() {
       <View style={styles.playerHeader}>
         <Text style={styles.playerName}>{currentPlayer.player.fullName}</Text>
         <Text style={styles.playerInfo}>
-          {[currentPlayer.position, currentPlayer.player.team, currentPlayer.player.draftYear ? `Draft ${currentPlayer.player.draftYear}` : null]
+          {[currentQD?.position || currentPlayer.position, currentPlayer.player.team, currentPlayer.player.draftYear ? `Draft ${currentPlayer.player.draftYear}` : null]
             .filter(Boolean)
             .join(' · ')}
         </Text>
+        {currentQD?.position && currentQD.position !== currentPlayer.position && (
+          <View style={styles.positionChangeBadge}>
+            <Ionicons name="swap-horizontal" size={12} color={Colors.amber} />
+            <Text style={styles.positionChangeText}>
+              Moved from {currentPlayer.position || 'N/A'}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Quarter tabs */}
@@ -429,6 +437,12 @@ const styles = StyleSheet.create({
   playerHeader: { alignItems: 'center', marginBottom: 16 },
   playerName: { color: Colors.text, fontSize: 20, fontWeight: '800' },
   playerInfo: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
+  positionChangeBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 8, marginTop: 4,
+  },
+  positionChangeText: { color: Colors.amber, fontSize: 11, fontWeight: '600' },
 
   quarterRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 },
   quarterTab: {

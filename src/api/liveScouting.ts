@@ -50,6 +50,7 @@ export interface QuarterData {
   contestWorkNegative: number;
   defensiveEffortPositive: number;
   defensiveEffortNegative: number;
+  position: string | null;
   notes: string | null;
   reviewCompleted: boolean;
 }

@@ -14,6 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
 import { liveScoutingApi, TRAITS, QuarterData, calcTraitRating } from '../../src/api/liveScouting';
+import { POSITIONS } from '../../src/types';
 
 export default function QuarterReviewScreen() {
   const router = useRouter();
@@ -29,6 +30,8 @@ export default function QuarterReviewScreen() {
   const [quarterData, setQuarterData] = useState<QuarterData | null>(null);
   const [playerName, setPlayerName] = useState('');
   const [notes, setNotes] = useState('');
+  const [position, setPosition] = useState<string>('');
+  const [sessionPosition, setSessionPosition] = useState<string>('');
 
   // Local editable counts for each trait
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -44,10 +47,13 @@ export default function QuarterReviewScreen() {
       const sp = session.sessionPlayers.find((s) => s.playerId === playerId);
       if (sp) {
         setPlayerName(sp.player.fullName);
+        setSessionPosition(sp.position || '');
         const qd = sp.quarterData.find((d) => d.quarter === q);
         if (qd) {
           setQuarterData(qd);
           setNotes(qd.notes || '');
+          // Use quarter position, fallback to session position
+          setPosition(qd.position || sp.position || '');
           // Pre-populate counts
           const c: Record<string, number> = {};
           TRAITS.forEach((t) => {
@@ -55,6 +61,8 @@ export default function QuarterReviewScreen() {
             c[t.negKey] = (qd as any)[t.negKey] || 0;
           });
           setCounts(c);
+        } else {
+          setPosition(sp.position || '');
         }
       }
     } catch {} finally {
@@ -73,8 +81,8 @@ export default function QuarterReviewScreen() {
     if (!sessionId || !playerId) return;
     setSaving(true);
     try {
-      // Save adjusted counts + notes via the review endpoint
-      const payload: Record<string, any> = { notes };
+      // Save adjusted counts + notes + position via the review endpoint
+      const payload: Record<string, any> = { notes, position: position || undefined };
       TRAITS.forEach((t) => {
         payload[t.posKey] = counts[t.posKey] || 0;
         payload[t.negKey] = counts[t.negKey] || 0;
@@ -113,6 +121,31 @@ export default function QuarterReviewScreen() {
       <Text style={styles.instruction}>
         Review & adjust trait observation counts. Ratings are auto-calculated from the +/- ratio.
       </Text>
+
+      {/* Position selector */}
+      <View style={styles.positionSection}>
+        <Text style={styles.positionLabel}>📍 Position this Quarter</Text>
+        {sessionPosition && position !== sessionPosition && (
+          <Text style={styles.positionChanged}>
+            Changed from session default: {sessionPosition}
+          </Text>
+        )}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.positionScroll}>
+          <View style={styles.positionChips}>
+            {POSITIONS.map((pos) => (
+              <TouchableOpacity
+                key={pos}
+                style={[styles.positionChip, position === pos && styles.positionChipActive]}
+                onPress={() => setPosition(pos)}
+              >
+                <Text style={[styles.positionChipText, position === pos && styles.positionChipTextActive]}>
+                  {pos}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
 
       {/* Scoring summary */}
       {quarterData && (
@@ -244,6 +277,24 @@ const styles = StyleSheet.create({
   instruction: {
     color: Colors.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 16, lineHeight: 18,
   },
+
+  positionSection: {
+    backgroundColor: Colors.card, borderRadius: 12, padding: 14, marginBottom: 12,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  positionLabel: { color: Colors.text, fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  positionChanged: { color: Colors.amber, fontSize: 11, fontWeight: '600', marginBottom: 6 },
+  positionScroll: { marginTop: 6 },
+  positionChips: { flexDirection: 'row', gap: 6, paddingRight: 8 },
+  positionChip: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border,
+  },
+  positionChipActive: {
+    backgroundColor: 'rgba(99,102,241,0.15)', borderColor: Colors.accent,
+  },
+  positionChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  positionChipTextActive: { color: Colors.accent, fontWeight: '700' },
 
   scoringSummary: {
     backgroundColor: Colors.elevated, borderRadius: 10, padding: 12, marginBottom: 16, alignItems: 'center',

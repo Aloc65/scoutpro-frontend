@@ -225,6 +225,33 @@ export default function SessionSummaryScreen() {
                 <Text style={styles.playerMeta}>
                   {[sp.position, sp.player.team].filter(Boolean).join(' · ')}
                 </Text>
+                {/* Position timeline */}
+                {(() => {
+                  const posTimeline = sp.quarterData.map((qd) => ({
+                    quarter: qd.quarter,
+                    position: qd.position || sp.position || null,
+                  }));
+                  const hasPerQuarterPositions = sp.quarterData.some((qd) => qd.position);
+                  const hasPositionChanges = posTimeline.some(
+                    (p) => p.position && p.position !== (sp.position || posTimeline[0]?.position),
+                  );
+                  if (!hasPerQuarterPositions && !sp.position) return null;
+                  return (
+                    <View style={styles.positionTimeline}>
+                      {posTimeline.map((p) => {
+                        const isChanged = p.position !== sp.position && p.position !== null;
+                        return (
+                          <View key={p.quarter} style={[styles.posTimelineItem, isChanged && styles.posTimelineItemChanged]}>
+                            <Text style={styles.posTimelineQ}>Q{p.quarter}</Text>
+                            <Text style={[styles.posTimelinePos, isChanged && styles.posTimelinePosChanged]}>
+                              {p.position || '—'}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
               </View>
               {overallRating !== null && (
                 <View style={[styles.overallBadge, { borderColor: ratingColor(overallRating) + '66' }]}>
@@ -634,6 +661,19 @@ const styles = StyleSheet.create({
   playerHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
   playerName: { color: Colors.text, fontSize: 16, fontWeight: '800' },
   playerMeta: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
+  positionTimeline: {
+    flexDirection: 'row', gap: 4, marginTop: 6, flexWrap: 'wrap',
+  },
+  posTimelineItem: {
+    backgroundColor: Colors.elevated, paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: Colors.border,
+  },
+  posTimelineItemChanged: {
+    backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.3)',
+  },
+  posTimelineQ: { color: Colors.textMuted, fontSize: 9, fontWeight: '700' },
+  posTimelinePos: { color: Colors.textSecondary, fontSize: 10, fontWeight: '600' },
+  posTimelinePosChanged: { color: Colors.amber, fontWeight: '700' },
   newBadge: {
     backgroundColor: Colors.green,
     paddingHorizontal: 6,

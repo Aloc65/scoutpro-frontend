@@ -162,19 +162,26 @@ export default function GridTrackingScreen() {
     <>
       {/* Header row: player names */}
       <View style={styles.gridRow}>
-        {players.map((sp) => (
-          <View key={sp.id} style={styles.gridHeaderCell}>
-            <Text style={styles.gridPlayerName} numberOfLines={1}>
-              {sp.player.fullName.split(' ').pop()}
-            </Text>
-            <Text style={styles.gridPlayerPos}>{sp.position || ''}</Text>
-            {sp.isNewPlayer && (
-              <View style={styles.gridNewBadge}>
-                <Text style={styles.gridNewText}>NEW</Text>
-              </View>
-            )}
-          </View>
-        ))}
+        {players.map((sp) => {
+          const qd = sp.quarterData.find((q) => q.quarter === activeQuarter);
+          const qPos = qd?.position || sp.position || '';
+          const posChanged = qd?.position && qd.position !== sp.position;
+          return (
+            <View key={sp.id} style={styles.gridHeaderCell}>
+              <Text style={styles.gridPlayerName} numberOfLines={1}>
+                {sp.player.fullName.split(' ').pop()}
+              </Text>
+              <Text style={[styles.gridPlayerPos, posChanged ? { color: Colors.amber } : null]}>
+                {qPos}{posChanged ? ' ↔' : ''}
+              </Text>
+              {sp.isNewPlayer && (
+                <View style={styles.gridNewBadge}>
+                  <Text style={styles.gridNewText}>NEW</Text>
+                </View>
+              )}
+            </View>
+          );
+        })}
       </View>
 
       {/* Scoring rows (goals, behinds) — simple +/- counters */}
