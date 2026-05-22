@@ -178,6 +178,29 @@ export default function AddPlayersScreen() {
         </Text>
       </View>
 
+      {/* Representing team — always visible session-level setting */}
+      <View style={styles.repTeamCard}>
+        <View style={styles.repTeamHeader}>
+          <Text style={styles.repTeamIcon}>🏟️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.repTeamTitle}>Representing Team</Text>
+            <Text style={styles.repTeamDesc}>
+              Which team are the players representing in this game?
+            </Text>
+          </View>
+        </View>
+        <TextInput
+          style={styles.input}
+          value={repTeam}
+          onChangeText={setRepTeam}
+          placeholder="e.g. Western Australia U18s, Aquinas PSA"
+          placeholderTextColor={Colors.textMuted}
+        />
+        <Text style={styles.repTeamHint}>
+          Optional — leave blank to use each player's primary club team
+        </Text>
+      </View>
+
       {/* Search existing players */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Search Existing Players</Text>
@@ -213,23 +236,6 @@ export default function AddPlayersScreen() {
           </View>
         )}
 
-        {/* Representing team input for existing players */}
-        {searchResults.length > 0 && (
-          <View style={styles.repTeamSection}>
-            <Text style={styles.repTeamLabel}>🏟️ Representing Team (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={repTeam}
-              onChangeText={setRepTeam}
-              placeholder="e.g. Western Australia U18s, Aquinas PSA"
-              placeholderTextColor={Colors.textMuted}
-            />
-            <Text style={styles.repTeamHint}>
-              Leave blank to use the player's primary team
-            </Text>
-          </View>
-        )}
-
         {searchResults.map((p) => (
           <TouchableOpacity key={p.id} style={styles.searchResult} onPress={() => addExistingPlayer(p)}>
             <View style={{ flex: 1 }}>
@@ -252,7 +258,7 @@ export default function AddPlayersScreen() {
       </View>
 
       {/* Create new player button */}
-      <TouchableOpacity style={styles.newPlayerBtn} onPress={() => setShowNewPlayer(true)}>
+      <TouchableOpacity style={styles.newPlayerBtn} onPress={() => { setNewRepTeam(repTeam); setShowNewPlayer(true); }}>
         <Ionicons name="person-add-outline" size={20} color={Colors.accent} />
         <Text style={styles.newPlayerBtnText}>Create New Player</Text>
         <View style={styles.newBadge}>
@@ -511,17 +517,24 @@ const styles = StyleSheet.create({
   existingPosLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
   existingPosSelected: { color: Colors.accent, fontSize: 12, fontWeight: '700', marginTop: 8 },
   existingPosHint: { color: Colors.textMuted, fontSize: 11, marginTop: 6, fontStyle: 'italic' },
-  repTeamSection: {
-    backgroundColor: 'rgba(16,185,129,0.06)',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 10,
-    marginBottom: 4,
+  repTeamCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.2)',
+    borderColor: 'rgba(16,185,129,0.3)',
+    marginBottom: 16,
   },
-  repTeamLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 6 },
-  repTeamHint: { color: Colors.textMuted, fontSize: 11, marginTop: 4, fontStyle: 'italic' },
+  repTeamHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  repTeamIcon: { fontSize: 24 },
+  repTeamTitle: { color: Colors.text, fontSize: 15, fontWeight: '700' },
+  repTeamDesc: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
+  repTeamHint: { color: Colors.textMuted, fontSize: 11, marginTop: 6, fontStyle: 'italic' },
   posGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
