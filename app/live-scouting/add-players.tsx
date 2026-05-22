@@ -37,6 +37,11 @@ export default function AddPlayersScreen() {
   const [searchResults, setSearchResults] = useState<SearchPlayer[]>([]);
   const [searching, setSearching] = useState(false);
 
+  // Per-player expanded card state (for existing player search results)
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [perPlayerPosition, setPerPlayerPosition] = useState('');
+  const [perPlayerRepTeam, setPerPlayerRepTeam] = useState('');
+
   // New player modal
   const [showNewPlayer, setShowNewPlayer] = useState(false);
   const [newFirst, setNewFirst] = useState('');
@@ -45,10 +50,6 @@ export default function AddPlayersScreen() {
   const [newDraftYear, setNewDraftYear] = useState('');
   const [newPosition, setNewPosition] = useState('');
   const [newRepTeam, setNewRepTeam] = useState('');
-
-  // Position + representing team picker for existing player
-  const [selectedPosition, setSelectedPosition] = useState('');
-  const [repTeam, setRepTeam] = useState('');
 
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
@@ -86,19 +87,32 @@ export default function AddPlayersScreen() {
     return () => clearTimeout(timer);
   }, [search, sessionPlayers]);
 
+  const toggleExpandPlayer = (playerId: string) => {
+    if (expandedPlayerId === playerId) {
+      setExpandedPlayerId(null);
+      setPerPlayerPosition('');
+      setPerPlayerRepTeam('');
+    } else {
+      setExpandedPlayerId(playerId);
+      setPerPlayerPosition('');
+      setPerPlayerRepTeam('');
+    }
+  };
+
   const addExistingPlayer = async (player: SearchPlayer) => {
     if (!sessionId) return;
     setLoading(true);
     try {
       await liveScoutingApi.addPlayer(sessionId, {
         playerId: player.id,
-        position: selectedPosition || undefined,
-        representingTeam: repTeam.trim() || undefined,
+        position: perPlayerPosition || undefined,
+        representingTeam: perPlayerRepTeam.trim() || undefined,
       });
       setSearch('');
       setSearchResults([]);
-      setSelectedPosition('');
-      setRepTeam('');
+      setExpandedPlayerId(null);
+      setPerPlayerPosition('');
+      setPerPlayerRepTeam('');
       await loadSession();
     } catch (err: any) {
       const msg = err?.message || 'Failed to add player';
@@ -178,29 +192,6 @@ export default function AddPlayersScreen() {
         </Text>
       </View>
 
-      {/* Representing team — always visible session-level setting */}
-      <View style={styles.repTeamCard}>
-        <View style={styles.repTeamHeader}>
-          <Text style={styles.repTeamIcon}>🏟️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.repTeamTitle}>Representing Team</Text>
-            <Text style={styles.repTeamDesc}>
-              Which team are the players representing in this game?
-            </Text>
-          </View>
-        </View>
-        <TextInput
-          style={styles.input}
-          value={repTeam}
-          onChangeText={setRepTeam}
-          placeholder="e.g. Western Australia U18s, Aquinas PSA"
-          placeholderTextColor={Colors.textMuted}
-        />
-        <Text style={styles.repTeamHint}>
-          Optional — leave blank to use each player's primary club team
-        </Text>
-      </View>
-
       {/* Search existing players */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Search Existing Players</Text>
@@ -213,52 +204,89 @@ export default function AddPlayersScreen() {
         />
         {searching && <ActivityIndicator style={{ marginTop: 8 }} color={Colors.accent} />}
 
-        {/* Position picker for existing players – shown when there are search results */}
-        {searchResults.length > 0 && (
-          <View style={styles.existingPosSection}>
-            <Text style={styles.existingPosLabel}>📍 Select Position Before Adding</Text>
-            <View style={styles.posGrid}>
-              {POSITIONS.map((pos) => (
-                <TouchableOpacity
-                  key={pos}
-                  style={[styles.posChip, selectedPosition === pos && styles.posChipActive]}
-                  onPress={() => setSelectedPosition(selectedPosition === pos ? '' : pos)}
-                >
-                  <Text style={[styles.posChipText, selectedPosition === pos && styles.posChipTextActive]}>{pos}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {selectedPosition ? (
-              <Text style={styles.existingPosSelected}>✓ Position: {selectedPosition}</Text>
-            ) : (
-              <Text style={styles.existingPosHint}>Tap a position chip, then tap a player to add them</Text>
-            )}
-          </View>
-        )}
+        {searchResults.map((p) => {
+          const isExpanded = expandedPlayerId === p.id;
+          return (
+            <View key={p.id} style={[styles.searchResultCard, isExpanded && styles.searchResultCardExpanded]}>
+              {/* Player header row — tap to expand/collapse */}
+              <TouchableOpacity
+                style={styles.searchResultHeader}
+                onPress={() => toggleExpandPlayer(p.id)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.playerName}>{p.fullName}</Text>
+                  <Text style={styles.playerMeta}>
+                    {[p.team, p.draftYear ? `Draft ${p.draftYear}` : null].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={isExpanded ? 'chevron-up' : 'add-circle'}
+                  size={isExpanded ? 20 : 24}
+                  color={isExpanded ? Colors.textSecondary : Colors.green}
+                />
+              </TouchableOpacity>
 
-        {searchResults.map((p) => (
-          <TouchableOpacity key={p.id} style={styles.searchResult} onPress={() => addExistingPlayer(p)}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.playerName}>{p.fullName}</Text>
-              <Text style={styles.playerMeta}>
-                {[p.team, p.draftYear ? `Draft ${p.draftYear}` : null].filter(Boolean).join(' · ')}
-              </Text>
+              {/* Expanded per-player settings */}
+              {isExpanded && (
+                <View style={styles.playerExpandedSection}>
+                  {/* Position */}
+                  <Text style={styles.expandedLabel}>📍 Position</Text>
+                  <View style={styles.posGrid}>
+                    {POSITIONS.map((pos) => (
+                      <TouchableOpacity
+                        key={pos}
+                        style={[styles.posChip, perPlayerPosition === pos && styles.posChipActive]}
+                        onPress={() => setPerPlayerPosition(perPlayerPosition === pos ? '' : pos)}
+                      >
+                        <Text style={[styles.posChipText, perPlayerPosition === pos && styles.posChipTextActive]}>{pos}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Representing Team */}
+                  <Text style={styles.expandedLabel}>🏟️ Representing Team</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={perPlayerRepTeam}
+                    onChangeText={setPerPlayerRepTeam}
+                    placeholder={p.team ? `Leave blank for "${p.team}"` : 'Team for this game (optional)'}
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                  <Text style={styles.expandedHint}>
+                    {perPlayerRepTeam.trim()
+                      ? `Will represent: ${perPlayerRepTeam.trim()}`
+                      : p.team
+                        ? `Will use primary team: ${p.team}`
+                        : 'No team set — enter one or leave blank'}
+                  </Text>
+
+                  {/* Add button */}
+                  <TouchableOpacity
+                    style={styles.addPlayerBtn}
+                    onPress={() => addExistingPlayer(p)}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="add-circle" size={18} color="#fff" />
+                        <Text style={styles.addPlayerBtnText}>Add {p.fullName.split(' ').pop()} to Session</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Ionicons name="add-circle" size={24} color={Colors.green} />
-              {selectedPosition ? (
-                <Text style={{ color: Colors.accent, fontSize: 9, fontWeight: '700', marginTop: 2 }}>{selectedPosition}</Text>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-        ))}
+          );
+        })}
         {search.trim().length >= 2 && !searching && searchResults.length === 0 && (
           <Text style={styles.noResults}>No players found</Text>
         )}
       </View>
 
       {/* Create new player button */}
-      <TouchableOpacity style={styles.newPlayerBtn} onPress={() => { setNewRepTeam(repTeam); setShowNewPlayer(true); }}>
+      <TouchableOpacity style={styles.newPlayerBtn} onPress={() => { setNewRepTeam(''); setShowNewPlayer(true); }}>
         <Ionicons name="person-add-outline" size={20} color={Colors.accent} />
         <Text style={styles.newPlayerBtnText}>Create New Player</Text>
         <View style={styles.newBadge}>
@@ -270,27 +298,40 @@ export default function AddPlayersScreen() {
       {sessionPlayers.length > 0 && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Players in Session</Text>
-          {sessionPlayers.map((sp) => (
-            <View key={sp.id} style={styles.addedPlayer}>
-              <View style={{ flex: 1 }}>
-                <View style={styles.playerNameRow}>
-                  <Text style={styles.playerName}>{sp.player.fullName}</Text>
-                  {sp.isNewPlayer && (
-                    <View style={styles.newBadgeSm}>
-                      <Text style={styles.newBadgeSmText}>NEW</Text>
+          {sessionPlayers.map((sp) => {
+            const displayTeam = sp.representingTeam || sp.player.team;
+            const isRepDifferent = sp.representingTeam && sp.representingTeam !== sp.player.team;
+            return (
+              <View key={sp.id} style={styles.addedPlayer}>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.playerNameRow}>
+                    <Text style={styles.playerName}>{sp.player.fullName}</Text>
+                    {sp.isNewPlayer && (
+                      <View style={styles.newBadgeSm}>
+                        <Text style={styles.newBadgeSmText}>NEW</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.playerMeta}>
+                    {[sp.position].filter(Boolean).join(' · ')}
+                  </Text>
+                  {displayTeam && (
+                    <View style={styles.addedTeamRow}>
+                      <Text style={isRepDifferent ? styles.addedRepTeam : styles.addedPrimaryTeam}>
+                        {isRepDifferent ? '🏟️ ' : ''}{displayTeam}
+                      </Text>
+                      {isRepDifferent && sp.player.team && (
+                        <Text style={styles.addedPrimaryClub}>(Club: {sp.player.team})</Text>
+                      )}
                     </View>
                   )}
                 </View>
-                <Text style={styles.playerMeta}>
-                  {[sp.position, sp.representingTeam || sp.player.team].filter(Boolean).join(' · ')}
-                  {sp.representingTeam && sp.representingTeam !== sp.player.team ? ' 🏟️' : ''}
-                </Text>
+                <TouchableOpacity onPress={() => removePlayer(sp.playerId)}>
+                  <Ionicons name="close-circle" size={22} color={Colors.error} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => removePlayer(sp.playerId)}>
-                <Ionicons name="close-circle" size={22} color={Colors.error} />
-              </TouchableOpacity>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
 
@@ -429,15 +470,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  searchResult: {
+
+  // Search result expandable cards
+  searchResultCard: {
+    borderRadius: 10,
+    backgroundColor: Colors.elevated,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  searchResultCardExpanded: {
+    borderColor: Colors.accent,
+    backgroundColor: 'rgba(6,182,212,0.04)',
+  },
+  searchResultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: Colors.elevated,
-    marginTop: 8,
   },
+  playerExpandedSection: {
+    paddingHorizontal: 12,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 10,
+  },
+  expandedLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 4, marginTop: 8 },
+  expandedHint: { color: Colors.textMuted, fontSize: 11, marginTop: 4, fontStyle: 'italic' },
+  addPlayerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: Colors.green,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 12,
+  },
+  addPlayerBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
   noResults: { color: Colors.textMuted, textAlign: 'center', marginTop: 12, fontSize: 13 },
   playerName: { color: Colors.text, fontSize: 15, fontWeight: '700' },
   playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -476,6 +549,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
+  addedTeamRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  addedRepTeam: { color: '#10B981', fontSize: 12, fontWeight: '600' },
+  addedPrimaryTeam: { color: Colors.textSecondary, fontSize: 12 },
+  addedPrimaryClub: { color: Colors.textMuted, fontSize: 10, fontStyle: 'italic' },
   startBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -502,39 +579,11 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     alignSelf: 'center',
     width: '100%',
+    maxHeight: '90%',
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   modalTitle: { color: Colors.text, fontSize: 18, fontWeight: '800' },
-  existingPosSection: {
-    backgroundColor: 'rgba(99,102,241,0.08)',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 12,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.2)',
-  },
-  existingPosLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
-  existingPosSelected: { color: Colors.accent, fontSize: 12, fontWeight: '700', marginTop: 8 },
-  existingPosHint: { color: Colors.textMuted, fontSize: 11, marginTop: 6, fontStyle: 'italic' },
-  repTeamCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.3)',
-    marginBottom: 16,
-  },
-  repTeamHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  repTeamIcon: { fontSize: 24 },
-  repTeamTitle: { color: Colors.text, fontSize: 15, fontWeight: '700' },
-  repTeamDesc: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
-  repTeamHint: { color: Colors.textMuted, fontSize: 11, marginTop: 6, fontStyle: 'italic' },
+  repTeamHint: { color: Colors.textMuted, fontSize: 11, marginTop: 4, fontStyle: 'italic' },
   posGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
