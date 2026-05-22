@@ -34,7 +34,15 @@ export default function NewSessionScreen() {
     setLoading(true);
     try {
       const gameTitle = `${homeTeam.trim()} vs ${awayTeam.trim()}`;
-      const dateTime = `${gameDate}T${gameTime}:00.000Z`;
+      // Build a robust ISO 8601 date string
+      const parsed = new Date(`${gameDate}T${gameTime}:00`);
+      if (isNaN(parsed.getTime())) {
+        const errMsg = 'Invalid date or time. Please use YYYY-MM-DD for date and HH:MM for time.';
+        if (Platform.OS === 'web') { window.alert(errMsg); } else { Alert.alert('Error', errMsg); }
+        setLoading(false);
+        return;
+      }
+      const dateTime = parsed.toISOString();
       const session = await liveScoutingApi.createSession({
         gameTitle,
         homeTeam: homeTeam.trim(),
@@ -110,23 +118,63 @@ export default function NewSessionScreen() {
         <View style={styles.dateRow}>
           <View style={styles.dateField}>
             <Text style={styles.label}>Date *</Text>
-            <TextInput
-              style={styles.input}
-              value={gameDate}
-              onChangeText={setGameDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.textMuted}
-            />
+            {Platform.OS === 'web' ? (
+              <input
+                type="date"
+                value={gameDate}
+                onChange={(e: any) => setGameDate(e.target.value)}
+                style={{
+                  backgroundColor: Colors.elevated,
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  color: Colors.text,
+                  fontSize: 15,
+                  border: `1px solid ${Colors.border}`,
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  width: '100%',
+                  boxSizing: 'border-box' as any,
+                }}
+              />
+            ) : (
+              <TextInput
+                style={styles.input}
+                value={gameDate}
+                onChangeText={setGameDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Colors.textMuted}
+              />
+            )}
           </View>
           <View style={styles.dateField}>
             <Text style={styles.label}>Time</Text>
-            <TextInput
-              style={styles.input}
-              value={gameTime}
-              onChangeText={setGameTime}
-              placeholder="HH:MM"
-              placeholderTextColor={Colors.textMuted}
-            />
+            {Platform.OS === 'web' ? (
+              <input
+                type="time"
+                value={gameTime}
+                onChange={(e: any) => setGameTime(e.target.value)}
+                style={{
+                  backgroundColor: Colors.elevated,
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  color: Colors.text,
+                  fontSize: 15,
+                  border: `1px solid ${Colors.border}`,
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  width: '100%',
+                  boxSizing: 'border-box' as any,
+                }}
+              />
+            ) : (
+              <TextInput
+                style={styles.input}
+                value={gameTime}
+                onChangeText={setGameTime}
+                placeholder="HH:MM"
+                placeholderTextColor={Colors.textMuted}
+              />
+            )}
           </View>
         </View>
       </View>
