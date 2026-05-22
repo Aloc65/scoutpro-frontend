@@ -44,9 +44,11 @@ export default function AddPlayersScreen() {
   const [newTeam, setNewTeam] = useState('');
   const [newDraftYear, setNewDraftYear] = useState('');
   const [newPosition, setNewPosition] = useState('');
+  const [newRepTeam, setNewRepTeam] = useState('');
 
-  // Position picker for existing player
+  // Position + representing team picker for existing player
   const [selectedPosition, setSelectedPosition] = useState('');
+  const [repTeam, setRepTeam] = useState('');
 
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
@@ -91,10 +93,12 @@ export default function AddPlayersScreen() {
       await liveScoutingApi.addPlayer(sessionId, {
         playerId: player.id,
         position: selectedPosition || undefined,
+        representingTeam: repTeam.trim() || undefined,
       });
       setSearch('');
       setSearchResults([]);
       setSelectedPosition('');
+      setRepTeam('');
       await loadSession();
     } catch (err: any) {
       const msg = err?.message || 'Failed to add player';
@@ -114,6 +118,7 @@ export default function AddPlayersScreen() {
         newPlayerTeam: newTeam.trim() || undefined,
         newPlayerDraftYear: newDraftYear ? parseInt(newDraftYear) : undefined,
         position: newPosition || undefined,
+        representingTeam: newRepTeam.trim() || undefined,
         isNewPlayer: true,
       });
       setShowNewPlayer(false);
@@ -122,6 +127,7 @@ export default function AddPlayersScreen() {
       setNewTeam('');
       setNewDraftYear('');
       setNewPosition('');
+      setNewRepTeam('');
       await loadSession();
     } catch (err: any) {
       const msg = err?.message || 'Failed to create player';
@@ -207,6 +213,23 @@ export default function AddPlayersScreen() {
           </View>
         )}
 
+        {/* Representing team input for existing players */}
+        {searchResults.length > 0 && (
+          <View style={styles.repTeamSection}>
+            <Text style={styles.repTeamLabel}>🏟️ Representing Team (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={repTeam}
+              onChangeText={setRepTeam}
+              placeholder="e.g. Western Australia U18s, Aquinas PSA"
+              placeholderTextColor={Colors.textMuted}
+            />
+            <Text style={styles.repTeamHint}>
+              Leave blank to use the player's primary team
+            </Text>
+          </View>
+        )}
+
         {searchResults.map((p) => (
           <TouchableOpacity key={p.id} style={styles.searchResult} onPress={() => addExistingPlayer(p)}>
             <View style={{ flex: 1 }}>
@@ -253,7 +276,8 @@ export default function AddPlayersScreen() {
                   )}
                 </View>
                 <Text style={styles.playerMeta}>
-                  {[sp.position, sp.player.team].filter(Boolean).join(' · ')}
+                  {[sp.position, sp.representingTeam || sp.player.team].filter(Boolean).join(' · ')}
+                  {sp.representingTeam && sp.representingTeam !== sp.player.team ? ' 🏟️' : ''}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => removePlayer(sp.playerId)}>
@@ -335,6 +359,18 @@ export default function AddPlayersScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={styles.label}>Representing Team</Text>
+            <TextInput
+              style={styles.input}
+              value={newRepTeam}
+              onChangeText={setNewRepTeam}
+              placeholder="Team for this game (optional)"
+              placeholderTextColor={Colors.textMuted}
+            />
+            <Text style={styles.repTeamHint}>
+              e.g. Western Australia U18s, Aquinas PSA
+            </Text>
 
             <TouchableOpacity
               style={[styles.createBtn, (!newFirst.trim() || !newLast.trim()) && styles.createBtnDisabled]}
@@ -475,6 +511,17 @@ const styles = StyleSheet.create({
   existingPosLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
   existingPosSelected: { color: Colors.accent, fontSize: 12, fontWeight: '700', marginTop: 8 },
   existingPosHint: { color: Colors.textMuted, fontSize: 11, marginTop: 6, fontStyle: 'italic' },
+  repTeamSection: {
+    backgroundColor: 'rgba(16,185,129,0.06)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.2)',
+  },
+  repTeamLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  repTeamHint: { color: Colors.textMuted, fontSize: 11, marginTop: 4, fontStyle: 'italic' },
   posGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

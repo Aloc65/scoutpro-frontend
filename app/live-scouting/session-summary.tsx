@@ -223,8 +223,13 @@ export default function SessionSummaryScreen() {
                   )}
                 </View>
                 <Text style={styles.playerMeta}>
-                  {[sp.position, sp.player.team].filter(Boolean).join(' · ')}
+                  {[sp.position, sp.representingTeam || sp.player.team].filter(Boolean).join(' · ')}
                 </Text>
+                {sp.representingTeam && sp.representingTeam !== sp.player.team && (
+                  <Text style={styles.repTeamBadge}>
+                    🏟️ Representing: {sp.representingTeam}
+                  </Text>
+                )}
                 {/* Position timeline */}
                 {(() => {
                   const posTimeline = sp.quarterData.map((qd) => ({
@@ -661,6 +666,9 @@ const styles = StyleSheet.create({
   playerHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
   playerName: { color: Colors.text, fontSize: 16, fontWeight: '800' },
   playerMeta: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
+  repTeamBadge: {
+    color: Colors.green, fontSize: 11, fontWeight: '600', marginTop: 3,
+  },
   positionTimeline: {
     flexDirection: 'row', gap: 4, marginTop: 6, flexWrap: 'wrap',
   },

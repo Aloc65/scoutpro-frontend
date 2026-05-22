@@ -60,6 +60,7 @@ export interface SessionPlayerData {
   sessionId: string;
   playerId: string;
   position: string | null;
+  representingTeam: string | null;
   orderIndex: number;
   isNewPlayer: boolean;
   player: {
@@ -148,6 +149,7 @@ export const liveScoutingApi = {
   addPlayer: (sessionId: string, data: {
     playerId?: string;
     position?: string;
+    representingTeam?: string;
     newPlayerFirstName?: string;
     newPlayerLastName?: string;
     newPlayerDraftYear?: number;

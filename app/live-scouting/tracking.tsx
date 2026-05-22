@@ -254,10 +254,13 @@ export default function TrackingScreen() {
       <View style={styles.playerHeader}>
         <Text style={styles.playerName}>{currentPlayer.player.fullName}</Text>
         <Text style={styles.playerInfo}>
-          {[currentQD?.position || currentPlayer.position, currentPlayer.player.team, currentPlayer.player.draftYear ? `Draft ${currentPlayer.player.draftYear}` : null]
+          {[currentQD?.position || currentPlayer.position, currentPlayer.representingTeam || currentPlayer.player.team, currentPlayer.player.draftYear ? `Draft ${currentPlayer.player.draftYear}` : null]
             .filter(Boolean)
             .join(' · ')}
         </Text>
+        {currentPlayer.representingTeam && currentPlayer.representingTeam !== currentPlayer.player.team && (
+          <Text style={styles.repTeamLabel}>🏟️ Representing: {currentPlayer.representingTeam}</Text>
+        )}
         {currentQD?.position && currentQD.position !== currentPlayer.position && (
           <View style={styles.positionChangeBadge}>
             <Ionicons name="swap-horizontal" size={12} color={Colors.amber} />
@@ -454,6 +457,7 @@ const styles = StyleSheet.create({
   playerHeader: { alignItems: 'center', marginBottom: 16 },
   playerName: { color: Colors.text, fontSize: 20, fontWeight: '800' },
   playerInfo: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
+  repTeamLabel: { color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 3 },
   positionChangeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 8, paddingVertical: 3,
