@@ -11,7 +11,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
 import {
@@ -51,7 +51,10 @@ export default function GridTrackingScreen() {
     }
   }, [sessionId]);
 
-  useEffect(() => { loadSession(); }, [loadSession]);
+  // Reload session on mount and when returning from add-players screen
+  useFocusEffect(
+    useCallback(() => { loadSession(); }, [loadSession])
+  );
 
   // Sync vertical scroll between left label column and right player columns
   const handleLeftScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -320,6 +323,13 @@ export default function GridTrackingScreen() {
           <Text style={styles.gameMeta}>{session.competition || ''} • Grid View</Text>
         </View>
         <TouchableOpacity
+          style={styles.addPlayerBtn}
+          onPress={() => router.push(`/live-scouting/add-players?sessionId=${sessionId}&from=tracking` as any)}
+        >
+          <Ionicons name="person-add" size={16} color={Colors.green} />
+          <Text style={styles.addPlayerBtnText}>Add Player</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.switchBtn}
           onPress={() => router.replace(`/live-scouting/tracking?sessionId=${sessionId}` as any)}
         >
@@ -402,6 +412,12 @@ const styles = StyleSheet.create({
   },
   gameTitle: { color: Colors.text, fontSize: 16, fontWeight: '800' },
   gameMeta: { color: Colors.textSecondary, fontSize: 12 },
+  addPlayerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8,
+    borderWidth: 1, borderColor: Colors.green, backgroundColor: 'rgba(16,185,129,0.08)',
+  },
+  addPlayerBtnText: { color: Colors.green, fontSize: 12, fontWeight: '700' },
   switchBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,

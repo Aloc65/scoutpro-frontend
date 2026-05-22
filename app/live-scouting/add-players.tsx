@@ -27,7 +27,8 @@ interface SearchPlayer {
 
 export default function AddPlayersScreen() {
   const router = useRouter();
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { sessionId, from } = useLocalSearchParams<{ sessionId: string; from?: string }>();
+  const isMidSession = from === 'tracking';
   const [sessionPlayers, setSessionPlayers] = useState<SessionPlayerData[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -144,16 +145,30 @@ export default function AddPlayersScreen() {
       Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Info', msg);
       return;
     }
-    router.replace(`/live-scouting/tracking?sessionId=${sessionId}` as any);
+    if (isMidSession) {
+      router.back();
+    } else {
+      router.replace(`/live-scouting/tracking?sessionId=${sessionId}` as any);
+    }
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
+        {isMidSession && (
+          <TouchableOpacity
+            style={styles.backToTrackingBtn}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={16} color={Colors.accent} />
+            <Text style={styles.backToTrackingText}>Back to Tracking</Text>
+          </TouchableOpacity>
+        )}
         <Ionicons name="people-outline" size={28} color={Colors.accent} />
-        <Text style={styles.title}>Add Players to Session</Text>
+        <Text style={styles.title}>{isMidSession ? 'Add Player Mid-Game' : 'Add Players to Session'}</Text>
         <Text style={styles.subtitle}>
           {sessionPlayers.length} player{sessionPlayers.length !== 1 ? 's' : ''} added
+          {isMidSession ? ' · Session in progress' : ''}
         </Text>
       </View>
 
@@ -249,13 +264,15 @@ export default function AddPlayersScreen() {
         </View>
       )}
 
-      {/* Start scouting button */}
+      {/* Start / continue scouting button */}
       <TouchableOpacity
         style={[styles.startBtn, sessionPlayers.length === 0 && styles.startBtnDisabled]}
         onPress={startScouting}
       >
-        <Ionicons name="play" size={20} color="#fff" />
-        <Text style={styles.startBtnText}>Start Live Scouting</Text>
+        <Ionicons name={isMidSession ? 'arrow-back-circle' : 'play'} size={20} color="#fff" />
+        <Text style={styles.startBtnText}>
+          {isMidSession ? 'Back to Live Tracking' : 'Start Live Scouting'}
+        </Text>
       </TouchableOpacity>
 
       {/* New Player Modal */}
@@ -340,7 +357,14 @@ export default function AddPlayersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, maxWidth: 600, alignSelf: 'center', width: '100%' },
-  header: { alignItems: 'center', marginBottom: 20, marginTop: 8 },
+  header: { alignItems: 'center', marginBottom: 20, marginTop: 8, width: '100%' },
+  backToTrackingBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
+    borderWidth: 1, borderColor: Colors.accent, backgroundColor: 'rgba(6,182,212,0.08)',
+    marginBottom: 12,
+  },
+  backToTrackingText: { color: Colors.accent, fontSize: 13, fontWeight: '700' },
   title: { color: Colors.text, fontSize: 22, fontWeight: '800', marginTop: 8 },
   subtitle: { color: Colors.textSecondary, fontSize: 14, marginTop: 4 },
   card: {

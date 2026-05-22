@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
 import {
@@ -60,9 +60,12 @@ export default function TrackingScreen() {
     }
   }, [sessionId]);
 
-  useEffect(() => {
-    loadSession();
-  }, [loadSession]);
+  // Reload session on mount and when returning from add-players screen
+  useFocusEffect(
+    useCallback(() => {
+      loadSession();
+    }, [loadSession])
+  );
 
   // All hooks must be called unconditionally
   const { width: screenWidth } = useWindowDimensions();
@@ -238,6 +241,13 @@ export default function TrackingScreen() {
             )}
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          style={styles.addPlayerTab}
+          onPress={() => router.push(`/live-scouting/add-players?sessionId=${sessionId}&from=tracking` as any)}
+        >
+          <Ionicons name="add" size={18} color={Colors.accent} />
+          <Text style={styles.addPlayerTabText}>Add</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Player info */}
@@ -433,6 +443,13 @@ const styles = StyleSheet.create({
   playerTabTextActive: { color: Colors.accent },
   newBadge: { backgroundColor: Colors.green, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   newBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
+  addPlayerTab: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1.5, borderColor: Colors.accent, borderStyle: 'dashed',
+    backgroundColor: 'rgba(6,182,212,0.08)', marginRight: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+  },
+  addPlayerTabText: { color: Colors.accent, fontSize: 13, fontWeight: '700' },
 
   playerHeader: { alignItems: 'center', marginBottom: 16 },
   playerName: { color: Colors.text, fontSize: 20, fontWeight: '800' },
