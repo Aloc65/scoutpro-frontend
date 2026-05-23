@@ -13,7 +13,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
-import { liveScoutingApi, TRAITS, QuarterData, calcTraitRating } from '../../src/api/liveScouting';
+import { liveScoutingApi, TRAITS, SLIDER_TRAITS, QuarterData, calcTraitRating } from '../../src/api/liveScouting';
 import { POSITIONS } from '../../src/types';
 
 export default function QuarterReviewScreen() {
@@ -35,6 +35,12 @@ export default function QuarterReviewScreen() {
 
   // Local editable counts for each trait
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // Slider ratings for athletic/holistic traits (null = not yet rated)
+  const [sliderRatings, setSliderRatings] = useState<Record<string, number | null>>({
+    speedRating: null,
+    flexibilityRating: null,
+    gameAwarenessRating: null,
+  });
 
   useEffect(() => {
     loadData();
@@ -61,6 +67,12 @@ export default function QuarterReviewScreen() {
             c[t.negKey] = (qd as any)[t.negKey] || 0;
           });
           setCounts(c);
+          // Pre-populate slider ratings
+          setSliderRatings({
+            speedRating: qd.speedRating ?? null,
+            flexibilityRating: qd.flexibilityRating ?? null,
+            gameAwarenessRating: qd.gameAwarenessRating ?? null,
+          });
         } else {
           setPosition(sp.position || '');
         }
@@ -81,11 +93,17 @@ export default function QuarterReviewScreen() {
     if (!sessionId || !playerId) return;
     setSaving(true);
     try {
-      // Save adjusted counts + notes + position via the review endpoint
+      // Save adjusted counts + notes + position + slider ratings via the review endpoint
       const payload: Record<string, any> = { notes, position: position || undefined };
       TRAITS.forEach((t) => {
         payload[t.posKey] = counts[t.posKey] || 0;
         payload[t.negKey] = counts[t.negKey] || 0;
+      });
+      // Include slider ratings (only if set)
+      SLIDER_TRAITS.forEach((st) => {
+        if (sliderRatings[st.key] != null) {
+          payload[st.key] = sliderRatings[st.key];
+        }
       });
       await liveScoutingApi.saveReview(sessionId, playerId, q, payload);
       router.back();
@@ -220,6 +238,62 @@ export default function QuarterReviewScreen() {
         );
       })}
 
+      {/* Athletic / Holistic Slider Ratings */}
+      <View style={styles.sliderSection}>
+        <Text style={styles.sliderSectionTitle}>🏃 Rate Athletic Traits</Text>
+        <Text style={styles.sliderSectionHint}>
+          Tap a rating for each trait (1.0–5.0). Leave blank if not observed this quarter.
+        </Text>
+
+        {SLIDER_TRAITS.map((st) => {
+          const currentVal = sliderRatings[st.key];
+          const STEPS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+          return (
+            <View key={st.key} style={styles.sliderCard}>
+              <View style={styles.sliderHeader}>
+                <Text style={styles.sliderLabel}>{st.icon} {st.label}</Text>
+                {currentVal != null ? (
+                  <View style={[styles.ratingBadge, { backgroundColor: ratingBg(currentVal) }]}>
+                    <Text style={[styles.ratingText, { color: ratingFg(currentVal) }]}>
+                      {currentVal.toFixed(1)} / 5
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.noRating}>Not rated</Text>
+                )}
+              </View>
+              <Text style={styles.sliderDescription}>{st.description}</Text>
+              <View style={styles.sliderSteps}>
+                {STEPS.map((step) => (
+                  <TouchableOpacity
+                    key={step}
+                    style={[
+                      styles.sliderStep,
+                      currentVal === step && styles.sliderStepActive,
+                    ]}
+                    onPress={() =>
+                      setSliderRatings((prev) => ({
+                        ...prev,
+                        [st.key]: prev[st.key] === step ? null : step, // toggle off if same
+                      }))
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.sliderStepText,
+                        currentVal === step && styles.sliderStepTextActive,
+                      ]}
+                    >
+                      {Number.isInteger(step) ? step.toString() : step.toFixed(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
       {/* Notes */}
       <Text style={styles.notesLabel}>📝 Quarter Notes</Text>
       <TextInput
@@ -329,6 +403,45 @@ const styles = StyleSheet.create({
   smallBtnPlusText: { fontSize: 18, fontWeight: '700', color: '#10B981' },
   countValuePos: { fontSize: 18, fontWeight: '800', color: '#10B981', minWidth: 28, textAlign: 'center' },
   countValueNeg: { fontSize: 18, fontWeight: '800', color: '#EF4444', minWidth: 28, textAlign: 'center' },
+
+  // ─── Slider rating styles ──────────────────────────────────────────
+  sliderSection: {
+    marginTop: 16, marginBottom: 8,
+  },
+  sliderSectionTitle: {
+    color: Colors.text, fontSize: 16, fontWeight: '800', marginBottom: 4,
+  },
+  sliderSectionHint: {
+    color: Colors.textSecondary, fontSize: 12, marginBottom: 12, lineHeight: 16,
+  },
+  sliderCard: {
+    backgroundColor: Colors.card, borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: Colors.border, marginBottom: 10,
+  },
+  sliderHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4,
+  },
+  sliderLabel: { color: Colors.text, fontSize: 14, fontWeight: '700' },
+  sliderDescription: {
+    color: Colors.textSecondary, fontSize: 11, marginBottom: 10, lineHeight: 15,
+  },
+  sliderSteps: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center',
+  },
+  sliderStep: {
+    width: 38, height: 34, borderRadius: 8,
+    backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  sliderStepActive: {
+    backgroundColor: 'rgba(99,102,241,0.2)', borderColor: Colors.accent,
+  },
+  sliderStepText: {
+    color: Colors.textSecondary, fontSize: 12, fontWeight: '600',
+  },
+  sliderStepTextActive: {
+    color: Colors.accent, fontWeight: '800',
+  },
 
   notesLabel: { color: Colors.text, fontSize: 14, fontWeight: '700', marginTop: 8, marginBottom: 8 },
   notesInput: {

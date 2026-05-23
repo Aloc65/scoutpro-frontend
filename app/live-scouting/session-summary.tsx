@@ -19,6 +19,7 @@ import {
   liveScoutingApi,
   LiveScoutingSession,
   TRAITS,
+  SLIDER_TRAITS,
   calcTraitRating,
 } from '../../src/api/liveScouting';
 import { getToken } from '../../src/api/client';
@@ -275,7 +276,7 @@ export default function SessionSummaryScreen() {
         const totalBehinds = sp.quarterData.reduce((sum, q) => sum + q.behinds, 0);
         const isExpanded = notesExpanded[sp.id] !== false; // default expanded
 
-        // Calculate overall rating across all traits
+        // Calculate overall rating across all traits (9 observation + 3 slider)
         let overallSum = 0;
         let overallCount = 0;
         TRAITS.forEach((trait) => {
@@ -284,6 +285,17 @@ export default function SessionSummaryScreen() {
           const r = calcTraitRating(totalPos, totalNeg);
           if (r !== null) {
             overallSum += r;
+            overallCount++;
+          }
+        });
+        // Include slider-rated athletic traits in overall average
+        SLIDER_TRAITS.forEach((st) => {
+          const vals = sp.quarterData
+            .map((q) => (q as any)[st.key] as number | null)
+            .filter((v: number | null): v is number => v != null);
+          if (vals.length > 0) {
+            const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+            overallSum += avg;
             overallCount++;
           }
         });
@@ -427,6 +439,36 @@ export default function SessionSummaryScreen() {
                     </View>
                     <Text style={[styles.traitBarValue, { color: ratingColor(displayRating) }]}>
                       {displayRating.toFixed(1)}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              {/* Athletic / Holistic Slider Trait Bars */}
+              {SLIDER_TRAITS.map((st) => {
+                const vals = sp.quarterData
+                  .map((q) => (q as any)[st.key] as number | null)
+                  .filter((v: number | null): v is number => v != null);
+                if (vals.length === 0) return null;
+                const avg = Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10;
+                const barWidth = (avg / 5) * 100;
+
+                return (
+                  <View key={st.key} style={styles.traitBarRow}>
+                    <Text style={styles.traitBarLabel}>{st.icon} {st.label}</Text>
+                    <View style={styles.traitBarTrack}>
+                      <View
+                        style={[
+                          styles.traitBarFill,
+                          {
+                            width: `${barWidth}%` as any,
+                            backgroundColor: ratingColor(avg),
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.traitBarValue, { color: ratingColor(avg) }]}>
+                      {avg.toFixed(1)}
                     </Text>
                   </View>
                 );

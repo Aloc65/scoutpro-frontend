@@ -17,6 +17,15 @@ export const TRAITS = [
 export type TraitPosKey = typeof TRAITS[number]['posKey'];
 export type TraitNegKey = typeof TRAITS[number]['negKey'];
 
+/** Athletic/holistic traits rated per-quarter via slider (1.0-5.0) */
+export const SLIDER_TRAITS = [
+  { key: 'speedRating' as const, label: 'Speed', icon: '⚡', description: 'Raw pace, acceleration, and ability to break away from opponents' },
+  { key: 'flexibilityRating' as const, label: 'Flexibility', icon: '🤸', description: 'Agility, body flexibility, and ability to adapt to different positions' },
+  { key: 'gameAwarenessRating' as const, label: 'Game Awareness', icon: '👁️', description: 'Football IQ, spatial awareness, and ability to read the play' },
+] as const;
+
+export type SliderTraitKey = typeof SLIDER_TRAITS[number]['key'];
+
 /** Calculate trait rating: 1 + 4*(pos/(pos+neg)), rounded to 1dp. Returns null if no observations. */
 export function calcTraitRating(pos: number, neg: number): number | null {
   const total = pos + neg;
@@ -50,6 +59,10 @@ export interface QuarterData {
   contestWorkNegative: number;
   defensiveEffortPositive: number;
   defensiveEffortNegative: number;
+  // Athletic/holistic slider ratings (1.0-5.0)
+  speedRating: number | null;
+  flexibilityRating: number | null;
+  gameAwarenessRating: number | null;
   position: string | null;
   notes: string | null;
   reviewCompleted: boolean;
