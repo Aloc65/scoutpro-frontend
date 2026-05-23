@@ -534,7 +534,26 @@ export default function AiAnalysisScreen() {
           )}
 
           {/* Regenerate button */}
-          <TouchableOpacity style={styles.regenerateBtn} onPress={runAnalysis}>
+          <TouchableOpacity
+            style={styles.regenerateBtn}
+            onPress={() => {
+              const doRegenerate = () => runAnalysis();
+              if (Platform.OS === 'web') {
+                if (window.confirm('Regenerate AI analysis? This will replace the current report with a fresh analysis.')) {
+                  doRegenerate();
+                }
+              } else {
+                Alert.alert(
+                  'Regenerate Analysis',
+                  'This will replace the current report with a fresh AI analysis. Continue?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Regenerate', style: 'default', onPress: doRegenerate },
+                  ],
+                );
+              }
+            }}
+          >
             <Ionicons name="refresh" size={16} color={Colors.orange} />
             <Text style={styles.regenerateText}>Regenerate Analysis</Text>
           </TouchableOpacity>

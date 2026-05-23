@@ -121,6 +121,28 @@ export default function SessionsListScreen() {
             {playerCount !== 1 ? 's' : ''}
           </Text>
         </View>
+        {/* Status indicators for completed sessions */}
+        {!isActive && (
+          <View style={styles.statusIndicators}>
+            {item.aiSummary ? (
+              <View style={styles.indicatorBadge}>
+                <Ionicons name="sparkles" size={11} color={Colors.orange} />
+                <Text style={[styles.indicatorText, { color: Colors.orange }]}>AI Report</Text>
+              </View>
+            ) : (
+              <View style={[styles.indicatorBadge, styles.indicatorPending]}>
+                <Ionicons name="sparkles-outline" size={11} color={Colors.textMuted} />
+                <Text style={[styles.indicatorText, { color: Colors.textMuted }]}>No AI Report</Text>
+              </View>
+            )}
+            {item.convertedReportId ? (
+              <View style={styles.indicatorBadge}>
+                <Ionicons name="document-text" size={11} color={Colors.green} />
+                <Text style={[styles.indicatorText, { color: Colors.green }]}>Report Created</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
         {isActive && (
           <View style={styles.resumeRow}>
             <Ionicons name="play-circle" size={16} color={Colors.accent} />
@@ -246,6 +268,29 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  statusIndicators: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    flexWrap: 'wrap',
+  },
+  indicatorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(249,115,22,0.08)',
+  },
+  indicatorPending: {
+    backgroundColor: Colors.elevated,
+  },
+  indicatorText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
 
   empty: { alignItems: 'center', paddingVertical: 60 },
