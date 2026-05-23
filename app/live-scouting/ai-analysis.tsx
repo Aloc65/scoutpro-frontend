@@ -37,6 +37,7 @@ export default function AiAnalysisScreen() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedPlayerIdx, setSelectedPlayerIdx] = useState(0);
+  const [savingReports, setSavingReports] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     strengths: true,
     development: true,
@@ -533,6 +534,82 @@ export default function AiAnalysisScreen() {
             </>
           )}
 
+          {/* Save to Player Profiles — PRIMARY CTA */}
+          <TouchableOpacity
+            style={[styles.saveToProfilesBtn, savingReports && styles.saveToProfilesBtnDisabled]}
+            disabled={savingReports}
+            onPress={async () => {
+              if (!sessionId) return;
+              const hasExisting = !!session?.convertedReportId;
+              const doSave = async () => {
+                setSavingReports(true);
+                try {
+                  // Always force update if reports already exist — user wants latest AI data saved
+                  const result = await liveScoutingApi.convertToReport(sessionId, hasExisting);
+                  if (result.alreadyConverted) {
+                    const msg = 'Reports already up to date.';
+                    Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Info', msg);
+                  } else if (result.updated) {
+                    const msg = `Updated ${result.updatedCount} existing report(s) and created ${result.createdCount} new report(s) on player profiles!`;
+                    Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Reports Updated', msg);
+                  } else {
+                    const msg = `Created ${result.playerCount} ScoutPro report(s) on player profiles!`;
+                    Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Reports Created', msg);
+                  }
+                  // Reload session to get updated convertedReportId
+                  loadSession();
+                } catch (err: any) {
+                  const msg = err?.message || 'Failed to save reports';
+                  Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+                } finally {
+                  setSavingReports(false);
+                }
+              };
+
+              if (hasExisting) {
+                // Confirm update of existing reports
+                if (Platform.OS === 'web') {
+                  if (window.confirm('Update existing ScoutPro reports with the latest AI analysis? This will overwrite the current report data on each player\'s profile.')) {
+                    doSave();
+                  }
+                } else {
+                  Alert.alert(
+                    'Update Reports',
+                    'Update existing ScoutPro reports with the latest AI analysis? This will overwrite the current report data on each player\'s profile.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Update Reports', style: 'default', onPress: doSave },
+                    ],
+                  );
+                }
+              } else {
+                doSave();
+              }
+            }}
+          >
+            {savingReports ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons
+                name={session?.convertedReportId ? 'sync' : 'save'}
+                size={18}
+                color="#fff"
+              />
+            )}
+            <Text style={styles.saveToProfilesText}>
+              {savingReports
+                ? 'Saving...'
+                : session?.convertedReportId
+                  ? 'Update Player Profile Reports'
+                  : 'Save Reports to Player Profiles'}
+            </Text>
+          </TouchableOpacity>
+          {session?.convertedReportId && (
+            <Text style={styles.savedHint}>
+              ✅ Reports already saved — tap to update with latest AI analysis
+            </Text>
+          )}
+
           {/* Regenerate button */}
           <TouchableOpacity
             style={styles.regenerateBtn}
@@ -921,6 +998,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   legacyBadgeText: { fontSize: 13, fontWeight: '800' },
+
+  // Save to Player Profiles
+  saveToProfilesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: Colors.green,
+    marginBottom: 6,
+  },
+  saveToProfilesBtnDisabled: { opacity: 0.6 },
+  saveToProfilesText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  savedHint: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
 
   // Regenerate
   regenerateBtn: {

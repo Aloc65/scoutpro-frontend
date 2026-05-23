@@ -475,37 +475,65 @@ export default function SessionSummaryScreen() {
             style={styles.actionBtn}
             onPress={async () => {
               if (!sessionId) return;
-              setConverting(true);
-              try {
-                const result = await liveScoutingApi.convertToReport(sessionId);
-                if (result.alreadyConverted) {
-                  const msg = 'Session already converted to report.';
-                  Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Info', msg);
-                } else {
-                  const msg = `Created ${result.playerCount} report(s) successfully!`;
-                  Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Success', msg);
+              const hasExisting = !!session.convertedReportId;
+
+              const doConvert = async () => {
+                setConverting(true);
+                try {
+                  const result = await liveScoutingApi.convertToReport(sessionId, hasExisting);
+                  if (result.alreadyConverted) {
+                    const msg = 'Reports already up to date.';
+                    Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Info', msg);
+                  } else if (result.updated) {
+                    const msg = `Updated ${result.updatedCount} report(s) with latest data!`;
+                    Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Reports Updated', msg);
+                  } else {
+                    const msg = `Created ${result.playerCount} report(s) successfully!`;
+                    Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Success', msg);
+                  }
+                  loadSession();
+                } catch (err: any) {
+                  const msg = err?.message || 'Conversion failed';
+                  Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+                } finally {
+                  setConverting(false);
                 }
-                loadSession();
-              } catch (err: any) {
-                const msg = err?.message || 'Conversion failed';
-                Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
-              } finally {
-                setConverting(false);
+              };
+
+              if (hasExisting) {
+                if (Platform.OS === 'web') {
+                  if (window.confirm('Update existing ScoutPro reports with the latest session/AI data?')) {
+                    doConvert();
+                  }
+                } else {
+                  Alert.alert(
+                    'Update Reports',
+                    'Update existing ScoutPro reports with the latest session/AI data?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Update', onPress: doConvert },
+                    ],
+                  );
+                }
+              } else {
+                doConvert();
               }
             }}
-            disabled={converting || !!session.convertedReportId}
+            disabled={converting}
           >
             {converting ? (
               <ActivityIndicator size="small" color={Colors.green} />
             ) : (
-              <Ionicons name="copy-outline" size={20} color={Colors.green} />
+              <Ionicons name={session.convertedReportId ? 'sync-outline' : 'copy-outline'} size={20} color={Colors.green} />
             )}
             <View style={{ flex: 1 }}>
-              <Text style={styles.actionBtnTitle}>📋 Create ScoutPro Report</Text>
+              <Text style={styles.actionBtnTitle}>
+                {session.convertedReportId ? '📋 Update ScoutPro Reports' : '📋 Create ScoutPro Report'}
+              </Text>
               <Text style={styles.actionBtnDesc}>
                 {session.convertedReportId
-                  ? 'Report already created'
-                  : 'Pre-fill report from session data'}
+                  ? 'Update reports with latest AI analysis'
+                  : 'Save to player profiles from session data'}
               </Text>
             </View>
             {session.convertedReportId && (

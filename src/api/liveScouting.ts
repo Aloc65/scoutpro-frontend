@@ -189,9 +189,17 @@ export const liveScoutingApi = {
   exportPdfUrl: (id: string) =>
     `${api.baseUrl}/api/live-scouting/sessions/${id}/export/pdf`,
 
-  convertToReport: (id: string) =>
-    api.post<{ reportIds: string[]; reportId: string; alreadyConverted: boolean; playerCount: number }>(
-      `/api/live-scouting/sessions/${id}/convert-to-report`,
+  convertToReport: (id: string, force = false) =>
+    api.post<{
+      reportIds: string[];
+      reportId: string;
+      alreadyConverted: boolean;
+      updated: boolean;
+      updatedCount: number;
+      createdCount: number;
+      playerCount: number;
+    }>(
+      `/api/live-scouting/sessions/${id}/convert-to-report${force ? '?force=true' : ''}`,
     ),
 
   suggestProfileUpdates: (id: string) =>
