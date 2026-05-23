@@ -183,6 +183,15 @@ export const liveScoutingApi = {
 
   // ─── Phase 2 APIs ─────────────────────────────────────────────────
 
+  updateSession: (id: string, data: {
+    gameTitle?: string;
+    homeTeam?: string;
+    awayTeam?: string;
+    venue?: string;
+    competition?: string;
+    gameDate?: string;
+  }) => api.patch(`/api/live-scouting/sessions/${id}`, data),
+
   analyzeSession: (id: string) =>
     api.post<AiAnalysis>(`/api/live-scouting/sessions/${id}/analyze`),
 

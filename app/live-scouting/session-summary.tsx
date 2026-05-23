@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  TextInput,
+  Modal,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
 import {
@@ -39,6 +41,17 @@ export default function SessionSummaryScreen() {
   const [converting, setConverting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [notesExpanded, setNotesExpanded] = useState<Record<string, boolean>>({});
+  const [editMode, setEditMode] = useState(false);
+  const [showEditInfo, setShowEditInfo] = useState(false);
+  const [editFields, setEditFields] = useState({
+    gameTitle: '',
+    homeTeam: '',
+    awayTeam: '',
+    venue: '',
+    competition: '',
+  });
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [dataEdited, setDataEdited] = useState(false);
 
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
@@ -50,9 +63,49 @@ export default function SessionSummaryScreen() {
     }
   }, [sessionId]);
 
-  useEffect(() => {
-    loadSession();
-  }, [loadSession]);
+  // Reload session when screen gains focus (e.g. returning from quarter edit)
+  useFocusEffect(
+    useCallback(() => {
+      loadSession();
+    }, [loadSession]),
+  );
+
+  const openEditInfoModal = () => {
+    if (!session) return;
+    setEditFields({
+      gameTitle: session.gameTitle || '',
+      homeTeam: session.homeTeam || '',
+      awayTeam: session.awayTeam || '',
+      venue: session.venue || '',
+      competition: session.competition || '',
+    });
+    setShowEditInfo(true);
+  };
+
+  const handleSaveInfo = async () => {
+    if (!sessionId) return;
+    setSavingInfo(true);
+    try {
+      await liveScoutingApi.updateSession(sessionId, editFields);
+      setDataEdited(true);
+      setShowEditInfo(false);
+      await loadSession();
+      const msg = 'Session info updated!';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Success', msg);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to update session info';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+    } finally {
+      setSavingInfo(false);
+    }
+  };
+
+  const navigateToQuarterEdit = (playerId: string, quarter: number) => {
+    setDataEdited(true);
+    router.push(
+      `/live-scouting/quarter-review?sessionId=${sessionId}&playerId=${playerId}&quarter=${quarter}` as any,
+    );
+  };
 
   const handleComplete = async () => {
     if (!sessionId) return;
@@ -143,6 +196,34 @@ export default function SessionSummaryScreen() {
         </View>
       )}
 
+      {/* ─── Edit Mode Toggle (COMPLETED sessions only) ─── */}
+      {session.status === 'COMPLETED' && (
+        <TouchableOpacity
+          style={[styles.editModeBtn, editMode && styles.editModeBtnActive]}
+          onPress={() => setEditMode(!editMode)}
+        >
+          <Ionicons
+            name={editMode ? 'checkmark-done' : 'create-outline'}
+            size={18}
+            color={editMode ? '#fff' : Colors.accent}
+          />
+          <Text style={[styles.editModeBtnText, editMode && styles.editModeBtnTextActive]}>
+            {editMode ? 'Done Editing' : 'Edit Session'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* ─── Stale AI Warning ─── */}
+      {editMode && session.aiSummary && (
+        <View style={styles.staleAiBanner}>
+          <Ionicons name="warning" size={18} color="#F59E0B" />
+          <Text style={styles.staleAiText}>
+            Editing session data may make AI analysis stale. Regenerate AI analysis after editing to
+            reflect changes.
+          </Text>
+        </View>
+      )}
+
       {/* ─── Game Info Card ─── */}
       <View style={styles.gameInfoCard}>
         <View style={styles.gameInfoRow}>
@@ -173,6 +254,12 @@ export default function SessionSummaryScreen() {
             </Text>
           </View>
         </View>
+        {editMode && (
+          <TouchableOpacity style={styles.editInfoBtn} onPress={openEditInfoModal}>
+            <Ionicons name="create-outline" size={16} color={Colors.accent} />
+            <Text style={styles.editInfoBtnText}>Edit Game Info</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ─── Player Summary Cards ─── */}
@@ -293,6 +380,25 @@ export default function SessionSummaryScreen() {
                 </View>
               </View>
             </View>
+
+            {/* Per-Quarter Edit Buttons (edit mode only) */}
+            {editMode && (
+              <View style={styles.quarterEditSection}>
+                <Text style={styles.miniLabel}>✏️ EDIT QUARTER DATA</Text>
+                <View style={styles.quarterEditRow}>
+                  {[1, 2, 3, 4].map((q) => (
+                    <TouchableOpacity
+                      key={q}
+                      style={styles.quarterEditBtn}
+                      onPress={() => navigateToQuarterEdit(sp.playerId, q)}
+                    >
+                      <Ionicons name="create-outline" size={14} color={Colors.accent} />
+                      <Text style={styles.quarterEditBtnText}>Q{q}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Trait Rating Bars */}
             <View style={styles.traitSection}>
@@ -558,6 +664,74 @@ export default function SessionSummaryScreen() {
           </TouchableOpacity>
         </View>
       )}
+      {/* ─── Edit Info Modal ─── */}
+      <Modal visible={showEditInfo} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Game Info</Text>
+
+            <Text style={styles.modalLabel}>Game Title</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editFields.gameTitle}
+              onChangeText={(t) => setEditFields((f) => ({ ...f, gameTitle: t }))}
+              placeholderTextColor={Colors.textMuted}
+            />
+
+            <Text style={styles.modalLabel}>Home Team</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editFields.homeTeam}
+              onChangeText={(t) => setEditFields((f) => ({ ...f, homeTeam: t }))}
+              placeholderTextColor={Colors.textMuted}
+            />
+
+            <Text style={styles.modalLabel}>Away Team</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editFields.awayTeam}
+              onChangeText={(t) => setEditFields((f) => ({ ...f, awayTeam: t }))}
+              placeholderTextColor={Colors.textMuted}
+            />
+
+            <Text style={styles.modalLabel}>Venue</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editFields.venue}
+              onChangeText={(t) => setEditFields((f) => ({ ...f, venue: t }))}
+              placeholderTextColor={Colors.textMuted}
+            />
+
+            <Text style={styles.modalLabel}>Competition</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editFields.competition}
+              onChangeText={(t) => setEditFields((f) => ({ ...f, competition: t }))}
+              placeholderTextColor={Colors.textMuted}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowEditInfo(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleSaveInfo}
+                disabled={savingInfo}
+              >
+                {savingInfo ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -896,4 +1070,163 @@ const styles = StyleSheet.create({
   },
   actionBtnTitle: { color: Colors.text, fontSize: 14, fontWeight: '700' },
   actionBtnDesc: { color: Colors.textSecondary, fontSize: 12, marginTop: 1 },
+
+  // ─── Edit Mode Styles ────────────────────────────────────────────
+  editModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.accent + '44',
+    marginBottom: 12,
+  },
+  editModeBtnActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  editModeBtnText: {
+    color: Colors.accent,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  editModeBtnTextActive: {
+    color: '#fff',
+  },
+
+  staleAiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(245,158,11,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.3)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  staleAiText: {
+    flex: 1,
+    color: '#F59E0B',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  editInfoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  editInfoBtnText: {
+    color: Colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  quarterEditSection: {
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    marginTop: 8,
+  },
+  quarterEditRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  quarterEditBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: Colors.elevated,
+    borderRadius: 8,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent + '44',
+  },
+  quarterEditBtnText: {
+    color: Colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // ─── Modal Styles ────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 16,
+  },
+  modalLabel: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+    marginTop: 10,
+  },
+  modalInput: {
+    backgroundColor: Colors.elevated,
+    borderRadius: 8,
+    padding: 10,
+    color: Colors.text,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: Colors.elevated,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalSaveBtn: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });
