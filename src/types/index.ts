@@ -1,5 +1,5 @@
 export const COMPETITIONS = ['Futures', 'Colts', 'Reserves', 'League', 'PSA', 'State 18s'] as const;
-export const POSITIONS = ['Forward', 'High Forward', 'Hybrid Fwd', 'Inside Mid', 'Outside Mid', 'Ruck', 'Key Defender', 'Mid Defender', 'Sml Defender', 'Hybrid Back'] as const;
+export const POSITIONS = ['Small Forward', 'Key Forward', 'High Forward', 'Medium Forward', 'Ruck', 'Outside Mid', 'Inside Mid', 'Key Back', 'Rebound Defender', 'Small Defender', 'Mid Defender'] as const;
 export const PROJECTIONS = ['Strong Prospect', 'Watch Player', 'Not Recommended'] as const;
 export const SIGNING_STATUSES = ['SIGNED', 'NOT_SIGNED'] as const;
 export type SigningStatus = typeof SIGNING_STATUSES[number];
