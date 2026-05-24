@@ -177,7 +177,17 @@ export default function GridTrackingScreen() {
               <Text style={[styles.gridPlayerPos, posChanged ? { color: Colors.amber } : null]}>
                 {qPos}{posChanged ? ' ↔' : ''}
               </Text>
-              {sp.isNewPlayer && (
+              {sp.status === 'DNP' && (
+                <View style={[styles.gridNewBadge, { backgroundColor: '#EF4444' }]}>
+                  <Text style={styles.gridNewText}>DNP</Text>
+                </View>
+              )}
+              {sp.status === 'INJ' && (
+                <View style={[styles.gridNewBadge, { backgroundColor: '#F59E0B' }]}>
+                  <Text style={styles.gridNewText}>INJ</Text>
+                </View>
+              )}
+              {sp.isNewPlayer && !sp.status && (
                 <View style={styles.gridNewBadge}>
                   <Text style={styles.gridNewText}>NEW</Text>
                 </View>

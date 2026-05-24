@@ -27,6 +27,7 @@ export default function QuarterReviewScreen() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [playerLocked, setPlayerLocked] = useState<string | null>(null); // 'DNP' | 'INJ' | null
   const [quarterData, setQuarterData] = useState<QuarterData | null>(null);
   const [playerName, setPlayerName] = useState('');
   const [notes, setNotes] = useState('');
@@ -54,6 +55,7 @@ export default function QuarterReviewScreen() {
       if (sp) {
         setPlayerName(sp.player.fullName);
         setSessionPosition(sp.position || '');
+        if (sp.status) setPlayerLocked(sp.status);
         const qd = sp.quarterData.find((d) => d.quarter === q);
         if (qd) {
           setQuarterData(qd);
@@ -135,6 +137,23 @@ export default function QuarterReviewScreen() {
         </View>
         <View style={{ width: 36 }} />
       </View>
+
+      {playerLocked && (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 10,
+          backgroundColor: playerLocked === 'DNP' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
+          borderWidth: 1, borderColor: playerLocked === 'DNP' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)',
+          borderRadius: 12, padding: 12, marginBottom: 12,
+        }}>
+          <Ionicons name={playerLocked === 'DNP' ? 'close-circle' : 'medkit'} size={20} color={playerLocked === 'DNP' ? '#EF4444' : '#F59E0B'} />
+          <Text style={{ color: Colors.textSecondary, fontSize: 13, flex: 1 }}>
+            Player marked as {playerLocked}. Editing is disabled.
+          </Text>
+          <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.elevated }}>
+            <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Text style={styles.instruction}>
         Review & adjust trait observation counts. Ratings are auto-calculated from the +/- ratio.
@@ -307,7 +326,7 @@ export default function QuarterReviewScreen() {
         textAlignVertical="top"
       />
 
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+      <TouchableOpacity style={[styles.saveBtn, !!playerLocked && { opacity: 0.4 }]} onPress={handleSave} disabled={saving || !!playerLocked}>
         {saving ? (
           <ActivityIndicator color="#fff" />
         ) : (

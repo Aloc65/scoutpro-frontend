@@ -68,6 +68,8 @@ export interface QuarterData {
   reviewCompleted: boolean;
 }
 
+export type PlayerStatus = 'DNP' | 'INJ' | null;
+
 export interface SessionPlayerData {
   id: string;
   sessionId: string;
@@ -76,6 +78,9 @@ export interface SessionPlayerData {
   representingTeam: string | null;
   orderIndex: number;
   isNewPlayer: boolean;
+  status: PlayerStatus;
+  injuryQuarter: number | null;
+  injuryNotes: string | null;
   player: {
     id: string;
     fullName: string;
@@ -172,6 +177,15 @@ export const liveScoutingApi = {
 
   removePlayer: (sessionId: string, playerId: string) =>
     api.delete(`/api/live-scouting/sessions/${sessionId}/players/${playerId}`),
+
+  updatePlayerStatus: (sessionId: string, playerId: string, data: {
+    status: 'DNP' | 'INJ' | null;
+    injuryQuarter?: number;
+    injuryNotes?: string;
+  }) => api.patch<SessionPlayerData>(
+    `/api/live-scouting/sessions/${sessionId}/players/${playerId}/status`,
+    data,
+  ),
 
   updateStats: (sessionId: string, playerId: string, quarter: number, field: string, delta: number) =>
     api.post<QuarterData>(

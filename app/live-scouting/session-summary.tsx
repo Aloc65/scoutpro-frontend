@@ -313,9 +313,19 @@ export default function SessionSummaryScreen() {
             {/* Player Header */}
             <View style={styles.playerHeader}>
               <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <Text style={styles.playerName}>{sp.player.fullName}</Text>
-                  {sp.isNewPlayer && (
+                  {sp.status === 'DNP' && (
+                    <View style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>DNP</Text>
+                    </View>
+                  )}
+                  {sp.status === 'INJ' && (
+                    <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>INJ Q{sp.injuryQuarter}</Text>
+                    </View>
+                  )}
+                  {sp.isNewPlayer && !sp.status && (
                     <View style={styles.newBadge}>
                       <Text style={styles.newBadgeText}>NEW</Text>
                     </View>
@@ -367,6 +377,22 @@ export default function SessionSummaryScreen() {
                 </View>
               )}
             </View>
+
+            {/* DNP / INJ info banner */}
+            {sp.status === 'DNP' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
+                <Ionicons name="close-circle" size={16} color="#EF4444" />
+                <Text style={{ color: Colors.textSecondary, fontSize: 12, flex: 1 }}>Did not play — excluded from analysis and reports.</Text>
+              </View>
+            )}
+            {sp.status === 'INJ' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(245,158,11,0.08)', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)' }}>
+                <Ionicons name="medkit" size={16} color="#F59E0B" />
+                <Text style={{ color: Colors.textSecondary, fontSize: 12, flex: 1 }}>
+                  Injured in Q{sp.injuryQuarter}. Only pre-injury data used in analysis.{sp.injuryNotes ? ` Notes: ${sp.injuryNotes}` : ''}
+                </Text>
+              </View>
+            )}
 
             {/* Goals by Quarter */}
             <View style={styles.goalsSection}>
