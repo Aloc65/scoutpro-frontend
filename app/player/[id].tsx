@@ -13,6 +13,7 @@ import {
   MeetingType,
   SIGNING_STATUS_LABELS,
   ChampionDataPlayerResponse,
+  NationalChampionshipsPlayerResponse,
   WatchList,
 } from '../../src/types';
 import Card from '../../src/components/Card';
@@ -401,6 +402,8 @@ export default function PlayerDetailScreen() {
   const [gamesWithStats, setGamesWithStats] = useState(0);
   const [championColumns, setChampionColumns] = useState<Array<{ key: string; label: string }>>([]);
   const [championSeasonAverages, setChampionSeasonAverages] = useState<Array<{ season: number | null; rows: number; averages: Record<string, number | null> }>>([]);
+  const [natChampColumns, setNatChampColumns] = useState<Array<{ key: string; label: string }>>([]);
+  const [natChampSeasonAverages, setNatChampSeasonAverages] = useState<Array<{ season: number | null; rows: number; averages: Record<string, number | null> }>>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   // Edit player state
@@ -424,9 +427,10 @@ export default function PlayerDetailScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [d, championData, watchStatus] = await Promise.all([
+      const [d, championData, natChampData, watchStatus] = await Promise.all([
         api.get<{ player: Player; reports: any[]; averageRatings: Ratings; gameStatTotals: GameStats; gameStatAverages: GameStats; gamesWithStats: number }>(`/api/players/${id}`),
         api.get<ChampionDataPlayerResponse>(`/api/champion-data/player/${id}`).catch(() => null),
+        api.get<NationalChampionshipsPlayerResponse>(`/api/national-championships/player/${id}`).catch(() => null),
         api.get<{ inWatchList: boolean; entry: WatchList | null }>(`/api/watch-list/player/${id}`).catch(() => ({ inWatchList: false, entry: null })),
       ]);
 
@@ -444,6 +448,14 @@ export default function PlayerDetailScreen() {
       } else {
         setChampionColumns([]);
         setChampionSeasonAverages([]);
+      }
+
+      if (natChampData) {
+        setNatChampColumns(natChampData.columns || []);
+        setNatChampSeasonAverages(natChampData.seasonAverages || []);
+      } else {
+        setNatChampColumns([]);
+        setNatChampSeasonAverages([]);
       }
     } catch {}
   }, [id]);
@@ -650,6 +662,12 @@ export default function PlayerDetailScreen() {
   const championAverageColumns = championColumns.filter((column) => (
     championSeasonAverages.length > 0
       ? Object.prototype.hasOwnProperty.call(championSeasonAverages[0].averages, column.key)
+      : false
+  ));
+
+  const natChampAverageColumns = natChampColumns.filter((column) => (
+    natChampSeasonAverages.length > 0
+      ? Object.prototype.hasOwnProperty.call(natChampSeasonAverages[0].averages, column.key)
       : false
   ));
   return (
@@ -907,6 +925,46 @@ export default function PlayerDetailScreen() {
                       <View style={styles.championTableRow}>
                         {championAverageColumns.map((column) => (
                           <View key={`value-${seasonRow.season ?? 'unknown'}-${column.key}`} style={styles.championTableCell}>
+                            <Text style={styles.championTableValueText}>{formatChampionValue(seasonRow.averages[column.key], column.key)}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </ScrollView>
+                </View>
+              ))}
+            </View>
+          )}
+        </Card>
+
+        <Card style={{ marginBottom: 16 }}>
+          <Text style={styles.sectionTitle}>National Championships Stats - Season Averages</Text>
+          {natChampSeasonAverages.length === 0 || natChampAverageColumns.length === 0 ? (
+            <Text style={styles.statsSubtitle}>No National Championships season averages imported for this player yet.</Text>
+          ) : (
+            <View style={styles.championSeasonTableWrap}>
+              {natChampSeasonAverages.map((seasonRow) => (
+                <View key={`nc-season-${seasonRow.season ?? 'unknown'}`} style={styles.championSeasonCard}>
+                  <Text style={[styles.championSeasonHeading, { color: '#F59E0B' }]}>Season {seasonRow.season ?? 'Unknown'}</Text>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator
+                    style={styles.championTableScroll}
+                    contentContainerStyle={styles.championTableContent}
+                  >
+                    <View style={styles.championTable}>
+                      <View style={[styles.championTableRow, styles.championTableHeaderRow]}>
+                        {natChampAverageColumns.map((column) => (
+                          <View key={`nc-header-${seasonRow.season ?? 'unknown'}-${column.key}`} style={[styles.championTableCell, styles.championTableHeaderCell]}>
+                            <Text style={styles.championTableHeaderText}>{column.label}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      <View style={styles.championTableRow}>
+                        {natChampAverageColumns.map((column) => (
+                          <View key={`nc-value-${seasonRow.season ?? 'unknown'}-${column.key}`} style={styles.championTableCell}>
                             <Text style={styles.championTableValueText}>{formatChampionValue(seasonRow.averages[column.key], column.key)}</Text>
                           </View>
                         ))}

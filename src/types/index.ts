@@ -189,6 +189,19 @@ export interface ChampionDataPlayerResponse {
   stats: ChampionDataStat[];
   seasonAverages: ChampionDataSeasonAverage[];
 }
+
+// ─── National Championships Stats ─────────────────────────────────────
+// Mirrors Champion Data types — same stat structure
+export type NationalChampionshipsStat = ChampionDataStat;
+export type NationalChampionshipsColumn = ChampionDataColumn;
+export type NationalChampionshipsSeasonAverage = ChampionDataSeasonAverage;
+
+export interface NationalChampionshipsPlayerResponse {
+  player: { id: string; fullName: string };
+  columns: NationalChampionshipsColumn[];
+  stats: NationalChampionshipsStat[];
+  seasonAverages: NationalChampionshipsSeasonAverage[];
+}
 export interface FullReport {
   id: string;
   playerId: string;

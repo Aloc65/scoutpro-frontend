@@ -27,13 +27,22 @@ type ImportResponse = {
   errors: string[];
 };
 
+type DataSource = 'champion-data' | 'national-championships';
+
+const DATA_SOURCES: Array<{ key: DataSource; label: string; icon: string; endpoint: string; color: string }> = [
+  { key: 'champion-data', label: 'Champion Data', icon: 'trophy-outline', endpoint: '/api/champion-data/import', color: '#06B6D4' },
+  { key: 'national-championships', label: 'National Championships', icon: 'flag-outline', endpoint: '/api/national-championships/import', color: '#F59E0B' },
+];
+
 export default function DataImportScreen() {
   const { user } = useAuth();
+  const [activeSource, setActiveSource] = useState<DataSource>('champion-data');
   const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<ImportResponse | null>(null);
 
   const hasResultErrors = useMemo(() => (result?.errors?.length || 0) > 0, [result]);
+  const currentSource = DATA_SOURCES.find((s) => s.key === activeSource)!;
 
   if (user?.role !== 'ADMIN') {
     return (
@@ -82,36 +91,56 @@ export default function DataImportScreen() {
 
   const runImport = async () => {
     if (!selectedFile) {
-      showAlert('No File Selected', 'Please select a Champion Data CSV/XLSX file first.');
+      showAlert('No File Selected', `Please select a ${currentSource.label} CSV/XLSX file first.`);
       return;
     }
 
     try {
       setUploading(true);
       const uploadFile = await buildUploadFile(selectedFile);
-      const response = await api.upload<ImportResponse>('/api/champion-data/import', uploadFile);
+      const response = await api.upload<ImportResponse>(currentSource.endpoint, uploadFile);
       setResult(response);
-      showAlert('Import Complete', 'Champion Data import completed successfully.');
+      showAlert('Import Complete', `${currentSource.label} import completed successfully.`);
     } catch (e: any) {
-      showAlert('Import Failed', e.message || 'Failed to import Champion Data file');
+      showAlert('Import Failed', e.message || `Failed to import ${currentSource.label} file`);
     } finally {
       setUploading(false);
     }
   };
 
+  const handleSourceChange = (source: DataSource) => {
+    setActiveSource(source);
+    setSelectedFile(null);
+    setResult(null);
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Data Source Tabs */}
+      <View style={styles.sourceTabs}>
+        {DATA_SOURCES.map((source) => (
+          <TouchableOpacity
+            key={source.key}
+            style={[styles.sourceTab, activeSource === source.key && { borderColor: source.color, backgroundColor: `${source.color}18` }]}
+            onPress={() => handleSourceChange(source.key)}
+          >
+            <Ionicons name={source.icon as any} size={16} color={activeSource === source.key ? source.color : Colors.textMuted} />
+            <Text style={[styles.sourceTabText, activeSource === source.key && { color: source.color }]}>{source.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <Card style={styles.card}>
-        <Ionicons name="cloud-upload-outline" size={40} color={Colors.accent} style={{ alignSelf: 'center' }} />
+        <Ionicons name="cloud-upload-outline" size={40} color={currentSource.color} style={{ alignSelf: 'center' }} />
         <Text style={styles.title}>Data Import</Text>
-        <Text style={styles.subtitle}>Upload Champion Data benchmark/match files (CSV/XLSX). This tab is designed for future data source imports too.</Text>
+        <Text style={styles.subtitle}>Upload {currentSource.label} benchmark/match files (CSV/XLSX).</Text>
 
         <TouchableOpacity style={styles.filePicker} activeOpacity={0.8} onPress={pickFile}>
           <Ionicons name="document-outline" size={18} color={Colors.textSecondary} />
-          <Text style={styles.filePickerText}>{selectedFile ? selectedFile.name : 'Select Champion Data file'}</Text>
+          <Text style={styles.filePickerText}>{selectedFile ? selectedFile.name : `Select ${currentSource.label} file`}</Text>
         </TouchableOpacity>
 
-        <GradientButton title="Import Champion Data" onPress={runImport} loading={uploading} style={{ marginTop: 14 }} />
+        <GradientButton title={`Import ${currentSource.label}`} onPress={runImport} loading={uploading} style={{ marginTop: 14 }} />
 
         {uploading && (
           <View style={styles.progressRow}>
@@ -162,6 +191,13 @@ export default function DataImportScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, paddingBottom: 32 },
+  sourceTabs: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  sourceTab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.card,
+  },
+  sourceTabText: { color: Colors.textMuted, fontSize: 13, fontWeight: '700' },
   card: { marginBottom: 16 },
   title: { fontSize: 22, fontWeight: '700', color: Colors.text, textAlign: 'center', marginTop: 10 },
   subtitle: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 20 },
