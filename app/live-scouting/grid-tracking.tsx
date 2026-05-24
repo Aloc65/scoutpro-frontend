@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +21,7 @@ import {
   LiveScoutingSession,
   TRAITS,
   calcTraitRating,
+  PlayerStatus,
 } from '../../src/api/liveScouting';
 
 const QUARTERS = [1, 2, 3, 4];
@@ -32,6 +35,12 @@ export default function GridTrackingScreen() {
   const [loading, setLoading] = useState(true);
   const [activeQuarter, setActiveQuarter] = useState(1);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [injuryModalVisible, setInjuryModalVisible] = useState(false);
+  const [injuryTargetPlayerId, setInjuryTargetPlayerId] = useState<string | null>(null);
+  const [injuryTargetName, setInjuryTargetName] = useState('');
+  const [injuryQuarterPick, setInjuryQuarterPick] = useState<number>(1);
+  const [injuryNotesText, setInjuryNotesText] = useState('');
 
   // Refs for syncing vertical scroll between left (fixed) and right (scrollable) columns
   const leftScrollRef = useRef<ScrollView>(null);
@@ -116,6 +125,82 @@ export default function GridTrackingScreen() {
     return (qd as any)[field] || 0;
   };
 
+  // ─── Status handlers ────────────────────────────────────────────
+
+  const handleSetDNP = (playerId: string, playerName: string) => {
+    const doIt = async () => {
+      setStatusUpdating(true);
+      try {
+        await liveScoutingApi.updatePlayerStatus(sessionId!, playerId, { status: 'DNP' });
+        await loadSession();
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to update status';
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+      } finally {
+        setStatusUpdating(false);
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Mark ${playerName} as DNP (Did Not Play)? This will lock all inputs for this player.`)) doIt();
+    } else {
+      Alert.alert('Confirm DNP', `Mark ${playerName} as DNP (Did Not Play)? This will lock all inputs for this player.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', style: 'destructive', onPress: doIt },
+      ]);
+    }
+  };
+
+  const handleOpenInjuryModal = (playerId: string, playerName: string) => {
+    setInjuryTargetPlayerId(playerId);
+    setInjuryTargetName(playerName);
+    setInjuryQuarterPick(activeQuarter);
+    setInjuryNotesText('');
+    setInjuryModalVisible(true);
+  };
+
+  const handleConfirmInjury = async () => {
+    if (!injuryTargetPlayerId) return;
+    setInjuryModalVisible(false);
+    setStatusUpdating(true);
+    try {
+      await liveScoutingApi.updatePlayerStatus(sessionId!, injuryTargetPlayerId, {
+        status: 'INJ',
+        injuryQuarter: injuryQuarterPick,
+        injuryNotes: injuryNotesText.trim() || undefined,
+      });
+      await loadSession();
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to update status';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+    } finally {
+      setStatusUpdating(false);
+      setInjuryTargetPlayerId(null);
+    }
+  };
+
+  const handleClearStatus = (playerId: string, playerName: string, currentStatus: string) => {
+    const doIt = async () => {
+      setStatusUpdating(true);
+      try {
+        await liveScoutingApi.updatePlayerStatus(sessionId!, playerId, { status: null });
+        await loadSession();
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to clear status';
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+      } finally {
+        setStatusUpdating(false);
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Clear ${currentStatus} status for ${playerName}?`)) doIt();
+    } else {
+      Alert.alert('Clear Status', `Clear ${currentStatus} status for ${playerName}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear', onPress: doIt },
+      ]);
+    }
+  };
+
   // Build rows: scoring rows + trait rows (each trait = 1 row showing +/- for each player)
   const scoringRows = [
     { field: 'goals', label: '⚽ Goals' },
@@ -132,6 +217,11 @@ export default function GridTrackingScreen() {
       {/* Header label */}
       <View style={[styles.labelRow, styles.headerLabelRow]}>
         <Text style={styles.gridLabelText}>Trait</Text>
+      </View>
+
+      {/* Status row label */}
+      <View style={[styles.labelRow, styles.statusLabelRow]}>
+        <Text style={styles.gridTraitLabel}>🏥 Status</Text>
       </View>
 
       {/* Scoring labels */}
@@ -197,26 +287,84 @@ export default function GridTrackingScreen() {
         })}
       </View>
 
+      {/* Status row — DNP / INJ buttons per player */}
+      <View style={[styles.gridRow, styles.statusRow]}>
+        {players.map((sp) => {
+          const isLocked = !!sp.status;
+          return (
+            <View key={sp.id} style={styles.gridStatusCell}>
+              {!sp.status && (
+                <View style={styles.gridStatusBtnRow}>
+                  <TouchableOpacity
+                    style={styles.gridDnpBtn}
+                    onPress={() => handleSetDNP(sp.playerId, sp.player.fullName)}
+                    disabled={statusUpdating}
+                  >
+                    <Ionicons name="close-circle-outline" size={12} color="#EF4444" />
+                    <Text style={styles.gridDnpBtnText}>DNP</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.gridInjBtn}
+                    onPress={() => handleOpenInjuryModal(sp.playerId, sp.player.fullName)}
+                    disabled={statusUpdating}
+                  >
+                    <Ionicons name="medkit-outline" size={12} color="#F59E0B" />
+                    <Text style={styles.gridInjBtnText}>INJ</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {sp.status === 'DNP' && (
+                <TouchableOpacity
+                  style={styles.gridStatusActiveBadge}
+                  onPress={() => handleClearStatus(sp.playerId, sp.player.fullName, 'DNP')}
+                  disabled={statusUpdating}
+                >
+                  <View style={[styles.gridStatusBadge, { backgroundColor: '#EF4444' }]}>
+                    <Ionicons name="close-circle" size={11} color="#fff" />
+                    <Text style={styles.gridStatusBadgeText}>DNP</Text>
+                  </View>
+                  <Text style={styles.gridClearText}>Tap to clear</Text>
+                </TouchableOpacity>
+              )}
+              {sp.status === 'INJ' && (
+                <TouchableOpacity
+                  style={styles.gridStatusActiveBadge}
+                  onPress={() => handleClearStatus(sp.playerId, sp.player.fullName, 'INJ')}
+                  disabled={statusUpdating}
+                >
+                  <View style={[styles.gridStatusBadge, { backgroundColor: '#F59E0B' }]}>
+                    <Ionicons name="medkit" size={11} color="#fff" />
+                    <Text style={styles.gridStatusBadgeText}>INJ Q{sp.injuryQuarter}</Text>
+                  </View>
+                  <Text style={styles.gridClearText}>Tap to clear</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
       {/* Scoring rows (goals, behinds) — simple +/- counters */}
       {scoringRows.map((row, idx) => (
         <View key={row.field} style={[styles.gridRow, idx % 2 === 0 ? styles.gridRowEven : null]}>
           {players.map((sp) => {
             const val = getVal(sp, row.field);
+            const isLocked = !!sp.status;
             return (
-              <View key={sp.id} style={styles.gridDataCell}>
+              <View key={sp.id} style={[styles.gridDataCell, isLocked && styles.gridCellLocked]}>
                 <View style={styles.gridCellRow}>
                   <TouchableOpacity
-                    style={styles.gridMinus}
+                    style={[styles.gridMinus, isLocked && styles.gridBtnDisabled]}
                     onPress={() => handleStatUpdate(sp.playerId, row.field, -1)}
-                    disabled={!!updating}
+                    disabled={!!updating || isLocked}
                   >
                     <Text style={styles.gridMinusText}>−</Text>
                   </TouchableOpacity>
                   <Text style={styles.gridCellValue}>{val}</Text>
                   <TouchableOpacity
-                    style={styles.gridPlus}
+                    style={[styles.gridPlus, isLocked && styles.gridBtnDisabled]}
                     onPress={() => handleStatUpdate(sp.playerId, row.field, 1)}
-                    disabled={!!updating}
+                    disabled={!!updating || isLocked}
                   >
                     <Text style={styles.gridPlusText}>+</Text>
                   </TouchableOpacity>
@@ -234,13 +382,14 @@ export default function GridTrackingScreen() {
             const pos = getVal(sp, trait.posKey);
             const neg = getVal(sp, trait.negKey);
             const rating = calcTraitRating(pos, neg);
+            const isLocked = !!sp.status;
             return (
-              <View key={sp.id} style={styles.gridDataCell}>
+              <View key={sp.id} style={[styles.gridDataCell, isLocked && styles.gridCellLocked]}>
                 <View style={styles.gridCellRow}>
                   <TouchableOpacity
-                    style={styles.gridPlus}
+                    style={[styles.gridPlus, isLocked && styles.gridBtnDisabled]}
                     onPress={() => handleStatUpdate(sp.playerId, trait.posKey, 1)}
-                    disabled={!!updating}
+                    disabled={!!updating || isLocked}
                   >
                     <Text style={styles.gridPlusText}>+</Text>
                   </TouchableOpacity>
@@ -257,9 +406,9 @@ export default function GridTrackingScreen() {
                     )}
                   </View>
                   <TouchableOpacity
-                    style={styles.gridMinus}
+                    style={[styles.gridMinus, isLocked && styles.gridBtnDisabled]}
                     onPress={() => handleStatUpdate(sp.playerId, trait.negKey, 1)}
-                    disabled={!!updating}
+                    disabled={!!updating || isLocked}
                   >
                     <Text style={styles.gridMinusText}>−</Text>
                   </TouchableOpacity>
@@ -274,18 +423,20 @@ export default function GridTrackingScreen() {
       <View style={styles.gridRow}>
         {players.map((sp) => {
           const qd = sp.quarterData.find((q) => q.quarter === activeQuarter);
+          const isLocked = !!sp.status;
           return (
             <TouchableOpacity
               key={sp.id}
-              style={styles.gridNotesCell}
+              style={[styles.gridNotesCell, isLocked && styles.gridCellLocked]}
               onPress={() =>
                 router.push(
                   `/live-scouting/notes?sessionId=${sessionId}&playerId=${sp.playerId}&quarter=${activeQuarter}` as any,
                 )
               }
+              disabled={isLocked}
             >
               <Text style={styles.gridNotesText} numberOfLines={2}>
-                {qd?.notes || 'Tap to add...'}
+                {isLocked ? (sp.status === 'DNP' ? '🚫 DNP' : '🏥 Injured') : (qd?.notes || 'Tap to add...')}
               </Text>
             </TouchableOpacity>
           );
@@ -296,23 +447,25 @@ export default function GridTrackingScreen() {
       <View style={styles.gridRow}>
         {players.map((sp) => {
           const qd = sp.quarterData.find((q) => q.quarter === activeQuarter);
+          const isLocked = !!sp.status;
           return (
             <TouchableOpacity
               key={sp.id}
-              style={styles.gridReviewCell}
+              style={[styles.gridReviewCell, isLocked && styles.gridCellLocked]}
               onPress={() =>
                 router.push(
                   `/live-scouting/quarter-review?sessionId=${sessionId}&playerId=${sp.playerId}&quarter=${activeQuarter}` as any,
                 )
               }
+              disabled={isLocked}
             >
               <Ionicons
-                name={qd?.reviewCompleted ? 'checkmark-circle' : 'star-outline'}
+                name={isLocked ? 'lock-closed' : qd?.reviewCompleted ? 'checkmark-circle' : 'star-outline'}
                 size={18}
-                color={qd?.reviewCompleted ? Colors.green : Colors.amber}
+                color={isLocked ? Colors.textMuted : qd?.reviewCompleted ? Colors.green : Colors.amber}
               />
               <Text style={styles.gridReviewText}>
-                {qd?.reviewCompleted ? 'Done' : 'Review'}
+                {isLocked ? 'Locked' : qd?.reviewCompleted ? 'Done' : 'Review'}
               </Text>
             </TouchableOpacity>
           );
@@ -367,6 +520,51 @@ export default function GridTrackingScreen() {
           <Text style={styles.summaryText}>Summary</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Injury modal */}
+      <Modal
+        visible={injuryModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInjuryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Mark as Injured</Text>
+            <Text style={styles.modalSubtext}>
+              {injuryTargetName ? `${injuryTargetName} — ` : ''}Select the quarter when the injury occurred:
+            </Text>
+            <View style={styles.modalQuarterRow}>
+              {QUARTERS.map((q) => (
+                <TouchableOpacity
+                  key={q}
+                  style={[styles.modalQuarterBtn, injuryQuarterPick === q && styles.modalQuarterBtnActive]}
+                  onPress={() => setInjuryQuarterPick(q)}
+                >
+                  <Text style={[styles.modalQuarterText, injuryQuarterPick === q && styles.modalQuarterTextActive]}>Q{q}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.modalLabel}>Injury Notes (optional)</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. Hamstring, left knee..."
+              placeholderTextColor={Colors.textMuted}
+              value={injuryNotesText}
+              onChangeText={setInjuryNotesText}
+              multiline
+            />
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setInjuryModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleConfirmInjury}>
+                <Text style={styles.modalConfirmText}>Confirm Injury</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Spreadsheet grid — fixed left labels + scrollable right player columns */}
       <View style={styles.gridWrapper}>
@@ -541,4 +739,74 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   gridReviewText: { color: Colors.textSecondary, fontSize: 11, fontWeight: '600', marginTop: 2 },
+
+  // Status row
+  statusLabelRow: { backgroundColor: 'rgba(245,158,11,0.04)' },
+  statusRow: { backgroundColor: 'rgba(245,158,11,0.04)' },
+  gridStatusCell: {
+    width: PLAYER_COL_WIDTH, paddingVertical: 6, paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center',
+    borderRightWidth: 1, borderRightColor: Colors.border,
+    minHeight: 52,
+  },
+  gridStatusBtnRow: { flexDirection: 'row', gap: 4 },
+  gridDnpBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6,
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)', backgroundColor: 'rgba(239,68,68,0.08)',
+  },
+  gridDnpBtnText: { color: '#EF4444', fontSize: 10, fontWeight: '800' },
+  gridInjBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6,
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)', backgroundColor: 'rgba(245,158,11,0.08)',
+  },
+  gridInjBtnText: { color: '#F59E0B', fontSize: 10, fontWeight: '800' },
+  gridStatusActiveBadge: { alignItems: 'center', gap: 2 },
+  gridStatusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5,
+  },
+  gridStatusBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  gridClearText: { color: Colors.textMuted, fontSize: 8, fontStyle: 'italic' },
+
+  // Locked cell styling
+  gridCellLocked: { opacity: 0.35 },
+  gridBtnDisabled: { opacity: 0.3 },
+
+  // Injury modal
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center', alignItems: 'center', padding: 20,
+  },
+  modalCard: {
+    backgroundColor: Colors.card, borderRadius: 16, padding: 24,
+    width: '100%', maxWidth: 380, borderWidth: 1, borderColor: Colors.border,
+  },
+  modalTitle: { color: Colors.text, fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  modalSubtext: { color: Colors.textSecondary, fontSize: 13, marginBottom: 16 },
+  modalQuarterRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  modalQuarterBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
+    backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border,
+  },
+  modalQuarterBtnActive: { backgroundColor: 'rgba(245,158,11,0.2)', borderColor: '#F59E0B' },
+  modalQuarterText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '700' },
+  modalQuarterTextActive: { color: '#F59E0B' },
+  modalLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  modalInput: {
+    backgroundColor: Colors.elevated, borderRadius: 10, borderWidth: 1, borderColor: Colors.border,
+    padding: 12, color: Colors.text, fontSize: 14, minHeight: 60, textAlignVertical: 'top', marginBottom: 16,
+  },
+  modalBtnRow: { flexDirection: 'row', gap: 10 },
+  modalCancelBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.elevated,
+  },
+  modalCancelText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '700' },
+  modalConfirmBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center',
+    backgroundColor: '#F59E0B',
+  },
+  modalConfirmText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
