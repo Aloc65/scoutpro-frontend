@@ -998,6 +998,9 @@ export default function PlayerDetailScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.meta}>vs {r.opponent} • {new Date(r.matchDate).toLocaleDateString()}</Text>
                   <Text style={styles.meta}>{r.scoutName} • {r.primaryPosition}</Text>
+                  {(r as any).representingTeam && (r as any).representingTeam !== player?.team && (
+                    <Text style={[styles.meta, { color: '#10B981' }]}>🏟️ Representing: {(r as any).representingTeam}</Text>
+                  )}
                   <View style={[styles.viewingBadge, { backgroundColor: `${viewingMethodMeta.color}22`, borderColor: `${viewingMethodMeta.color}66` }]}>
                     <Text style={styles.viewingBadgeEmoji}>{viewingMethodMeta.icon}</Text>
                     <Text style={[styles.viewingBadgeText, { color: viewingMethodMeta.color }]}>{viewingMethodMeta.label}</Text>

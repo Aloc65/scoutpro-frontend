@@ -78,6 +78,7 @@ export default function EditReportScreen() {
   const [showOpponentDropdown, setShowOpponentDropdown] = useState(false);
   const [venue, setVenue] = useState('');
   const [competition, setCompetition] = useState('');
+  const [representingTeam, setRepresentingTeam] = useState('');
   const [viewingMethod, setViewingMethod] = useState<ReportViewingMethod>('LIVE');
 
   const [positionsPlayed, setPositionsPlayed] = useState<string[]>([]);
@@ -183,6 +184,7 @@ export default function EditReportScreen() {
       setShowOpponentDropdown(false);
       setVenue(r.venue || '');
       setCompetition(r.competition || '');
+      setRepresentingTeam(r.representingTeam || '');
       setViewingMethod(r.viewingMethod || 'LIVE');
       setPositionsPlayed(r.positionsPlayed);
       setPrimaryPosition(r.primaryPosition);
@@ -228,6 +230,7 @@ export default function EditReportScreen() {
       await api.patch(`/api/reports/${id}`, {
         matchDate: new Date(matchDate).toISOString(),
         opponent, venue: venue || undefined, competition: competition || undefined,
+        representingTeam: representingTeam || undefined,
         positionsPlayed, primaryPosition, viewingMethod, summary,
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
         developmentAreas: developmentAreas || undefined,
@@ -263,6 +266,9 @@ export default function EditReportScreen() {
             <Text style={styles.title}>{report.playerName}</Text>
             <Text style={styles.meta}>vs {report.opponent} • {isoToDDMMYYYY(report.matchDate)}</Text>
             <Text style={styles.meta}>Scout: {report.scoutName} • {report.primaryPosition}</Text>
+            {report.representingTeam && (
+              <Text style={styles.meta}>🏟️ Representing: {report.representingTeam}{report.representingTeam !== report.playerTeam ? ` (primary: ${report.playerTeam})` : ''}</Text>
+            )}
             <View style={[styles.viewingBadge, { backgroundColor: `${report.viewingMethod === 'LIVE' ? Colors.green : Colors.primary}22`, borderColor: `${report.viewingMethod === 'LIVE' ? Colors.green : Colors.primary}66` }] }>
               <Text style={styles.viewingBadgeEmoji}>{report.viewingMethod === 'LIVE' ? '🎥' : '📹'}</Text>
               <Text style={[styles.viewingBadgeText, { color: report.viewingMethod === 'LIVE' ? Colors.green : Colors.primary }]}>
@@ -383,6 +389,21 @@ export default function EditReportScreen() {
               <Input label="Other Opponent *" value={customOpponent} onChangeText={setCustomOpponent} />
             )}
             <Input label="Venue" value={venue} onChangeText={setVenue} />
+
+            {/* Representing Team */}
+            <Text style={styles.fieldLabel}>Representing Team</Text>
+            <Text style={styles.helperText}>The team this player was representing in this match</Text>
+            <Input
+              label="e.g., WA U18s, PSA, Swan Districts"
+              value={representingTeam}
+              onChangeText={setRepresentingTeam}
+            />
+            {representingTeam && report?.playerTeam && representingTeam !== report.playerTeam && (
+              <View style={styles.repTeamBadge}>
+                <Text style={styles.repTeamBadgeText}>🏟️ Representing: {representingTeam} (primary team: {report.playerTeam})</Text>
+              </View>
+            )}
+
             <Text style={styles.fieldLabel}>Competition</Text>
             <View style={styles.chipRow}>
               {COMPETITIONS.map((c) => (
@@ -664,4 +685,18 @@ const styles = StyleSheet.create({
   dropdownItemSelected: { backgroundColor: 'rgba(79, 70, 229, 0.15)' },
   dropdownItemText: { fontSize: 15, color: Colors.text },
   dropdownItemTextSelected: { color: Colors.primary, fontWeight: '700' },
+  repTeamBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  repTeamBadgeText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });

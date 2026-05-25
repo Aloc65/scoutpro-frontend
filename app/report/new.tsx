@@ -83,7 +83,8 @@ export default function NewReportScreen() {
   const [customOpponent, setCustomOpponent] = useState('');
   const [showOpponentDropdown, setShowOpponentDropdown] = useState(false);
   const [venue, setVenue] = useState('');
-  const [competition, setCompetition] = useState('');
+  const [competition, setCompetition] = useState("Under 16's");
+  const [representingTeam, setRepresentingTeam] = useState('');
   const [viewingMethod, setViewingMethod] = useState<ReportViewingMethod>('LIVE');
 
   const [positionsPlayed, setPositionsPlayed] = useState<string[]>([]);
@@ -103,6 +104,15 @@ export default function NewReportScreen() {
   const [fetchingStats, setFetchingStats] = useState(false);
   const [fetchMessage, setFetchMessage] = useState('');
 
+  const selectedPlayer = useMemo(() => players.find((p) => p.id === selectedPlayerId), [players, selectedPlayerId]);
+
+  // Auto-set representing team to player's primary team when player changes
+  useEffect(() => {
+    if (selectedPlayer?.team) {
+      setRepresentingTeam(selectedPlayer.team);
+    }
+  }, [selectedPlayer]);
+
   const opponent = useMemo(() => {
     if (selectedOpponentOption === OTHER_OPPONENT_OPTION) {
       return customOpponent.trim();
@@ -111,7 +121,6 @@ export default function NewReportScreen() {
   }, [selectedOpponentOption, customOpponent]);
 
   const fetchStatsFromWeb = async () => {
-    const selectedPlayer = players.find((p) => p.id === selectedPlayerId);
     if (!selectedPlayer) {
       showAlert('Missing Info', 'Please select a player first');
       return;
@@ -194,6 +203,7 @@ export default function NewReportScreen() {
         playerId: selectedPlayerId,
         matchDate: new Date(matchDate).toISOString(),
         opponent, venue: venue || undefined, competition: competition || undefined,
+        representingTeam: representingTeam || undefined,
         positionsPlayed, primaryPosition, viewingMethod, summary,
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
         developmentAreas: developmentAreas || undefined,
@@ -268,6 +278,21 @@ export default function NewReportScreen() {
               <Input label="Other Opponent *" value={customOpponent} onChangeText={setCustomOpponent} />
             )}
             <Input label="Venue" value={venue} onChangeText={setVenue} />
+
+            {/* Representing Team */}
+            <Text style={styles.fieldLabel}>Representing Team</Text>
+            <Text style={styles.helperText}>The team this player was representing in this match</Text>
+            <Input
+              label="e.g., WA U18s, PSA, Swan Districts"
+              value={representingTeam}
+              onChangeText={setRepresentingTeam}
+            />
+            {representingTeam && selectedPlayer?.team && representingTeam !== selectedPlayer.team && (
+              <View style={styles.repTeamBadge}>
+                <Text style={styles.repTeamBadgeText}>🏟️ Representing: {representingTeam} (primary team: {selectedPlayer.team})</Text>
+              </View>
+            )}
+
             <Text style={styles.fieldLabel}>Competition</Text>
             <View style={styles.chipRow}>
               {COMPETITIONS.map((c) => (
@@ -506,4 +531,18 @@ const styles = StyleSheet.create({
   dropdownItemSelected: { backgroundColor: 'rgba(79, 70, 229, 0.15)' },
   dropdownItemText: { fontSize: 15, color: Colors.text },
   dropdownItemTextSelected: { color: Colors.primary, fontWeight: '700' },
+  repTeamBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  repTeamBadgeText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });

@@ -59,6 +59,9 @@ export default function ReportsScreen() {
                 <Text style={styles.name}>{item.playerName}</Text>
                 <Text style={styles.meta}>vs {item.opponent} • {new Date(item.matchDate).toLocaleDateString()}</Text>
                 <Text style={styles.meta}>{item.scoutName} • {item.primaryPosition}</Text>
+                {item.representingTeam && item.representingTeam !== item.playerTeam && (
+                  <Text style={[styles.meta, { color: '#10B981' }]}>🏟️ Representing: {item.representingTeam}</Text>
+                )}
                 <View style={[styles.viewingBadge, { backgroundColor: `${getViewingBadgeColor(item.viewingMethod)}22`, borderColor: `${getViewingBadgeColor(item.viewingMethod)}66` }]}>
                   <Text style={styles.viewingBadgeEmoji}>{getViewingBadgeIcon(item.viewingMethod)}</Text>
                   <Text style={[styles.viewingBadgeText, { color: getViewingBadgeColor(item.viewingMethod) }]}>

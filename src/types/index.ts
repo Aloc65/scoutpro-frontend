@@ -1,4 +1,4 @@
-export const COMPETITIONS = ['Futures', 'Colts', 'Reserves', 'League', 'PSA', 'State 18s'] as const;
+export const COMPETITIONS = ['Futures', 'Colts', 'Reserves', 'League', 'PSA', 'State 18s', "Under 16's"] as const;
 export const POSITIONS = ['Small Forward', 'Key Forward', 'High Forward', 'Medium Forward', 'Ruck', 'Outside Mid', 'Inside Mid', 'Key Back', 'Rebound Defender', 'Small Defender', 'Mid Defender'] as const;
 export const PROJECTIONS = ['Strong Prospect', 'Watch Player', 'Not Recommended'] as const;
 export const SIGNING_STATUSES = ['SIGNED', 'NOT_SIGNED'] as const;
@@ -86,6 +86,7 @@ export interface ReportListItem {
   competition: string | null;
   scoutName: string;
   overallProjection: string | null;
+  representingTeam: string | null;
   primaryPosition: string;
   viewingMethod: ReportViewingMethod;
   createdAt: string;
@@ -223,6 +224,7 @@ export interface FullReport {
   weaknesses: string | null;
   developmentAreas: string | null;
   overallProjection: string | null;
+  representingTeam: string | null;
   goals: number | null;
   behinds: number | null;
   disposals: number | null;
