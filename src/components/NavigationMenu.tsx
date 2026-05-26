@@ -37,6 +37,7 @@ const PRIMARY_ITEMS: MenuItem[] = [
 const SECONDARY_ITEMS: MenuItem[] = [
   { key: 'fixtures', label: 'Fixtures', icon: 'calendar-outline', href: '/fixtures' },
   { key: 'export', label: 'Export', icon: 'download-outline', href: '/export' },
+  { key: 'weekly-reports', label: 'Weekly Reports', icon: 'mail-outline', href: '/weekly-reports', adminOnly: true },
   { key: 'data-import', label: 'Data Import', icon: 'cloud-upload-outline', href: '/data-import', adminOnly: true },
 ];
 
