@@ -30,7 +30,7 @@ interface ReportSummary {
   playerName: string;
   scoutName: string;
   createdAt: string;
-  overallRating: number;
+  overallProjection: string;
 }
 
 interface PreviewData {
@@ -41,8 +41,8 @@ interface PreviewData {
   summary: {
     totalReports: number;
     uniquePlayers: number;
-    uniqueScouts: number;
-    avgRating: number;
+    activeScouts: string[];
+    competitions: string[];
     strongProspects: number;
     watchPlayers: number;
   };
@@ -266,10 +266,10 @@ export default function WeeklyReportsScreen() {
             <View style={styles.statsGrid}>
               <StatBox label="Reports" value={preview.summary.totalReports} icon="document-text" color={Colors.primary} />
               <StatBox label="Players" value={preview.summary.uniquePlayers} icon="people" color={Colors.accent} />
-              <StatBox label="Scouts" value={preview.summary.uniqueScouts} icon="person" color={Colors.green} />
+              <StatBox label="Scouts" value={preview.summary.activeScouts?.length ?? 0} icon="person" color={Colors.green} />
               <StatBox label="Strong" value={preview.summary.strongProspects} icon="trending-up" color={Colors.green} />
               <StatBox label="Watch" value={preview.summary.watchPlayers} icon="eye" color={Colors.orange} />
-              <StatBox label="Avg Rating" value={preview.summary.avgRating?.toFixed(1) || '-'} icon="star" color={Colors.amber} />
+              <StatBox label="Competitions" value={preview.summary.competitions?.length ?? 0} icon="trophy" color={Colors.amber} />
             </View>
           </Card>
         )}
