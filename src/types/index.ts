@@ -263,11 +263,34 @@ export interface Meeting {
   updatedAt: string;
 }
 
+export interface UpcomingGame {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  venue: string | null;
+  competition: string;
+  round: string;
+  date: string;
+  time: string | null;
+  sessionId: string | null;
+  sessionStatus: string | null;
+  playerCount: number;
+}
+
+export interface UpcomingGamesData {
+  weekendLabel: string;
+  weekendStart: string;
+  weekendEnd: string;
+  games: UpcomingGame[];
+  totalGames: number;
+}
+
 export interface DashboardData {
   totalPlayers: number;
   totalReports: number;
   myReports: number;
   recentReports: ReportListItem[];
+  upcomingGames?: UpcomingGamesData;
 }
 
 // ─── Live Scouting Types ─────────────────────────────────────────────
