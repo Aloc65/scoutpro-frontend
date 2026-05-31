@@ -30,6 +30,7 @@ function CompactGameRow({ game, onPress }: { game: UpcomingGame; onPress: () => 
         </View>
         <Text style={cs.rowTeams} numberOfLines={1}>
           {game.homeTeam} <Text style={cs.rowVs}>vs</Text> {game.awayTeam}
+          {game.venue ? <Text style={cs.rowVenue}> @ {game.venue}</Text> : null}
         </Text>
       </View>
       <View style={cs.rowRight}>
@@ -279,6 +280,7 @@ const cs = StyleSheet.create({
   compChipText: { fontSize: 9, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase' },
   rowTeams: { fontSize: 13, color: Colors.text, fontWeight: '600', flex: 1 },
   rowVs: { color: Colors.textMuted, fontWeight: '400', fontSize: 11 },
+  rowVenue: { color: Colors.textMuted, fontWeight: '400', fontSize: 11 },
   rowRight: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
   rowTime: { fontSize: 11, color: Colors.textSecondary, fontWeight: '600' },
 });
