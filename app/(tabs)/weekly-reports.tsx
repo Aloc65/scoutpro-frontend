@@ -205,7 +205,7 @@ export default function WeeklyReportsScreen() {
         </View>
         <Text style={styles.howToStep}>1. Select your reporting period below</Text>
         <Text style={styles.howToStep}>2. Review the summary of included reports</Text>
-        <Text style={styles.howToStep}>3. Tap <Text style={styles.howToBold}>Download PDF</Text> to get the full report package</Text>
+        <Text style={styles.howToStep}>3. Tap <Text style={styles.howToBold}>Run Weekly Report</Text> to generate &amp; download the full report package</Text>
         <Text style={styles.howToStep}>4. Attach the PDF to your email and send to your scouts</Text>
       </Card>
 
@@ -333,10 +333,11 @@ export default function WeeklyReportsScreen() {
         {/* Download Button — PRIMARY ACTION */}
         <View style={styles.downloadSection}>
           <GradientButton
-            label={downloading ? 'Generating PDF...' : `Download Weekly Report PDF`}
+            title={downloading ? 'Generating Report…' : 'RUN WEEKLY REPORT'}
             onPress={handleDownload}
+            loading={downloading}
             disabled={downloading || !preview || preview.reportCount === 0}
-            icon="download"
+            icon="download-outline"
           />
           {preview && preview.reportCount > 0 && (
             <Text style={styles.downloadHint}>
