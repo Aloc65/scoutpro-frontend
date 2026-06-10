@@ -2,7 +2,8 @@ import { api } from './client';
 import { Meeting } from '../types';
 
 export async function getMeetingsByPlayer(playerId: string): Promise<Meeting[]> {
-  return api.get<Meeting[]>(`/api/meetings?playerId=${playerId}`);
+  // Backend route is GET /api/meetings/player/:playerId (path param, not a query string)
+  return api.get<Meeting[]>(`/api/meetings/player/${playerId}`);
 }
 
 export async function createMeeting(data: {
