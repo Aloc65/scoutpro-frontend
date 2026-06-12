@@ -744,7 +744,6 @@ export default function PlayerDetailScreen() {
                 </TouchableOpacity>
               </View>
               {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
-              {player.state && <Text style={styles.info}>📍 {player.state}</Text>}
             </View>
           </View>
 
@@ -843,6 +842,16 @@ export default function PlayerDetailScreen() {
                   <Ionicons name="trophy-outline" size={14} color={Colors.accent} />
                   <Text style={styles.dobLabel}>Draft Year</Text>
                   <Text style={styles.dobValue}>{player.draftYear}</Text>
+                </View>
+              </>
+            )}
+            {player.state && (
+              <>
+                <View style={styles.dobDivider} />
+                <View style={styles.dobItem}>
+                  <Ionicons name="location-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.dobLabel}>State</Text>
+                  <Text style={styles.dobValue}>{player.state}</Text>
                 </View>
               </>
             )}
