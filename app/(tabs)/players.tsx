@@ -27,8 +27,24 @@ import Input from '../../src/components/Input';
 import GradientButton from '../../src/components/GradientButton';
 import { showAlert, showConfirm } from '../../src/utils/alert';
 
-const COMPETITION_OPTIONS = ['All', ...COMPETITIONS] as const;
 const STATE_FILTER_OPTIONS = ['All', ...AUSTRALIAN_STATES] as const;
+
+// Competitions are currently state-specific. The list below (Futures, Colts,
+// Reserves, League, PSA, State 18s, Under 16s) is unique to Western Australia.
+// Other states don't have defined competitions yet — add entries here as the
+// scouting expansion rolls out to give each state its own competition list.
+const STATE_COMPETITIONS: Record<string, readonly string[]> = {
+  WA: COMPETITIONS,
+};
+
+// Returns the competition filter chips to show for the selected state filter.
+// For "All" (includes WA players) and "WA" we surface the WA competitions.
+// States without a defined competition list return [] so the row is hidden.
+function getCompetitionOptionsForState(state: string): string[] {
+  if (state === 'All') return ['All', ...COMPETITIONS];
+  const comps = STATE_COMPETITIONS[state];
+  return comps && comps.length > 0 ? ['All', ...comps] : [];
+}
 
 export default function PlayersScreen() {
   const { user } = useAuth();
@@ -109,6 +125,18 @@ export default function PlayersScreen() {
       return surnameA.localeCompare(surnameB);
     });
   }, [players, competitionFilter, stateFilter, nameFilter]);
+
+  // Competition chips are state-aware: only show competitions relevant to the
+  // selected state (WA-specific for now). Hidden entirely for states without a list.
+  const competitionOptions = useMemo(() => getCompetitionOptionsForState(stateFilter), [stateFilter]);
+
+  // If the selected competition isn't valid for the newly selected state, reset it
+  // so the list isn't silently filtered to zero results.
+  useEffect(() => {
+    if (competitionFilter !== 'All' && !competitionOptions.includes(competitionFilter)) {
+      setCompetitionFilter('All');
+    }
+  }, [competitionOptions, competitionFilter]);
 
   const hasActiveFilters = competitionFilter !== 'All' || stateFilter !== 'All' || nameFilter.trim().length > 0;
 
@@ -329,18 +357,20 @@ export default function PlayersScreen() {
           )}
         </View>
 
-        {/* Competition filter chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
-          {COMPETITION_OPTIONS.map((c) => (
-            <TouchableOpacity
-              key={c}
-              onPress={() => setCompetitionFilter(c)}
-              style={[styles.filterChip, competitionFilter === c && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterChipText, competitionFilter === c && styles.filterChipTextActive]}>{c}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Competition filter chips (state-aware: hidden for states with no competitions) */}
+        {competitionOptions.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+            {competitionOptions.map((c) => (
+              <TouchableOpacity
+                key={c}
+                onPress={() => setCompetitionFilter(c)}
+                style={[styles.filterChip, competitionFilter === c && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterChipText, competitionFilter === c && styles.filterChipTextActive]}>{c}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
 
         {/* State filter chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
