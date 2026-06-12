@@ -4,7 +4,7 @@ import {
   TouchableOpacity, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native';
 import { Colors } from '../theme/colors';
-import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus } from '../types';
+import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus, AUSTRALIAN_STATES } from '../types';
 import GradientButton from './GradientButton';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -20,6 +20,7 @@ interface EditPlayerFormProps {
 export default function EditPlayerForm({ visible, player, onSave, onClose }: EditPlayerFormProps) {
   const [fullName, setFullName] = useState('');
   const [team, setTeam] = useState('');
+  const [state, setState] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [competition, setCompetition] = useState('');
   const [dominantFoot, setDominantFoot] = useState('');
@@ -31,6 +32,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showCompDropdown, setShowCompDropdown] = useState(false);
+  const [showStateDropdown, setShowStateDropdown] = useState(false);
   const [showFootDropdown, setShowFootDropdown] = useState(false);
   const [showSigningDropdown, setShowSigningDropdown] = useState(false);
 
@@ -38,6 +40,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
     if (player && visible) {
       setFullName(player.fullName || '');
       setTeam(player.team || '');
+      setState(player.state || '');
       // Convert ISO datetime to DD/MM/YYYY for text input
       if (player.dateOfBirth) {
         const d = new Date(player.dateOfBirth);
@@ -114,6 +117,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
       await onSave({
         fullName: fullName.trim(),
         team: team.trim() || null,
+        state: (state || null) as any,
         dateOfBirth: dobISO,
         competition: competition || null,
         dominantFoot: dominantFoot || null,
@@ -220,6 +224,9 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
                 placeholderTextColor={Colors.textMuted}
               />
             </View>
+
+            {/* State dropdown */}
+            {renderDropdown('State', state, AUSTRALIAN_STATES, showStateDropdown, setShowStateDropdown, setState)}
 
             {/* Date of Birth */}
             <View style={styles.fieldContainer}>

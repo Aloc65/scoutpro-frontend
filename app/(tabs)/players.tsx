@@ -13,13 +13,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api, getToken } from '../../src/api/client';
 import { useAuth } from '../../src/context/AuthContext';
 import { Colors } from '../../src/theme/colors';
-import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus } from '../../src/types';
+import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus, AUSTRALIAN_STATES } from '../../src/types';
 import Card from '../../src/components/Card';
 import EmptyState from '../../src/components/EmptyState';
 import Input from '../../src/components/Input';
@@ -27,6 +28,7 @@ import GradientButton from '../../src/components/GradientButton';
 import { showAlert, showConfirm } from '../../src/utils/alert';
 
 const COMPETITION_OPTIONS = ['All', ...COMPETITIONS] as const;
+const STATE_FILTER_OPTIONS = ['All', ...AUSTRALIAN_STATES] as const;
 
 export default function PlayersScreen() {
   const { user } = useAuth();
@@ -34,7 +36,7 @@ export default function PlayersScreen() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ fullName: '', team: '', dateOfBirth: '', draftYear: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' as SigningStatus });
+  const [form, setForm] = useState({ fullName: '', team: '', state: '', dateOfBirth: '', draftYear: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' as SigningStatus });
   const [saving, setSaving] = useState(false);
   const [dobError, setDobError] = useState<string | null>(null);
 
@@ -64,6 +66,7 @@ export default function PlayersScreen() {
   // Filter state
   const [nameFilter, setNameFilter] = useState('');
   const [competitionFilter, setCompetitionFilter] = useState<string>('All');
+  const [stateFilter, setStateFilter] = useState<string>('All');
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -92,6 +95,9 @@ export default function PlayersScreen() {
     if (competitionFilter !== 'All') {
       result = result.filter((p) => p.competition === competitionFilter);
     }
+    if (stateFilter !== 'All') {
+      result = result.filter((p) => p.state === stateFilter);
+    }
     if (nameFilter.trim()) {
       const query = nameFilter.trim().toLowerCase();
       result = result.filter((p) => p.fullName.toLowerCase().includes(query));
@@ -102,13 +108,14 @@ export default function PlayersScreen() {
       const surnameB = (b.fullName || '').trim().split(/\s+/).pop()?.toLowerCase() || '';
       return surnameA.localeCompare(surnameB);
     });
-  }, [players, competitionFilter, nameFilter]);
+  }, [players, competitionFilter, stateFilter, nameFilter]);
 
-  const hasActiveFilters = competitionFilter !== 'All' || nameFilter.trim().length > 0;
+  const hasActiveFilters = competitionFilter !== 'All' || stateFilter !== 'All' || nameFilter.trim().length > 0;
 
   const clearFilters = () => {
     setNameFilter('');
     setCompetitionFilter('All');
+    setStateFilter('All');
   };
 
   // ─── Selection logic ──────────────────────────────────
@@ -274,6 +281,7 @@ export default function PlayersScreen() {
       await api.post('/api/players', {
         fullName: form.fullName,
         team: form.team || undefined,
+        state: form.state || undefined,
         dateOfBirth: dobISO,
         draftYear: form.draftYear ? parseInt(form.draftYear) : undefined,
         competition: form.competition || undefined,
@@ -284,7 +292,7 @@ export default function PlayersScreen() {
         signingStatus: form.signingStatus,
       });
       setModalOpen(false);
-      setForm({ fullName: '', team: '', dateOfBirth: '', draftYear: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' });
+      setForm({ fullName: '', team: '', state: '', dateOfBirth: '', draftYear: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' });
       setDobError(null);
       load();
     } catch (e: any) {
@@ -330,6 +338,19 @@ export default function PlayersScreen() {
               style={[styles.filterChip, competitionFilter === c && styles.filterChipActive]}
             >
               <Text style={[styles.filterChipText, competitionFilter === c && styles.filterChipTextActive]}>{c}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* State filter chips */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+          {STATE_FILTER_OPTIONS.map((s) => (
+            <TouchableOpacity
+              key={s}
+              onPress={() => setStateFilter(s)}
+              style={[styles.filterChip, stateFilter === s && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterChipText, stateFilter === s && styles.filterChipTextActive]}>{s}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -438,6 +459,15 @@ export default function PlayersScreen() {
                   </TouchableOpacity>
                 )}
 
+                {/* Player photo thumbnail */}
+                {item.photoUrl ? (
+                  <Image source={{ uri: item.photoUrl }} style={styles.playerThumb} resizeMode="cover" />
+                ) : (
+                  <View style={styles.playerThumbPlaceholder}>
+                    <Ionicons name="person" size={18} color={Colors.textMuted} />
+                  </View>
+                )}
+
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={styles.name}>{item.fullName}</Text>
@@ -455,7 +485,7 @@ export default function PlayersScreen() {
                     )}
                   </View>
                   <Text style={styles.meta}>
-                    {[item.team, item.competition, item.age != null ? (item.draftYear ? `${item.age}yo | ${item.draftYear} Draft` : `${item.age}yo`) : (item.draftYear ? `${item.draftYear} Draft` : null)].filter(Boolean).join(' • ')}
+                    {[item.team, item.state, item.competition, item.age != null ? (item.draftYear ? `${item.age}yo | ${item.draftYear} Draft` : `${item.age}yo`) : (item.draftYear ? `${item.draftYear} Draft` : null)].filter(Boolean).join(' • ')}
                   </Text>
                 </View>
                 {isAdmin && (
@@ -477,6 +507,15 @@ export default function PlayersScreen() {
               <Text style={styles.modalTitle}>Add Player</Text>
               <Input label="Full Name *" value={form.fullName} onChangeText={(t) => setForm({ ...form, fullName: t })} />
               <Input label="Team" value={form.team} onChangeText={(t) => setForm({ ...form, team: t })} />
+              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 6, marginTop: 4 }}>State</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {AUSTRALIAN_STATES.map((s) => (
+                  <TouchableOpacity key={s} onPress={() => setForm({ ...form, state: form.state === s ? '' : s })}
+                    style={[styles.chip, form.state === s && styles.chipActive]}>
+                    <Text style={[styles.chipText, form.state === s && { color: '#fff' }]}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               <View style={{ marginBottom: 12 }}>
                 <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 6 }}>Date of Birth</Text>
                 <TextInput
@@ -605,6 +644,8 @@ const styles = StyleSheet.create({
   clearBtnText: { color: Colors.accent, fontSize: 12, fontWeight: '600' },
   addBtn: { backgroundColor: Colors.primary, borderRadius: 10, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   playerCard: { marginBottom: 10 },
+  playerThumb: { width: 36, height: 48, borderRadius: 6, backgroundColor: Colors.elevated, marginRight: 10 },
+  playerThumbPlaceholder: { width: 36, height: 48, borderRadius: 6, backgroundColor: Colors.elevated, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   playerCardSelected: {
     borderWidth: 1.5,
     borderColor: Colors.accent,

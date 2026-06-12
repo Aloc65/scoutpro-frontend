@@ -18,6 +18,9 @@ export const REPORT_VIEWING_METHOD_LABELS: Record<ReportViewingMethod, string> =
 export const WATCH_LIST_SIGNED_STATUSES = ['Signed', 'Unsigned'] as const;
 export type SignedStatus = typeof WATCH_LIST_SIGNED_STATUSES[number];
 
+export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'NT'] as const;
+export type AustralianState = typeof AUSTRALIAN_STATES[number];
+
 export interface User {
   id: string;
   email: string;
@@ -32,6 +35,7 @@ export interface Player {
   id: string;
   fullName: string;
   team: string | null;
+  state: AustralianState | null;
   dateOfBirth: string | null;
   age: number | null;
   competition: string | null;
@@ -41,6 +45,8 @@ export interface Player {
   draftYear: number | null;
   signingStatus: 'SIGNED' | 'NOT_SIGNED';
   notes: string | null;
+  photoUrl: string | null;
+  photoLastUpdated: string | null;
   createdAt: string;
 }
 

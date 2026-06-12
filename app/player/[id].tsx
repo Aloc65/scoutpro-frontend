@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Platform, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Platform, ActivityIndicator, TextInput, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors } from '../../src/theme/colors';
@@ -394,6 +394,7 @@ export default function PlayerDetailScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
   const canEditNotes = user?.role === 'ADMIN' || user?.role === 'SCOUT';
+  const [photoFetching, setPhotoFetching] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
   const [reports, setReports] = useState<any[]>([]);
   const [avgRatings, setAvgRatings] = useState<Ratings | null>(null);
@@ -545,6 +546,28 @@ export default function PlayerDetailScreen() {
     }
   };
 
+  const handleFetchPhoto = async () => {
+    if (!player) return;
+    setPhotoFetching(true);
+    try {
+      const result = await api.post<{ success: boolean; photoUrl: string | null; message: string }>(`/api/players/${player.id}/fetch-photo`);
+      if (result.success && result.photoUrl) {
+        setPlayer({ ...player, photoUrl: result.photoUrl });
+        if (Platform.OS === 'web') window.alert('Photo updated!');
+        else Alert.alert('Success', 'Photo updated!');
+      } else {
+        if (Platform.OS === 'web') window.alert(result.message);
+        else Alert.alert('Not Found', result.message);
+      }
+    } catch (e) {
+      const msg = 'Failed to fetch photo';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setPhotoFetching(false);
+    }
+  };
+
   const toggleWatchList = async () => {
     try {
       setWatchListLoading(true);
@@ -679,18 +702,51 @@ export default function PlayerDetailScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
       >
         <Card style={{ marginBottom: 16 }}>
-          <View style={styles.playerHeaderRow}>
-            <Text style={[styles.name, { flex: 1 }]}>{player.fullName}</Text>
-            <TouchableOpacity
-              style={styles.editPlayerBtn}
-              onPress={() => setEditFormVisible(true)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="create-outline" size={16} color={Colors.accent} />
-              <Text style={styles.editPlayerBtnText}>Edit</Text>
-            </TouchableOpacity>
+          <View style={styles.profileTopRow}>
+            {/* Player Photo */}
+            <View>
+              {player.photoUrl ? (
+                <Image
+                  source={{ uri: player.photoUrl }}
+                  style={styles.playerPhoto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.playerPhotoPlaceholder}>
+                  <Ionicons name="person" size={32} color={Colors.textMuted} />
+                </View>
+              )}
+              {isAdmin && (
+                <TouchableOpacity
+                  style={styles.fetchPhotoBtn}
+                  onPress={handleFetchPhoto}
+                  disabled={photoFetching}
+                  activeOpacity={0.7}
+                >
+                  {photoFetching ? (
+                    <ActivityIndicator size="small" color={Colors.accent} />
+                  ) : (
+                    <Ionicons name="camera-outline" size={14} color={Colors.accent} />
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.profileInfo}>
+              <View style={styles.playerHeaderRow}>
+                <Text style={[styles.name, { flex: 1 }]}>{player.fullName}</Text>
+                <TouchableOpacity
+                  style={styles.editPlayerBtn}
+                  onPress={() => setEditFormVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="create-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.editPlayerBtnText}>Edit</Text>
+                </TouchableOpacity>
+              </View>
+              {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
+              {player.state && <Text style={styles.info}>📍 {player.state}</Text>}
+            </View>
           </View>
-          {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
 
           <TouchableOpacity
             style={watchListEntry ? styles.watchListBtnActive : styles.watchListBtn}
@@ -1135,6 +1191,11 @@ export default function PlayerDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  profileTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  playerPhoto: { width: 72, height: 96, borderRadius: 10, backgroundColor: Colors.elevated },
+  playerPhotoPlaceholder: { width: 72, height: 96, borderRadius: 10, backgroundColor: Colors.elevated, alignItems: 'center', justifyContent: 'center' },
+  fetchPhotoBtn: { position: 'absolute', bottom: -4, right: -4, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  profileInfo: { flex: 1 },
   playerHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
