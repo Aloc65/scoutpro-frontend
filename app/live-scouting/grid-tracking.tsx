@@ -264,6 +264,9 @@ export default function GridTrackingScreen() {
               <Text style={styles.gridPlayerName} numberOfLines={1}>
                 {sp.player.fullName.split(' ').pop()}
               </Text>
+              {sp.jumperNumber != null && (
+                <Text style={styles.gridJumper}>#{sp.jumperNumber}</Text>
+              )}
               <Text style={[styles.gridPlayerPos, posChanged ? { color: Colors.amber } : null]}>
                 {qPos}{posChanged ? ' ↔' : ''}
               </Text>
@@ -698,6 +701,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.elevated, minHeight: 52,
   },
   gridPlayerName: { color: Colors.text, fontSize: 13, fontWeight: '800' },
+  gridJumper: { color: Colors.accent, fontSize: 13, fontWeight: '900', marginTop: 1 },
   gridPlayerPos: { color: Colors.textMuted, fontSize: 10, marginTop: 1 },
   gridNewBadge: { backgroundColor: Colors.green, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, marginTop: 2 },
   gridNewText: { color: '#fff', fontSize: 7, fontWeight: '800' },

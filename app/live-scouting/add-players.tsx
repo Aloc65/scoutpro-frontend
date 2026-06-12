@@ -41,6 +41,7 @@ export default function AddPlayersScreen() {
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [perPlayerPosition, setPerPlayerPosition] = useState('');
   const [perPlayerRepTeam, setPerPlayerRepTeam] = useState('');
+  const [perPlayerJumper, setPerPlayerJumper] = useState('');
 
   // New player modal
   const [showNewPlayer, setShowNewPlayer] = useState(false);
@@ -50,6 +51,7 @@ export default function AddPlayersScreen() {
   const [newDraftYear, setNewDraftYear] = useState('');
   const [newPosition, setNewPosition] = useState('');
   const [newRepTeam, setNewRepTeam] = useState('');
+  const [newJumper, setNewJumper] = useState('');
 
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
@@ -107,12 +109,14 @@ export default function AddPlayersScreen() {
         playerId: player.id,
         position: perPlayerPosition || undefined,
         representingTeam: perPlayerRepTeam.trim() || undefined,
+        jumperNumber: perPlayerJumper.trim() !== '' ? parseInt(perPlayerJumper, 10) : undefined,
       });
       setSearch('');
       setSearchResults([]);
       setExpandedPlayerId(null);
       setPerPlayerPosition('');
       setPerPlayerRepTeam('');
+      setPerPlayerJumper('');
       await loadSession();
     } catch (err: any) {
       const msg = err?.message || 'Failed to add player';
@@ -133,6 +137,7 @@ export default function AddPlayersScreen() {
         newPlayerDraftYear: newDraftYear ? parseInt(newDraftYear) : undefined,
         position: newPosition || undefined,
         representingTeam: newRepTeam.trim() || undefined,
+        jumperNumber: newJumper.trim() !== '' ? parseInt(newJumper, 10) : undefined,
         isNewPlayer: true,
       });
       setShowNewPlayer(false);
@@ -142,6 +147,7 @@ export default function AddPlayersScreen() {
       setNewDraftYear('');
       setNewPosition('');
       setNewRepTeam('');
+      setNewJumper('');
       await loadSession();
     } catch (err: any) {
       const msg = err?.message || 'Failed to create player';
@@ -260,6 +266,19 @@ export default function AddPlayersScreen() {
                         : 'No team set — enter one or leave blank'}
                   </Text>
 
+                  {/* Jumper number */}
+                  <Text style={styles.expandedLabel}>👕 Jumper Number</Text>
+                  <TextInput
+                    style={[styles.input, styles.jumperInput]}
+                    value={perPlayerJumper}
+                    onChangeText={(t) => setPerPlayerJumper(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                    placeholder="#"
+                    placeholderTextColor={Colors.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Text style={styles.expandedHint}>Playing number for this game (optional)</Text>
+
                   {/* Add button */}
                   <TouchableOpacity
                     style={styles.addPlayerBtn}
@@ -303,6 +322,11 @@ export default function AddPlayersScreen() {
             const isRepDifferent = sp.representingTeam && sp.representingTeam !== sp.player.team;
             return (
               <View key={sp.id} style={styles.addedPlayer}>
+                {sp.jumperNumber != null && (
+                  <View style={styles.jumperBadge}>
+                    <Text style={styles.jumperBadgeText}>{sp.jumperNumber}</Text>
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <View style={styles.playerNameRow}>
                     <Text style={styles.playerName}>{sp.player.fullName}</Text>
@@ -419,6 +443,18 @@ export default function AddPlayersScreen() {
               e.g. Western Australia U18s, Aquinas PSA
             </Text>
 
+            <Text style={styles.label}>Jumper Number</Text>
+            <TextInput
+              style={[styles.input, styles.jumperInput]}
+              value={newJumper}
+              onChangeText={(t) => setNewJumper(t.replace(/[^0-9]/g, '').slice(0, 2))}
+              placeholder="#"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <Text style={styles.repTeamHint}>Playing number for this game (optional)</Text>
+
             <TouchableOpacity
               style={[styles.createBtn, (!newFirst.trim() || !newLast.trim()) && styles.createBtnDisabled]}
               onPress={addNewPlayer}
@@ -499,6 +535,18 @@ const styles = StyleSheet.create({
   },
   expandedLabel: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 4, marginTop: 8 },
   expandedHint: { color: Colors.textMuted, fontSize: 11, marginTop: 4, fontStyle: 'italic' },
+  jumperInput: { width: 90, textAlign: 'center', fontSize: 20, fontWeight: '800', letterSpacing: 1 },
+  jumperBadge: {
+    minWidth: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    paddingHorizontal: 6,
+  },
+  jumperBadgeText: { color: '#fff', fontSize: 18, fontWeight: '800' },
   addPlayerBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -76,6 +76,7 @@ export interface SessionPlayerData {
   playerId: string;
   position: string | null;
   representingTeam: string | null;
+  jumperNumber: number | null;
   orderIndex: number;
   isNewPlayer: boolean;
   status: PlayerStatus;
@@ -168,6 +169,7 @@ export const liveScoutingApi = {
     playerId?: string;
     position?: string;
     representingTeam?: string;
+    jumperNumber?: number;
     newPlayerFirstName?: string;
     newPlayerLastName?: string;
     newPlayerDraftYear?: number;
@@ -184,6 +186,13 @@ export const liveScoutingApi = {
     injuryNotes?: string;
   }) => api.patch<SessionPlayerData>(
     `/api/live-scouting/sessions/${sessionId}/players/${playerId}/status`,
+    data,
+  ),
+
+  updatePlayerDetails: (sessionId: string, playerId: string, data: {
+    jumperNumber?: number | null;
+  }) => api.patch<SessionPlayerData>(
+    `/api/live-scouting/sessions/${sessionId}/players/${playerId}/details`,
     data,
   ),
 

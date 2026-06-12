@@ -41,6 +41,9 @@ export default function TrackingScreen() {
   const [injuryModalVisible, setInjuryModalVisible] = useState(false);
   const [injuryQuarterPick, setInjuryQuarterPick] = useState<number>(1);
   const [injuryNotesText, setInjuryNotesText] = useState('');
+  const [jumperModalVisible, setJumperModalVisible] = useState(false);
+  const [jumperInputText, setJumperInputText] = useState('');
+  const [jumperUpdating, setJumperUpdating] = useState(false);
 
   const loadSession = useCallback(async () => {
     if (!sessionId) {
@@ -307,6 +310,33 @@ export default function TrackingScreen() {
     }
   };
 
+  const handleOpenJumperModal = () => {
+    setJumperInputText(currentPlayer.jumperNumber != null ? String(currentPlayer.jumperNumber) : '');
+    setJumperModalVisible(true);
+  };
+
+  const handleConfirmJumper = async () => {
+    const trimmed = jumperInputText.trim();
+    const value = trimmed === '' ? null : parseInt(trimmed, 10);
+    setJumperModalVisible(false);
+    setJumperUpdating(true);
+    try {
+      await liveScoutingApi.updatePlayerDetails(sessionId!, currentPlayer.playerId, {
+        jumperNumber: value,
+      });
+      await loadSession();
+    } catch (err: any) {
+      if (isSessionExpiredError(err)) {
+        setLoadError('session_expired');
+        setLoadErrorMessage('Your session has expired. Please log in again.');
+      } else {
+        Alert.alert('Error', err?.message || 'Failed to update jumper number');
+      }
+    } finally {
+      setJumperUpdating(false);
+    }
+  };
+
   const isPlayerLocked = !!(currentPlayer.status);
 
   const getVal = (field: string): number => {
@@ -345,6 +375,11 @@ export default function TrackingScreen() {
             <Text style={[styles.playerTabText, activePlayerIdx === idx && styles.playerTabTextActive]}>
               {sp.player.fullName.split(' ').pop()}
             </Text>
+            {sp.jumperNumber != null && (
+              <Text style={[styles.playerTabJumper, activePlayerIdx === idx && styles.playerTabJumperActive]}>
+                #{sp.jumperNumber}
+              </Text>
+            )}
             {sp.status === 'DNP' && (
               <View style={styles.dnpBadge}>
                 <Text style={styles.statusBadgeText}>DNP</Text>
@@ -373,7 +408,30 @@ export default function TrackingScreen() {
 
       {/* Player info */}
       <View style={styles.playerHeader}>
-        <Text style={styles.playerName}>{currentPlayer.player.fullName}</Text>
+        <View style={styles.playerNameRow}>
+          <TouchableOpacity
+            style={[styles.jumperPill, currentPlayer.jumperNumber == null && styles.jumperPillEmpty]}
+            onPress={handleOpenJumperModal}
+            disabled={jumperUpdating}
+          >
+            {jumperUpdating ? (
+              <ActivityIndicator color={Colors.accent} size="small" />
+            ) : currentPlayer.jumperNumber != null ? (
+              <Text style={styles.jumperPillNumber}>#{currentPlayer.jumperNumber}</Text>
+            ) : (
+              <>
+                <Ionicons name="shirt-outline" size={16} color={Colors.accent} />
+                <Text style={styles.jumperPillAddText}>Set #</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <Text style={[styles.playerName, { flex: 1 }]}>{currentPlayer.player.fullName}</Text>
+          {currentPlayer.jumperNumber != null && (
+            <TouchableOpacity onPress={handleOpenJumperModal} disabled={jumperUpdating} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="pencil" size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.playerInfo}>
           {[currentQD?.position || currentPlayer.position, currentPlayer.representingTeam || currentPlayer.player.team, currentPlayer.player.draftYear ? `Draft ${currentPlayer.player.draftYear}` : null]
             .filter(Boolean)
@@ -482,6 +540,42 @@ export default function TrackingScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleConfirmInjury}>
                 <Text style={styles.modalConfirmText}>Confirm Injury</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Jumper number modal */}
+      <Modal
+        visible={jumperModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setJumperModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Jumper Number</Text>
+            <Text style={styles.modalSubtext}>
+              Playing number for {currentPlayer.player.fullName} this game:
+            </Text>
+            <TextInput
+              style={styles.jumperModalInput}
+              placeholder="#"
+              placeholderTextColor={Colors.textMuted}
+              value={jumperInputText}
+              onChangeText={(t) => setJumperInputText(t.replace(/[^0-9]/g, '').slice(0, 2))}
+              keyboardType="number-pad"
+              maxLength={2}
+              autoFocus
+            />
+            <Text style={styles.modalSubtext}>Leave blank to clear.</Text>
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setJumperModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleConfirmJumper}>
+                <Text style={styles.modalConfirmText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -663,6 +757,8 @@ const styles = StyleSheet.create({
   playerTabActive: { backgroundColor: 'rgba(6,182,212,0.2)', borderWidth: 1, borderColor: Colors.accent },
   playerTabText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '700' },
   playerTabTextActive: { color: Colors.accent },
+  playerTabJumper: { color: Colors.textMuted, fontSize: 12, fontWeight: '800', marginTop: 1 },
+  playerTabJumperActive: { color: Colors.accent },
   newBadge: { backgroundColor: Colors.green, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   newBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
   addPlayerTab: {
@@ -674,6 +770,16 @@ const styles = StyleSheet.create({
   addPlayerTabText: { color: Colors.accent, fontSize: 13, fontWeight: '700' },
 
   playerHeader: { alignItems: 'center', marginBottom: 16 },
+  playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
+  jumperPill: {
+    minWidth: 48, height: 40, borderRadius: 10, backgroundColor: Colors.accent,
+    alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3, paddingHorizontal: 8,
+  },
+  jumperPillEmpty: {
+    backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.accent, borderStyle: 'dashed',
+  },
+  jumperPillNumber: { color: '#fff', fontSize: 22, fontWeight: '900' },
+  jumperPillAddText: { color: Colors.accent, fontSize: 12, fontWeight: '700' },
   playerName: { color: Colors.text, fontSize: 20, fontWeight: '800' },
   playerInfo: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
   repTeamLabel: { color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 3 },
@@ -833,6 +939,11 @@ const styles = StyleSheet.create({
   modalInput: {
     backgroundColor: Colors.elevated, borderRadius: 10, borderWidth: 1, borderColor: Colors.border,
     padding: 12, color: Colors.text, fontSize: 14, minHeight: 60, textAlignVertical: 'top', marginBottom: 16,
+  },
+  jumperModalInput: {
+    backgroundColor: Colors.elevated, borderRadius: 10, borderWidth: 1, borderColor: Colors.accent,
+    paddingVertical: 14, color: Colors.text, fontSize: 32, fontWeight: '900', textAlign: 'center',
+    letterSpacing: 2, marginTop: 8, marginBottom: 8,
   },
   modalBtnRow: { flexDirection: 'row', gap: 10 },
   modalCancelBtn: {
