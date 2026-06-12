@@ -880,7 +880,7 @@ export default function PlayerDetailScreen() {
           {/* ── Other player details ── */}
           <Text style={styles.info}>
             {[
-              player.competition,
+              player.customCompetition || player.competition,
               player.dominantFoot,
               player.height ? `${player.height}cm` : null,
               player.weight ? `${player.weight}kg` : null,

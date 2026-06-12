@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api, getToken } from '../../src/api/client';
 import { useAuth } from '../../src/context/AuthContext';
 import { Colors } from '../../src/theme/colors';
-import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus, AUSTRALIAN_STATES } from '../../src/types';
+import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus, AUSTRALIAN_STATES, getCompetitionsForState } from '../../src/types';
 import Card from '../../src/components/Card';
 import EmptyState from '../../src/components/EmptyState';
 import Input from '../../src/components/Input';
@@ -29,21 +29,14 @@ import { showAlert, showConfirm } from '../../src/utils/alert';
 
 const STATE_FILTER_OPTIONS = ['All', ...AUSTRALIAN_STATES] as const;
 
-// Competitions are currently state-specific. The list below (Futures, Colts,
-// Reserves, League, PSA, State 18s, Under 16s) is unique to Western Australia.
-// Other states don't have defined competitions yet — add entries here as the
-// scouting expansion rolls out to give each state its own competition list.
-const STATE_COMPETITIONS: Record<string, readonly string[]> = {
-  WA: COMPETITIONS,
-};
-
 // Returns the competition filter chips to show for the selected state filter.
 // For "All" (includes WA players) and "WA" we surface the WA competitions.
 // States without a defined competition list return [] so the row is hidden.
+// (Per-state competition lists live in STATE_COMPETITIONS in ../../src/types.)
 function getCompetitionOptionsForState(state: string): string[] {
   if (state === 'All') return ['All', ...COMPETITIONS];
-  const comps = STATE_COMPETITIONS[state];
-  return comps && comps.length > 0 ? ['All', ...comps] : [];
+  const comps = getCompetitionsForState(state);
+  return comps.length > 0 ? ['All', ...comps] : [];
 }
 
 export default function PlayersScreen() {
@@ -52,7 +45,7 @@ export default function PlayersScreen() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ fullName: '', team: '', state: '', dateOfBirth: '', draftYear: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' as SigningStatus });
+  const [form, setForm] = useState({ fullName: '', team: '', state: '', dateOfBirth: '', draftYear: '', competition: '', customCompetition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' as SigningStatus });
   const [saving, setSaving] = useState(false);
   const [dobError, setDobError] = useState<string | null>(null);
 
@@ -137,6 +130,20 @@ export default function PlayersScreen() {
       setCompetitionFilter('All');
     }
   }, [competitionOptions, competitionFilter]);
+
+  // ─── Add Player form: state-aware competitions ────────
+  // Predefined competitions available for the state selected in the Add Player
+  // form. Empty when no state is chosen or the state has no predefined list
+  // (in which case the user uses the free-text "Other Competition" field).
+  const formCompetitions = useMemo(() => getCompetitionsForState(form.state), [form.state]);
+
+  // Clear a previously chosen predefined competition if it's no longer valid for
+  // the newly selected state (e.g. switching from WA to a state with no list).
+  useEffect(() => {
+    if (form.competition && !formCompetitions.includes(form.competition)) {
+      setForm((f) => ({ ...f, competition: '' }));
+    }
+  }, [formCompetitions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasActiveFilters = competitionFilter !== 'All' || stateFilter !== 'All' || nameFilter.trim().length > 0;
 
@@ -313,6 +320,7 @@ export default function PlayersScreen() {
         dateOfBirth: dobISO,
         draftYear: form.draftYear ? parseInt(form.draftYear) : undefined,
         competition: form.competition || undefined,
+        customCompetition: form.customCompetition.trim() || undefined,
         dominantFoot: form.dominantFoot || undefined,
         height: form.height ? parseFloat(form.height) : undefined,
         weight: form.weight ? parseFloat(form.weight) : undefined,
@@ -320,7 +328,7 @@ export default function PlayersScreen() {
         signingStatus: form.signingStatus,
       });
       setModalOpen(false);
-      setForm({ fullName: '', team: '', state: '', dateOfBirth: '', draftYear: '', competition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' });
+      setForm({ fullName: '', team: '', state: '', dateOfBirth: '', draftYear: '', competition: '', customCompetition: '', dominantFoot: '', height: '', weight: '', notes: '', signingStatus: 'NOT_SIGNED' });
       setDobError(null);
       load();
     } catch (e: any) {
@@ -515,7 +523,7 @@ export default function PlayersScreen() {
                     )}
                   </View>
                   <Text style={styles.meta}>
-                    {[item.team, item.state, item.competition, item.age != null ? (item.draftYear ? `${item.age}yo | ${item.draftYear} Draft` : `${item.age}yo`) : (item.draftYear ? `${item.draftYear} Draft` : null)].filter(Boolean).join(' • ')}
+                    {[item.team, item.state, item.customCompetition || item.competition, item.age != null ? (item.draftYear ? `${item.age}yo | ${item.draftYear} Draft` : `${item.age}yo`) : (item.draftYear ? `${item.draftYear} Draft` : null)].filter(Boolean).join(' • ')}
                   </Text>
                 </View>
                 {isAdmin && (
@@ -561,14 +569,29 @@ export default function PlayersScreen() {
               </View>
               <Input label="Draft Year" value={form.draftYear} onChangeText={(t) => setForm({ ...form, draftYear: t })} keyboardType="numeric" placeholder="e.g. 2026" />
               <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 6, marginTop: 4 }}>Competition</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                {COMPETITIONS.map((c) => (
-                  <TouchableOpacity key={c} onPress={() => setForm({ ...form, competition: form.competition === c ? '' : c })}
-                    style={[styles.chip, form.competition === c && styles.chipActive]}>
-                    <Text style={[styles.chipText, form.competition === c && { color: '#fff' }]}>{c}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {!form.state ? (
+                // No state chosen yet → competition selection is not applicable.
+                <Text style={styles.compHint}>Select a state above to choose a competition.</Text>
+              ) : formCompetitions.length > 0 ? (
+                // State has predefined competitions (currently WA only).
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                  {formCompetitions.map((c) => (
+                    <TouchableOpacity key={c} onPress={() => setForm({ ...form, competition: form.competition === c ? '' : c })}
+                      style={[styles.chip, form.competition === c && styles.chipActive]}>
+                      <Text style={[styles.chipText, form.competition === c && { color: '#fff' }]}>{c}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                // State selected but no predefined list → prompt to use Other Competition.
+                <Text style={styles.compHint}>No predefined competitions for {form.state}. Use “Other Competition” below.</Text>
+              )}
+              <Input
+                label="Other Competition"
+                value={form.customCompetition}
+                onChangeText={(t) => setForm({ ...form, customCompetition: t })}
+                placeholder="Enter a custom competition (optional)"
+              />
               <Input label="Dominant Foot" value={form.dominantFoot} onChangeText={(t) => setForm({ ...form, dominantFoot: t })} placeholder="Left / Right / Both" />
               <Input label="Height (cm)" value={form.height} onChangeText={(t) => setForm({ ...form, height: t })} keyboardType="numeric" />
               <Input label="Weight (kg)" value={form.weight} onChangeText={(t) => setForm({ ...form, weight: t })} keyboardType="numeric" />
@@ -831,6 +854,7 @@ const styles = StyleSheet.create({
   chipSigned: { backgroundColor: Colors.green, borderColor: Colors.green },
   chipNotSigned: { backgroundColor: Colors.orange, borderColor: Colors.orange },
   chipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  compHint: { color: Colors.textMuted, fontSize: 13, fontStyle: 'italic', marginBottom: 12 },
 
   // Signing status badges on player cards
   signingBadgeSigned: {

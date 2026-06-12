@@ -4,7 +4,7 @@ import {
   TouchableOpacity, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native';
 import { Colors } from '../theme/colors';
-import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus, AUSTRALIAN_STATES } from '../types';
+import { Player, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus, AUSTRALIAN_STATES, getCompetitionsForState } from '../types';
 import GradientButton from './GradientButton';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -23,6 +23,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
   const [state, setState] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [competition, setCompetition] = useState('');
+  const [customCompetition, setCustomCompetition] = useState('');
   const [dominantFoot, setDominantFoot] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
@@ -57,6 +58,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
       }
       setDobError(null);
       setCompetition(player.competition || '');
+      setCustomCompetition(player.customCompetition || '');
       setDominantFoot(player.dominantFoot || '');
       setHeight(player.height != null ? String(player.height) : '');
       setWeight(player.weight != null ? String(player.weight) : '');
@@ -65,6 +67,18 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
       setError('');
     }
   }, [player, visible]);
+
+  // Predefined competitions for the currently selected state (WA only for now).
+  // Empty when no state selected or the state has no predefined list.
+  const stateCompetitions = getCompetitionsForState(state);
+
+  // Clear a previously chosen predefined competition if it's not valid for the
+  // selected state (e.g. switching from WA to a state with no predefined list).
+  useEffect(() => {
+    if (competition && !stateCompetitions.includes(competition)) {
+      setCompetition('');
+    }
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Validate DD/MM/YYYY format for DOB
   const validateDobInput = (value: string): string | null => {
@@ -120,6 +134,7 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
         state: (state || null) as any,
         dateOfBirth: dobISO,
         competition: competition || null,
+        customCompetition: customCompetition.trim() || null,
         dominantFoot: dominantFoot || null,
         height: height ? Number(height) : null,
         weight: weight ? Number(weight) : null,
@@ -243,8 +258,33 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
               {dobError ? <Text style={styles.dobErrorText}>{dobError}</Text> : null}
             </View>
 
-            {/* Competition dropdown */}
-            {renderDropdown('Competition', competition, COMPETITIONS, showCompDropdown, setShowCompDropdown, setCompetition)}
+            {/* Competition — state-aware: dropdown of predefined competitions for
+                the selected state, or a hint to use the free-text field below. */}
+            {!state ? (
+              <View style={styles.fieldContainer}>
+                <Text style={styles.label}>Competition</Text>
+                <Text style={styles.compHint}>Select a state above to choose a competition.</Text>
+              </View>
+            ) : stateCompetitions.length > 0 ? (
+              renderDropdown('Competition', competition, stateCompetitions, showCompDropdown, setShowCompDropdown, setCompetition)
+            ) : (
+              <View style={styles.fieldContainer}>
+                <Text style={styles.label}>Competition</Text>
+                <Text style={styles.compHint}>No predefined competitions for {state}. Use “Other Competition” below.</Text>
+              </View>
+            )}
+
+            {/* Other / custom competition (free text) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Other Competition</Text>
+              <TextInput
+                style={styles.input}
+                value={customCompetition}
+                onChangeText={setCustomCompetition}
+                placeholder="Enter a custom competition (optional)"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
 
             {/* Dominant Foot dropdown */}
             {renderDropdown('Dominant Foot', dominantFoot, DOMINANT_FOOT_OPTIONS, showFootDropdown, setShowFootDropdown, setDominantFoot)}
@@ -500,5 +540,10 @@ const styles = StyleSheet.create({
     color: Colors.error || '#ef4444',
     fontSize: 12,
     marginTop: 4,
+  },
+  compHint: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });

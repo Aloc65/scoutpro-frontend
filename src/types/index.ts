@@ -21,6 +21,23 @@ export type SignedStatus = typeof WATCH_LIST_SIGNED_STATUSES[number];
 export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'NT'] as const;
 export type AustralianState = typeof AUSTRALIAN_STATES[number];
 
+// Competitions are state-specific. The predefined list (Futures, Colts, Reserves,
+// League, PSA, State 18s, Under 16s) is currently unique to Western Australia.
+// Other states don't have a predefined competition list yet — add entries here as
+// the scouting expansion rolls out so each state gets its own competitions.
+export const STATE_COMPETITIONS: Record<string, readonly string[]> = {
+  WA: COMPETITIONS,
+};
+
+// Returns the predefined competitions available for a given state.
+// Returns [] when no state is selected or the state has no predefined list,
+// in which case callers should fall back to the free-text "Other Competition".
+export function getCompetitionsForState(state: string | null | undefined): string[] {
+  if (!state) return [];
+  const comps = STATE_COMPETITIONS[state];
+  return comps && comps.length > 0 ? [...comps] : [];
+}
+
 export interface User {
   id: string;
   email: string;
@@ -39,6 +56,7 @@ export interface Player {
   dateOfBirth: string | null;
   age: number | null;
   competition: string | null;
+  customCompetition: string | null;
   dominantFoot: string | null;
   height: number | null;
   weight: number | null;
