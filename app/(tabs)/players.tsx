@@ -357,7 +357,20 @@ export default function PlayersScreen() {
           )}
         </View>
 
-        {/* Competition filter chips (state-aware: hidden for states with no competitions) */}
+        {/* State filter chips (top row) */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+          {STATE_FILTER_OPTIONS.map((s) => (
+            <TouchableOpacity
+              key={s}
+              onPress={() => setStateFilter(s)}
+              style={[styles.filterChip, stateFilter === s && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterChipText, stateFilter === s && styles.filterChipTextActive]}>{s}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Competition filter chips (directly under states; state-aware: hidden for states with no competitions) */}
         {competitionOptions.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
             {competitionOptions.map((c) => (
@@ -371,19 +384,6 @@ export default function PlayersScreen() {
             ))}
           </ScrollView>
         )}
-
-        {/* State filter chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
-          {STATE_FILTER_OPTIONS.map((s) => (
-            <TouchableOpacity
-              key={s}
-              onPress={() => setStateFilter(s)}
-              style={[styles.filterChip, stateFilter === s && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterChipText, stateFilter === s && styles.filterChipTextActive]}>{s}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
 
         {/* Results count & clear */}
         <View style={styles.resultsRow}>
