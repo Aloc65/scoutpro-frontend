@@ -21,13 +21,22 @@ export type SignedStatus = typeof WATCH_LIST_SIGNED_STATUSES[number];
 export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'NT'] as const;
 export type AustralianState = typeof AUSTRALIAN_STATES[number];
 
-// Competitions are state-specific. The predefined list (Futures, Colts, Reserves,
-// League, PSA, State 18s, Under 16s) is currently unique to Western Australia.
-// Other states don't have a predefined competition list yet — add entries here as
-// the scouting expansion rolls out so each state gets its own competitions.
+// Competitions are state-specific. Each state has its own predefined list below.
+// WA reuses the COMPETITIONS const above. States without a predefined list (TAS, NT)
+// are intentionally omitted — callers fall back to the free-text "Other Competition".
 export const STATE_COMPETITIONS: Record<string, readonly string[]> = {
   WA: COMPETITIONS,
+  VIC: ['Talent League', 'APS School Football', 'AGS School Football', 'APS'],
+  SA: ['Seniors', 'Reserves', 'U18s', 'SAAS'],
+  QLD: ['Talent League'],
+  NSW: ['Talent League', 'VFL'],
 };
+
+// Deduplicated union of every state's predefined competitions. Used by the player
+// list filter's "All" option so users can filter by any competition across states.
+export const ALL_COMPETITIONS: string[] = Array.from(
+  new Set(Object.values(STATE_COMPETITIONS).flat()),
+);
 
 // Returns the predefined competitions available for a given state.
 // Returns [] when no state is selected or the state has no predefined list,

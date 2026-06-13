@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api, getToken } from '../../src/api/client';
 import { useAuth } from '../../src/context/AuthContext';
 import { Colors } from '../../src/theme/colors';
-import { Player, COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus, AUSTRALIAN_STATES, getCompetitionsForState } from '../../src/types';
+import { Player, ALL_COMPETITIONS, SIGNING_STATUSES, SIGNING_STATUS_LABELS, SigningStatus, AUSTRALIAN_STATES, getCompetitionsForState } from '../../src/types';
 import Card from '../../src/components/Card';
 import EmptyState from '../../src/components/EmptyState';
 import Input from '../../src/components/Input';
@@ -30,11 +30,12 @@ import { showAlert, showConfirm } from '../../src/utils/alert';
 const STATE_FILTER_OPTIONS = ['All', ...AUSTRALIAN_STATES] as const;
 
 // Returns the competition filter chips to show for the selected state filter.
-// For "All" (includes WA players) and "WA" we surface the WA competitions.
+// For "All" we surface every state's competitions (deduplicated union) so users
+// can filter across all states. For a specific state we surface that state's list.
 // States without a defined competition list return [] so the row is hidden.
 // (Per-state competition lists live in STATE_COMPETITIONS in ../../src/types.)
 function getCompetitionOptionsForState(state: string): string[] {
-  if (state === 'All') return ['All', ...COMPETITIONS];
+  if (state === 'All') return ['All', ...ALL_COMPETITIONS];
   const comps = getCompetitionsForState(state);
   return comps.length > 0 ? ['All', ...comps] : [];
 }
