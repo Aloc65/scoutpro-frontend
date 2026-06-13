@@ -29,6 +29,7 @@ import AflPlayerComparison from '../../src/components/AflPlayerComparison';
 import { getMeetingsByPlayer, createMeeting, updateMeeting, deleteMeeting } from '../../src/api/meetings';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { downloadReportPdf } from '../../src/utils/downloadReportPdf';
 
 const FUNDAMENTALS_LABELS: [keyof Ratings, string][] = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
@@ -397,6 +398,7 @@ export default function PlayerDetailScreen() {
   const [photoFetching, setPhotoFetching] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
   const [reports, setReports] = useState<any[]>([]);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
   const [avgRatings, setAvgRatings] = useState<Ratings | null>(null);
   const [gameStatTotals, setGameStatTotals] = useState<GameStats | null>(null);
   const [gameStatAverages, setGameStatAverages] = useState<GameStats | null>(null);
@@ -1071,7 +1073,25 @@ export default function PlayerDetailScreen() {
                     <Text style={[styles.viewingBadgeText, { color: viewingMethodMeta.color }]}>{viewingMethodMeta.label}</Text>
                   </View>
                 </View>
-                <ProjectionBadge value={r.overallProjection} />
+                <View style={{ alignItems: 'flex-end', gap: 8 }}>
+                  <ProjectionBadge value={r.overallProjection} />
+                  <TouchableOpacity
+                    style={styles.reportDownloadBtn}
+                    activeOpacity={0.7}
+                    disabled={downloadingReportId === r.id}
+                    onPress={async () => {
+                      setDownloadingReportId(r.id);
+                      await downloadReportPdf(r.id);
+                      setDownloadingReportId(null);
+                    }}
+                  >
+                    {downloadingReportId === r.id ? (
+                      <ActivityIndicator size="small" color={Colors.accent} />
+                    ) : (
+                      <Ionicons name="download-outline" size={18} color={Colors.accent} />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
               {GAME_STAT_KEYS.some(([key]) => (r as any)[key] != null) && (
                 <View style={styles.reportStatsRow}>
@@ -1404,6 +1424,7 @@ const styles = StyleSheet.create({
   statViewItem: { width: '30%', minWidth: 90, backgroundColor: Colors.elevated, borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   statViewValue: { fontSize: 22, fontWeight: '800', color: Colors.accent },
   statViewLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 4, fontWeight: '600' },
+  reportDownloadBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border },
   reportStatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   reportStatChip: { fontSize: 11, color: Colors.accent, backgroundColor: Colors.elevated, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontWeight: '600', overflow: 'hidden' },
   viewingBadge: {

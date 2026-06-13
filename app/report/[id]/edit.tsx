@@ -15,6 +15,7 @@ import DatePicker from '../../../src/components/DatePicker';
 import { OTHER_OPPONENT_OPTION, WAFL_TEAMS } from '../../../src/constants/waflTeams';
 
 import { showAlert, showConfirm } from '../../../src/utils/alert';
+import { downloadReportPdf } from '../../../src/utils/downloadReportPdf';
 import { Ionicons } from '@expo/vector-icons';
 const FUNDAMENTALS_KEYS = [
   ['kicking', 'Kicking'], ['handball', 'Handball'], ['marking', 'Marking'],
@@ -71,6 +72,7 @@ export default function EditReportScreen() {
   const [report, setReport] = useState<FullReport | null>(null);
   const [playerSigningStatus, setPlayerSigningStatus] = useState<SigningStatus | null>(null);
   const [editing, setEditing] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Editable fields
   const [matchDate, setMatchDate] = useState('');
@@ -332,6 +334,18 @@ export default function EditReportScreen() {
             {report.developmentAreas && <><Text style={styles.subTitle}>Development Areas</Text><Text style={styles.body}>{report.developmentAreas}</Text></>}
           </Card>
 
+          <GradientButton
+            title={downloadingPdf ? 'Generating PDF…' : 'Download Report PDF'}
+            icon="download-outline"
+            loading={downloadingPdf}
+            disabled={downloadingPdf}
+            onPress={async () => {
+              setDownloadingPdf(true);
+              await downloadReportPdf(report.id);
+              setDownloadingPdf(false);
+            }}
+            style={{ marginBottom: 12 }}
+          />
           {canEdit && <GradientButton title="Edit Report" onPress={() => setEditing(true)} style={{ marginBottom: 12 }} />}
           {canDelete && (
             <TouchableOpacity onPress={deleteReport} style={styles.deleteBtn}>
