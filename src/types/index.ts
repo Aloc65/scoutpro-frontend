@@ -91,6 +91,7 @@ export interface WatchList {
     team: string | null;
     dateOfBirth: string | null;
     competition: string | null;
+    state: AustralianState | null;
   };
 }
 

@@ -18,9 +18,10 @@ import EmptyState from '../../src/components/EmptyState';
 import GradientButton from '../../src/components/GradientButton';
 import { Colors } from '../../src/theme/colors';
 import { showAlert } from '../../src/utils/alert';
-import { SignedStatus, WatchList } from '../../src/types';
+import { SignedStatus, WatchList, AUSTRALIAN_STATES } from '../../src/types';
 
 const SIGNED_FILTER_OPTIONS = ['All', 'Signed', 'Unsigned'] as const;
+const STATE_FILTER_OPTIONS = ['All', ...AUSTRALIAN_STATES] as const;
 const SORT_OPTIONS = [
   { key: 'surname', label: 'Surname' },
   { key: 'club', label: 'Club' },
@@ -28,13 +29,25 @@ const SORT_OPTIONS = [
 
 type SortMode = (typeof SORT_OPTIONS)[number]['key'];
 
+// Module-level memory so the selected state filter is preserved when the user
+// navigates away from the Watch List tab and comes back (the screen unmounts in
+// the stack navigator, so component state alone would reset to 'All').
+let persistedStateFilter: string = 'All';
+
 export default function WatchListScreen() {
   const [items, setItems] = useState<WatchList[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [signedStatus, setSignedStatus] = useState<(typeof SIGNED_FILTER_OPTIONS)[number]>('All');
+  const [stateFilter, setStateFilterState] = useState<string>(persistedStateFilter);
   const [draftYear, setDraftYear] = useState<string>('All');
+
+  // Persist the selection at module scope so it survives navigation away/back.
+  const setStateFilter = useCallback((value: string) => {
+    persistedStateFilter = value;
+    setStateFilterState(value);
+  }, []);
   const [availableDraftYears, setAvailableDraftYears] = useState<string[]>(['All']);
   const [sortBy, setSortBy] = useState<SortMode>('surname');
   const [exporting, setExporting] = useState(false);
@@ -49,11 +62,12 @@ export default function WatchListScreen() {
     const params = new URLSearchParams();
     if (search.trim()) params.set('search', search.trim());
     if (signedStatus !== 'All') params.set('signedStatus', signedStatus);
+    if (stateFilter !== 'All') params.set('state', stateFilter);
     if (draftYear !== 'All') params.set('draftYear', draftYear);
     params.set('sortBy', sortBy);
     const query = params.toString();
     return query ? `?${query}` : '';
-  }, [draftYear, search, signedStatus, sortBy]);
+  }, [draftYear, search, signedStatus, stateFilter, sortBy]);
 
   const load = useCallback(async () => {
     try {
@@ -174,6 +188,7 @@ export default function WatchListScreen() {
   const clearFilters = () => {
     setSearch('');
     setSignedStatus('All');
+    setStateFilter('All');
     setDraftYear('All');
     setSortBy('surname');
   };
@@ -191,6 +206,22 @@ export default function WatchListScreen() {
             style={styles.searchInput}
           />
         </View>
+
+        <Text style={styles.filterLabel}>State</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.draftYearTabsRow}>
+          {STATE_FILTER_OPTIONS.map((s) => {
+            const isActive = stateFilter === s;
+            return (
+              <TouchableOpacity
+                key={s}
+                style={[styles.draftYearTab, isActive && styles.draftYearTabActive]}
+                onPress={() => setStateFilter(s)}
+              >
+                <Text style={[styles.draftYearTabText, isActive && styles.draftYearTabTextActive]}>{s}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
         <Text style={styles.filterLabel}>Draft Year</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.draftYearTabsRow}>
@@ -276,6 +307,7 @@ export default function WatchListScreen() {
               <View style={[styles.row, styles.headerRow]}>
                 <Text style={[styles.cell, styles.headerCell, styles.nameCol]}>Player Name</Text>
                 <Text style={[styles.cell, styles.headerCell, styles.clubCol]}>Club</Text>
+                <Text style={[styles.cell, styles.headerCell, styles.stateCol]}>State</Text>
                 <Text style={[styles.cell, styles.headerCell, styles.yearCol]}>Draft Year</Text>
                 <Text style={[styles.cell, styles.headerCell, styles.statusCol]}>Signed Status</Text>
                 <Text style={[styles.cell, styles.headerCell, styles.teamsCol]}>AFL Teams Interested</Text>
@@ -286,6 +318,7 @@ export default function WatchListScreen() {
                 <View key={item.id} style={styles.row}>
                   <Text style={[styles.cell, styles.nameCol]}>{item.player?.fullName || '—'}</Text>
                   <Text style={[styles.cell, styles.clubCol]}>{item.player?.team || '—'}</Text>
+                  <Text style={[styles.cell, styles.stateCol]}>{item.player?.state || '—'}</Text>
                   <Text style={[styles.cell, styles.yearCol]}>{item.draftYear || '—'}</Text>
                   <Text style={[styles.cell, styles.statusCol]}>{item.signedStatus}</Text>
                   <Text style={[styles.cell, styles.teamsCol]} numberOfLines={2}>
@@ -460,6 +493,7 @@ const styles = StyleSheet.create({
   headerCell: { color: Colors.text, fontWeight: '700' },
   nameCol: { width: 180 },
   clubCol: { width: 130 },
+  stateCol: { width: 70 },
   yearCol: { width: 90 },
   statusCol: { width: 110 },
   teamsCol: { width: 260 },
