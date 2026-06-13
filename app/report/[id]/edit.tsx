@@ -8,6 +8,7 @@ import { FullReport, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, Playe
 import Input from '../../../src/components/Input';
 import GradientButton from '../../../src/components/GradientButton';
 import Card from '../../../src/components/Card';
+import ExpandedTextEditorModal from '../../../src/components/ExpandedTextEditorModal';
 import RatingBar from '../../../src/components/RatingBar';
 import ProjectionBadge from '../../../src/components/ProjectionBadge';
 import DatePicker from '../../../src/components/DatePicker';
@@ -84,6 +85,7 @@ export default function EditReportScreen() {
   const [positionsPlayed, setPositionsPlayed] = useState<string[]>([]);
   const [primaryPosition, setPrimaryPosition] = useState('');
   const [summary, setSummary] = useState('');
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [strengths, setStrengths] = useState('');
   const [weaknesses, setWeaknesses] = useState('');
   const [developmentAreas, setDevelopmentAreas] = useState('');
@@ -520,7 +522,18 @@ export default function EditReportScreen() {
 
           <Text style={styles.section}>Notes</Text>
           <Card style={{ marginBottom: 16 }}>
-            <Input label="Summary *" value={summary} onChangeText={setSummary} multiline numberOfLines={3} />
+            <View style={{ position: 'relative' }}>
+              <Input label="Summary *" value={summary} onChangeText={setSummary} multiline numberOfLines={3} />
+              <TouchableOpacity
+                onPress={() => setSummaryModalOpen(true)}
+                style={styles.expandBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="expand-outline" size={15} color={Colors.accent} />
+                <Text style={styles.expandBtnText}>Expand</Text>
+              </TouchableOpacity>
+            </View>
             <Input label="Strengths" value={strengths} onChangeText={setStrengths} multiline />
             <Input label="Weaknesses" value={weaknesses} onChangeText={setWeaknesses} multiline />
             <Input label="Development Areas" value={developmentAreas} onChangeText={setDevelopmentAreas} multiline />
@@ -540,12 +553,24 @@ export default function EditReportScreen() {
           <GradientButton title="Save Changes" onPress={save} loading={saving} />
         </View>
       </KeyboardAvoidingView>
+
+      <ExpandedTextEditorModal
+        visible={summaryModalOpen}
+        title="Edit Summary"
+        initialValue={summary}
+        placeholder="Write the scouting summary…"
+        hint="This is the main report summary. Take your time — the editor is fully scrollable."
+        onSave={(v) => { setSummary(v); setSummaryModalOpen(false); }}
+        onClose={() => setSummaryModalOpen(false)}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  expandBtn: { position: 'absolute', top: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: 4 },
+  expandBtnText: { color: Colors.accent, fontSize: 12, fontWeight: '600' },
   title: { fontSize: 22, fontWeight: '800', color: Colors.text },
   meta: { fontSize: 13, color: Colors.textSecondary, marginTop: 3 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 12 },
