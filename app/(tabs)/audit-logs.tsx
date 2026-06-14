@@ -29,6 +29,46 @@ const ACTION_FILTER_OPTIONS: ('All' | AuditAction)[] = ['All', ...AUDIT_ACTIONS]
 const ENTITY_FILTER_OPTIONS = ['All', 'Auth', 'User', 'Report', 'Player', 'WatchList', 'AuditLog'] as const;
 const PAGE_SIZE = 25;
 
+/**
+ * Normalise a user-entered date into a strict ISO 8601 date string
+ * (YYYY-MM-DD) that the backend's @IsDateString() validator accepts.
+ *
+ * The date filter inputs are free text, so users can type loose formats like
+ * "2026-6-1" or "6/14/2026" which class-validator rejects with
+ * "start date must be valid ISO 8601 date string". This helper parses such
+ * inputs and re-emits them in strict YYYY-MM-DD form. Returns '' when the
+ * input is empty or cannot be parsed (so the param is simply omitted).
+ *
+ * Local date components are used (not toISOString) to avoid an off-by-one-day
+ * shift caused by timezone conversion to UTC.
+ */
+function normalizeDateParam(input: string): string {
+  const t = (input || '').trim();
+  if (!t) return '';
+  // Already strict YYYY-MM-DD — pass through unchanged.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const d = new Date(t);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Inline style for the native web <input type="date"> so it visually matches
+// the app's dark themed text inputs.
+const webDateInputStyle: any = {
+  width: '100%',
+  backgroundColor: Colors.elevated,
+  color: Colors.text,
+  border: `1px solid ${Colors.border}`,
+  borderRadius: 8,
+  padding: '10px 12px',
+  fontSize: 14,
+  boxSizing: 'border-box',
+  outline: 'none',
+};
+
 function formatTimestamp(ts: string): string {
   if (!ts) return '—';
   const d = new Date(ts);
@@ -87,8 +127,10 @@ export default function AuditLogsScreen() {
       if (actionFilter !== 'All') params.set('action', actionFilter);
       if (entityFilter !== 'All') params.set('entity', entityFilter);
       if (userFilter !== 'All') params.set('userId', userFilter);
-      if (startDate.trim()) params.set('startDate', startDate.trim());
-      if (endDate.trim()) params.set('endDate', endDate.trim());
+      const normalizedStart = normalizeDateParam(startDate);
+      const normalizedEnd = normalizeDateParam(endDate);
+      if (normalizedStart) params.set('startDate', normalizedStart);
+      if (normalizedEnd) params.set('endDate', normalizedEnd);
       return params.toString();
     },
     [page, search, actionFilter, entityFilter, userFilter, startDate, endDate],
@@ -227,29 +269,54 @@ export default function AuditLogsScreen() {
           <View style={styles.dateRow}>
             <View style={styles.dateField}>
               <Text style={styles.dateHint}>From</Text>
-              <TextInput
-                value={startDate}
-                onChangeText={(t) => {
-                  setStartDate(t);
-                  applyFilterReset();
-                }}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={Colors.textMuted}
-                style={styles.dateInput}
-              />
+              {Platform.OS === 'web' ? (
+                // Native browser date picker guarantees a strict YYYY-MM-DD value.
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e: any) => {
+                    setStartDate(e.target.value);
+                    applyFilterReset();
+                  }}
+                  style={webDateInputStyle}
+                />
+              ) : (
+                <TextInput
+                  value={startDate}
+                  onChangeText={(t) => {
+                    setStartDate(t);
+                    applyFilterReset();
+                  }}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.dateInput}
+                />
+              )}
             </View>
             <View style={styles.dateField}>
               <Text style={styles.dateHint}>To</Text>
-              <TextInput
-                value={endDate}
-                onChangeText={(t) => {
-                  setEndDate(t);
-                  applyFilterReset();
-                }}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={Colors.textMuted}
-                style={styles.dateInput}
-              />
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e: any) => {
+                    setEndDate(e.target.value);
+                    applyFilterReset();
+                  }}
+                  style={webDateInputStyle}
+                />
+              ) : (
+                <TextInput
+                  value={endDate}
+                  onChangeText={(t) => {
+                    setEndDate(t);
+                    applyFilterReset();
+                  }}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.dateInput}
+                />
+              )}
             </View>
           </View>
 
