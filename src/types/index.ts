@@ -337,3 +337,56 @@ export const SCOUTING_TRAITS = [
 export type ScoutingTrait = typeof SCOUTING_TRAITS[number];
 
 export type LiveScoutingStatus = 'ACTIVE' | 'COMPLETED' | 'ABANDONED';
+
+
+// ─── Audit Log Types ─────────────────────────────────────────────────
+
+export const AUDIT_ACTIONS = [
+  'LOGIN',
+  'FAILED_LOGIN',
+  'PASSWORD_RESET',
+  'USER_CREATED',
+  'USER_DELETED',
+  'REPORT_CREATED',
+  'REPORT_EDITED',
+  'REPORT_DELETED',
+  'DATA_EXPORTED',
+  'ADMIN_ACTION',
+] as const;
+
+export type AuditAction = typeof AUDIT_ACTIONS[number];
+
+export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  LOGIN: 'Login',
+  FAILED_LOGIN: 'Failed Login',
+  PASSWORD_RESET: 'Password Reset',
+  USER_CREATED: 'User Created',
+  USER_DELETED: 'User Deleted',
+  REPORT_CREATED: 'Report Created',
+  REPORT_EDITED: 'Report Edited',
+  REPORT_DELETED: 'Report Deleted',
+  DATA_EXPORTED: 'Data Exported',
+  ADMIN_ACTION: 'Admin Action',
+};
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  userId: string | null;
+  username: string | null;
+  action: AuditAction;
+  entity: string | null;
+  entityId: string | null;
+  details: Record<string, any> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  success: boolean;
+}
+
+export interface AuditLogListResponse {
+  items: AuditLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
