@@ -33,26 +33,66 @@ const PAGE_SIZE = 25;
  * Normalise a user-entered date into a strict ISO 8601 date string
  * (YYYY-MM-DD) that the backend's @IsDateString() validator accepts.
  *
- * The date filter inputs are free text, so users can type loose formats like
- * "2026-6-1" or "6/14/2026" which class-validator rejects with
- * "start date must be valid ISO 8601 date string". This helper parses such
- * inputs and re-emits them in strict YYYY-MM-DD form. Returns '' when the
- * input is empty or cannot be parsed (so the param is simply omitted).
+ * ScoutPro is used in Australia, so day-first DD/MM/YYYY is the expected
+ * human input (e.g. "14/06/2026" => "2026-06-14", NOT the US month-first
+ * interpretation). We therefore parse day/month/year components ourselves
+ * rather than relying on `new Date(str)`, whose handling of slash-separated
+ * dates is US month-first and would mis-parse Australian dates (or reject
+ * "14/06/2026" entirely as an invalid month 14).
  *
- * Local date components are used (not toISOString) to avoid an off-by-one-day
- * shift caused by timezone conversion to UTC.
+ * Accepted inputs:
+ *   - Strict ISO "YYYY-MM-DD"          -> passed through unchanged
+ *   - Day-first "DD/MM/YYYY" or "DD-MM-YYYY" (1-2 digit day/month, also
+ *     mixed separators like "14/06-2026") -> converted to "YYYY-MM-DD"
+ * Returns '' when the input is empty or cannot be parsed (so the query param
+ * is simply omitted instead of sending an invalid value).
  */
 function normalizeDateParam(input: string): string {
   const t = (input || '').trim();
   if (!t) return '';
-  // Already strict YYYY-MM-DD — pass through unchanged.
+
+  // Already strict ISO YYYY-MM-DD — pass through unchanged.
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  const d = new Date(t);
-  if (isNaN(d.getTime())) return '';
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+
+  // ISO with single-digit month/day, e.g. "2026-6-1" -> pad to YYYY-MM-DD.
+  const isoLoose = t.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (isoLoose) {
+    const year = Number(isoLoose[1]);
+    const month = Number(isoLoose[2]);
+    const day = Number(isoLoose[3]);
+    return buildIsoDate(year, month, day);
+  }
+
+  // Australian day-first DD/MM/YYYY (slash or dash separators).
+  const dayFirst = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dayFirst) {
+    const day = Number(dayFirst[1]);
+    const month = Number(dayFirst[2]);
+    const year = Number(dayFirst[3]);
+    return buildIsoDate(year, month, day);
+  }
+
+  return '';
+}
+
+/**
+ * Build a strict "YYYY-MM-DD" string from numeric components, validating the
+ * calendar ranges (and real day-of-month, so 31/02 is rejected). Returns ''
+ * when the date is invalid.
+ */
+function buildIsoDate(year: number, month: number, day: number): string {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return '';
+  if (year < 1000 || year > 9999) return '';
+  if (month < 1 || month > 12) return '';
+  if (day < 1 || day > 31) return '';
+  // Reject impossible days (e.g. 31 April, 29 Feb in a non-leap year).
+  const probe = new Date(year, month - 1, day);
+  if (probe.getFullYear() !== year || probe.getMonth() !== month - 1 || probe.getDate() !== day) {
+    return '';
+  }
+  const mm = String(month).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return `${year}-${mm}-${dd}`;
 }
 
 // Inline style for the native web <input type="date"> so it visually matches
@@ -287,7 +327,7 @@ export default function AuditLogsScreen() {
                     setStartDate(t);
                     applyFilterReset();
                   }}
-                  placeholder="YYYY-MM-DD"
+                  placeholder="DD/MM/YYYY"
                   placeholderTextColor={Colors.textMuted}
                   style={styles.dateInput}
                 />
@@ -312,7 +352,7 @@ export default function AuditLogsScreen() {
                     setEndDate(t);
                     applyFilterReset();
                   }}
-                  placeholder="YYYY-MM-DD"
+                  placeholder="DD/MM/YYYY"
                   placeholderTextColor={Colors.textMuted}
                   style={styles.dateInput}
                 />
