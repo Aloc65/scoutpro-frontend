@@ -56,6 +56,7 @@ export default function AppLayout() {
       <Stack.Screen name="users" options={{ title: 'Users' }} />
       <Stack.Screen name="audit-logs" options={{ title: 'Audit Logs' }} />
       <Stack.Screen name="security-alerts" options={{ title: 'Security Alerts' }} />
+      <Stack.Screen name="backups" options={{ title: 'Backups' }} />
     </Stack>
   );
 }
