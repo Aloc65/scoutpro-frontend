@@ -390,3 +390,44 @@ export interface AuditLogListResponse {
   limit: number;
   totalPages: number;
 }
+
+// ─── Security Monitoring & Alerting ──────────────────────────────────
+
+export const SECURITY_ALERT_TYPES = ['FAILED_LOGIN', 'LARGE_EXPORT', 'UNUSUAL_ACTIVITY'] as const;
+export type SecurityAlertType = typeof SECURITY_ALERT_TYPES[number];
+
+export const SECURITY_ALERT_TYPE_LABELS: Record<SecurityAlertType, string> = {
+  FAILED_LOGIN: 'Repeated Failed Logins',
+  LARGE_EXPORT: 'Large Data Export',
+  UNUSUAL_ACTIVITY: 'Unusual Activity',
+};
+
+export type SecurityAlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type SecurityAlertStatus = 'NEW' | 'ACKNOWLEDGED';
+
+export interface SecurityAlert {
+  id: string;
+  createdAt: string;
+  type: SecurityAlertType;
+  severity: SecurityAlertSeverity;
+  title: string;
+  message: string;
+  userId: string | null;
+  username: string | null;
+  ipAddress: string | null;
+  details: Record<string, any> | null;
+  emailSent: boolean;
+  smsSent: boolean;
+  status: SecurityAlertStatus;
+  acknowledgedAt: string | null;
+  acknowledgedBy: string | null;
+}
+
+export interface SecurityAlertListResponse {
+  items: SecurityAlert[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  newCount: number;
+}

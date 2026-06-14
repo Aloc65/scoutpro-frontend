@@ -40,6 +40,7 @@ const SECONDARY_ITEMS: MenuItem[] = [
   { key: 'weekly-reports', label: 'Weekly Reports', icon: 'mail-outline', href: '/weekly-reports', adminOnly: true },
   { key: 'data-import', label: 'Data Import', icon: 'cloud-upload-outline', href: '/data-import', adminOnly: true },
   { key: 'audit-logs', label: 'Audit Logs', icon: 'receipt-outline', href: '/audit-logs', adminOnly: true },
+  { key: 'security-alerts', label: 'Security Alerts', icon: 'shield-checkmark-outline', href: '/security-alerts', adminOnly: true },
 ];
 
 const getIsActive = (pathname: string, item: MenuItem): boolean => {

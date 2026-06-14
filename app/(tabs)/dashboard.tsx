@@ -50,6 +50,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [securitySummary, setSecuritySummary] = useState<{ newCount: number; last7Days: number } | null>(null);
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -58,7 +59,14 @@ export default function DashboardScreen() {
       const d = await api.get<DashboardData>('/api/dashboard');
       setData(d);
     } catch {}
-  }, []);
+    // Admin-only: load security alerts summary (best-effort, non-blocking).
+    if (user?.role === 'ADMIN') {
+      try {
+        const s = await api.get<{ newCount: number; last7Days: number }>('/api/security-alerts/summary');
+        setSecuritySummary(s);
+      } catch {}
+    }
+  }, [user?.role]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -169,6 +177,34 @@ export default function DashboardScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
     >
       <Text style={styles.greeting}>Hello, {user?.name} 👋</Text>
+
+      {/* ── Admin: security alerts banner ── */}
+      {user?.role === 'ADMIN' && securitySummary ? (
+        <TouchableOpacity
+          style={[styles.securityBanner, securitySummary.newCount > 0 && styles.securityBannerAlert]}
+          onPress={() => router.push('/security-alerts')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.securityIconWrap}>
+            <Ionicons
+              name={securitySummary.newCount > 0 ? 'shield-half' : 'shield-checkmark'}
+              size={22}
+              color={securitySummary.newCount > 0 ? Colors.error : Colors.green}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.securityTitle}>
+              {securitySummary.newCount > 0
+                ? `${securitySummary.newCount} unacknowledged security alert${securitySummary.newCount === 1 ? '' : 's'}`
+                : 'No new security alerts'}
+            </Text>
+            <Text style={styles.securitySub}>
+              {securitySummary.last7Days} alert{securitySummary.last7Days === 1 ? '' : 's'} in the last 7 days · Tap to review
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+        </TouchableOpacity>
+      ) : null}
 
       {/* ── Desktop grid: stat cards + upcoming games side-by-side ── */}
       {isDesktop ? (
@@ -289,6 +325,28 @@ const cs = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   greeting: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 20 },
+  securityBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  securityBannerAlert: { borderColor: Colors.error },
+  securityIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: Colors.elevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  securityTitle: { color: Colors.text, fontSize: 15, fontWeight: '700' },
+  securitySub: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
   statCard: { width: 140, alignItems: 'center', paddingVertical: 20 },
   statCount: { fontSize: 28, fontWeight: '800', color: Colors.text, marginTop: 8 },
   statLabel: { fontSize: 12, color: Colors.textSecondary, marginTop: 4 },
