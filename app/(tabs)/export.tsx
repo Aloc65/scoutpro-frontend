@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert, TextInput, TouchableOpacity, Platform } from 'react-native';
 import { useAuth } from '../../src/context/AuthContext';
-import { api } from '../../src/api/client';
+import { api, getToken } from '../../src/api/client';
 import { Colors } from '../../src/theme/colors';
 import GradientButton from '../../src/components/GradientButton';
 import Card from '../../src/components/Card';
@@ -17,6 +17,7 @@ export default function ExportScreen() {
   const [email, setEmail] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [namesLoading, setNamesLoading] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'ADMIN') {
@@ -45,6 +46,40 @@ export default function ExportScreen() {
       showAlert('Error', e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadPlayerNames = async () => {
+    try {
+      setNamesLoading(true);
+      const token = await getToken();
+      const res = await fetch(`${api.baseUrl}/api/export/player-names`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || `Export failed: ${res.status}`);
+      }
+      const blob = await res.blob();
+      const filename = `ScoutPro_Player_Names_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      if (Platform.OS === 'web') {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showAlert('Success', 'Player names exported as Excel.');
+      } else {
+        showAlert('Info', 'Export download is currently available on web.');
+      }
+    } catch (e: any) {
+      showAlert('Export Error', e.message || 'Failed to export player names');
+    } finally {
+      setNamesLoading(false);
     }
   };
 
@@ -117,6 +152,18 @@ export default function ExportScreen() {
           <Ionicons name="send-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
           <Text style={styles.emailButtonText}>{emailLoading ? 'Sending...' : 'Email CSV'}</Text>
         </TouchableOpacity>
+      </Card>
+
+      <Card style={[styles.exportCard, { marginTop: 16 }]}>
+        <Ionicons name="people-outline" size={48} color={Colors.accent} style={{ alignSelf: 'center' }} />
+        <Text style={styles.title}>Player Names</Text>
+        <Text style={styles.count}>Export the first &amp; last name of every player as an Excel spreadsheet</Text>
+        <GradientButton
+          title={namesLoading ? 'Preparing...' : 'Download Player Names (Excel)'}
+          onPress={downloadPlayerNames}
+          loading={namesLoading}
+          style={{ marginTop: 20 }}
+        />
       </Card>
     </View>
   );
