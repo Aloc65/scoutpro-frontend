@@ -6,7 +6,6 @@ import { Colors } from '../../src/theme/colors';
 import {
   Player,
   Ratings,
-  GameStats,
   GAME_STAT_KEYS,
   Meeting,
   MEETING_TYPE_LABELS,
@@ -400,9 +399,6 @@ export default function PlayerDetailScreen() {
   const [reports, setReports] = useState<any[]>([]);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
   const [avgRatings, setAvgRatings] = useState<Ratings | null>(null);
-  const [gameStatTotals, setGameStatTotals] = useState<GameStats | null>(null);
-  const [gameStatAverages, setGameStatAverages] = useState<GameStats | null>(null);
-  const [gamesWithStats, setGamesWithStats] = useState(0);
   const [championColumns, setChampionColumns] = useState<Array<{ key: string; label: string }>>([]);
   const [championSeasonAverages, setChampionSeasonAverages] = useState<Array<{ season: number | null; rows: number; averages: Record<string, number | null> }>>([]);
   const [natChampColumns, setNatChampColumns] = useState<Array<{ key: string; label: string }>>([]);
@@ -431,7 +427,7 @@ export default function PlayerDetailScreen() {
   const load = useCallback(async () => {
     try {
       const [d, championData, natChampData, watchStatus] = await Promise.all([
-        api.get<{ player: Player; reports: any[]; averageRatings: Ratings; gameStatTotals: GameStats; gameStatAverages: GameStats; gamesWithStats: number }>(`/api/players/${id}`),
+        api.get<{ player: Player; reports: any[]; averageRatings: Ratings }>(`/api/players/${id}`),
         api.get<ChampionDataPlayerResponse>(`/api/champion-data/player/${id}`).catch(() => null),
         api.get<NationalChampionshipsPlayerResponse>(`/api/national-championships/player/${id}`).catch(() => null),
         api.get<{ inWatchList: boolean; entry: WatchList | null }>(`/api/watch-list/player/${id}`).catch(() => ({ inWatchList: false, entry: null })),
@@ -440,9 +436,6 @@ export default function PlayerDetailScreen() {
       setPlayer(d.player);
       setReports(d.reports);
       setAvgRatings(d.averageRatings);
-      setGameStatTotals(d.gameStatTotals);
-      setGameStatAverages(d.gameStatAverages);
-      setGamesWithStats(d.gamesWithStats);
       setWatchListEntry(watchStatus?.entry || null);
 
       if (championData) {
@@ -933,36 +926,14 @@ export default function PlayerDetailScreen() {
           </Card>
         )}
 
-        {/* Season Totals */}
-        {gameStatTotals && gamesWithStats > 0 && (
-          <Card style={{ marginBottom: 16 }}>
-            <Text style={styles.sectionTitle}>Season Totals</Text>
-            <Text style={styles.statsSubtitle}>{gamesWithStats} game{gamesWithStats !== 1 ? 's' : ''} with stats recorded</Text>
-            <View style={styles.statsViewGrid}>
-              {GAME_STAT_KEYS.map(([key, label]) => (
-                <View key={key} style={styles.statViewItem}>
-                  <Text style={styles.statViewValue}>{(gameStatTotals as any)[key] ?? 0}</Text>
-                  <Text style={styles.statViewLabel}>{label}</Text>
-                </View>
-              ))}
-            </View>
-          </Card>
-        )}
-
-        {/* Per Game Averages */}
-        {gameStatAverages && gamesWithStats > 0 && (
-          <Card style={{ marginBottom: 16 }}>
-            <Text style={styles.sectionTitle}>Averages Per Game</Text>
-            <View style={styles.statsViewGrid}>
-              {GAME_STAT_KEYS.map(([key, label]) => (
-                <View key={key} style={styles.statViewItem}>
-                  <Text style={[styles.statViewValue, { color: Colors.primary }]}>{(gameStatAverages as any)[key] != null ? (gameStatAverages as any)[key] : '—'}</Text>
-                  <Text style={styles.statViewLabel}>{label}</Text>
-                </View>
-              ))}
-            </View>
-          </Card>
-        )}
+        {/*
+          Statistics on the player profile come exclusively from Champion Data.
+          The two sections below are the only statistical sections:
+            1. Champion Data (current season league play)
+            2. National Championships
+          Previously displayed report-derived "Season Totals" and "Averages Per
+          Game" (sourced from WAFL website data) have been intentionally removed.
+        */}
 
         <Card style={{ marginBottom: 16 }}>
           <Text style={styles.sectionTitle}>Champion Data Stats - Season Averages</Text>
@@ -1420,10 +1391,6 @@ const styles = StyleSheet.create({
   ratingGroupTitle: { fontSize: 14, fontWeight: '800', color: Colors.accent, letterSpacing: 1, marginBottom: 10, marginTop: 4, textTransform: 'uppercase' },
   ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
   statsSubtitle: { fontSize: 13, color: Colors.textMuted, marginBottom: 12 },
-  statsViewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  statViewItem: { width: '30%', minWidth: 90, backgroundColor: Colors.elevated, borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  statViewValue: { fontSize: 22, fontWeight: '800', color: Colors.accent },
-  statViewLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 4, fontWeight: '600' },
   reportDownloadBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border },
   reportStatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   reportStatChip: { fontSize: 11, color: Colors.accent, backgroundColor: Colors.elevated, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontWeight: '600', overflow: 'hidden' },
