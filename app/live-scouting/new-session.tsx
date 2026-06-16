@@ -13,7 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/theme/colors';
-import { COMPETITIONS } from '../../src/types';
+import { AUSTRALIAN_STATES, getCompetitionsForState } from '../../src/types';
 import { liveScoutingApi } from '../../src/api/liveScouting';
 
 export default function NewSessionScreen() {
@@ -23,6 +23,7 @@ export default function NewSessionScreen() {
   const [homeTeam, setHomeTeam] = useState('');
   const [awayTeam, setAwayTeam] = useState('');
   const [venue, setVenue] = useState('');
+  const [state, setState] = useState('');
   const [competition, setCompetition] = useState('');
   const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
   const [gameTime, setGameTime] = useState('14:00');
@@ -49,6 +50,7 @@ export default function NewSessionScreen() {
         awayTeam: awayTeam.trim(),
         venue: venue.trim() || undefined,
         competition: competition || undefined,
+        state: state || undefined,
         gameDate: dateTime,
       });
       router.replace(`/live-scouting/add-players?sessionId=${session.id}` as any);
@@ -102,9 +104,34 @@ export default function NewSessionScreen() {
           placeholderTextColor={Colors.textMuted}
         />
 
-        <Text style={styles.label}>Competition</Text>
+        <Text style={styles.label}>State / Territory</Text>
         <View style={styles.competitionRow}>
-          {COMPETITIONS.map((c) => (
+          {AUSTRALIAN_STATES.map((s) => (
+            <TouchableOpacity
+              key={s}
+              style={[styles.compChip, state === s && styles.compChipActive]}
+              onPress={() => {
+                const next = state === s ? '' : s;
+                setState(next);
+                // Reset competition if it isn't valid for the newly selected state
+                if (competition && !getCompetitionsForState(next).includes(competition)) {
+                  setCompetition('');
+                }
+              }}
+            >
+              <Text style={[styles.compChipText, state === s && styles.compChipTextActive]}>{s}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Competition</Text>
+        {!state && (
+          <Text style={styles.helperHint}>
+            Select a State/Territory above to see its competitions. National Championships is always available.
+          </Text>
+        )}
+        <View style={styles.competitionRow}>
+          {getCompetitionsForState(state).map((c) => (
             <TouchableOpacity
               key={c}
               style={[styles.compChip, competition === c && styles.compChipActive]}
@@ -224,6 +251,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   competitionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  helperHint: { color: Colors.textMuted, fontSize: 12, marginTop: 2, marginBottom: 4, fontStyle: 'italic' },
   compChip: {
     paddingHorizontal: 12,
     paddingVertical: 8,

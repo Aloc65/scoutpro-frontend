@@ -54,6 +54,13 @@ export default function SessionSummaryScreen() {
   const [savingInfo, setSavingInfo] = useState(false);
   const [dataEdited, setDataEdited] = useState(false);
 
+  // End-of-game athletic trait ratings (game-level), keyed by playerId.
+  // Synced from the loaded session and persisted via the player-details endpoint.
+  const [athleticRatings, setAthleticRatings] = useState<
+    Record<string, { speedRating: number | null; flexibilityRating: number | null; gameAwarenessRating: number | null }>
+  >({});
+  const [savingRating, setSavingRating] = useState<string | null>(null);
+
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
     try {
@@ -70,6 +77,64 @@ export default function SessionSummaryScreen() {
       loadSession();
     }, [loadSession]),
   );
+
+  // Keep local athletic ratings in sync with the loaded session
+  useEffect(() => {
+    if (!session) return;
+    const map: Record<string, { speedRating: number | null; flexibilityRating: number | null; gameAwarenessRating: number | null }> = {};
+    session.sessionPlayers.forEach((sp) => {
+      map[sp.playerId] = {
+        speedRating: sp.speedRating ?? null,
+        flexibilityRating: sp.flexibilityRating ?? null,
+        gameAwarenessRating: sp.gameAwarenessRating ?? null,
+      };
+    });
+    setAthleticRatings(map);
+  }, [session]);
+
+  // Persist an athletic trait rating for a player. Tapping the active value clears it.
+  const setAthleticRating = async (
+    playerId: string,
+    key: 'speedRating' | 'flexibilityRating' | 'gameAwarenessRating',
+    value: number,
+  ) => {
+    if (!sessionId) return;
+    const current = athleticRatings[playerId]?.[key] ?? null;
+    const newVal = current === value ? null : value;
+    // optimistic update
+    setAthleticRatings((prev) => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], [key]: newVal },
+    }));
+    setSavingRating(`${playerId}:${key}`);
+    try {
+      await liveScoutingApi.updatePlayerDetails(sessionId, playerId, { [key]: newVal });
+      setDataEdited(true);
+    } catch (err: any) {
+      // revert on failure
+      setAthleticRatings((prev) => ({
+        ...prev,
+        [playerId]: { ...prev[playerId], [key]: current },
+      }));
+      const msg = err?.message || 'Failed to save rating';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+    } finally {
+      setSavingRating(null);
+    }
+  };
+
+  // Players that must have athletic ratings before the game can be finalised.
+  // DNP (Did Not Play) players are excluded — they were never observed.
+  const playersMissingAthletic = (): string[] => {
+    if (!session) return [];
+    return session.sessionPlayers
+      .filter((sp) => sp.status !== 'DNP')
+      .filter((sp) => {
+        const r = athleticRatings[sp.playerId];
+        return !r || r.speedRating == null || r.flexibilityRating == null || r.gameAwarenessRating == null;
+      })
+      .map((sp) => sp.player.fullName);
+  };
 
   const openEditInfoModal = () => {
     if (!session) return;
@@ -110,6 +175,17 @@ export default function SessionSummaryScreen() {
 
   const handleComplete = async () => {
     if (!sessionId) return;
+
+    // Athletic traits (Speed, Flexibility, Game Awareness) are MANDATORY before
+    // the game can be finalised. Block and prompt if any are missing.
+    const missing = playersMissingAthletic();
+    if (missing.length > 0) {
+      const msg =
+        `Please complete the Athletic Traits ratings (Speed, Flexibility, Game Awareness) for every player before finalising the game.\n\nMissing for: ${missing.join(', ')}.`;
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Athletic Traits Required', msg);
+      return;
+    }
+
     const doComplete = async () => {
       setCompleting(true);
       try {
@@ -288,14 +364,11 @@ export default function SessionSummaryScreen() {
             overallCount++;
           }
         });
-        // Include slider-rated athletic traits in overall average
+        // Include end-of-game athletic trait ratings (game-level) in overall average
         SLIDER_TRAITS.forEach((st) => {
-          const vals = sp.quarterData
-            .map((q) => (q as any)[st.key] as number | null)
-            .filter((v: number | null): v is number => v != null);
-          if (vals.length > 0) {
-            const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-            overallSum += avg;
+          const val = (sp as any)[st.key] as number | null;
+          if (val != null) {
+            overallSum += val;
             overallCount++;
           }
         });
@@ -470,14 +543,11 @@ export default function SessionSummaryScreen() {
                 );
               })}
 
-              {/* Athletic / Holistic Slider Trait Bars */}
+              {/* Athletic trait bars — read from end-of-game game-level ratings */}
               {SLIDER_TRAITS.map((st) => {
-                const vals = sp.quarterData
-                  .map((q) => (q as any)[st.key] as number | null)
-                  .filter((v: number | null): v is number => v != null);
-                if (vals.length === 0) return null;
-                const avg = Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10;
-                const barWidth = (avg / 5) * 100;
+                const val = athleticRatings[sp.playerId]?.[st.key] ?? ((sp as any)[st.key] as number | null);
+                if (val == null) return null;
+                const barWidth = (val / 5) * 100;
 
                 return (
                   <View key={st.key} style={styles.traitBarRow}>
@@ -488,18 +558,76 @@ export default function SessionSummaryScreen() {
                           styles.traitBarFill,
                           {
                             width: `${barWidth}%` as any,
-                            backgroundColor: ratingColor(avg),
+                            backgroundColor: ratingColor(val),
                           },
                         ]}
                       />
                     </View>
-                    <Text style={[styles.traitBarValue, { color: ratingColor(avg) }]}>
-                      {avg.toFixed(1)}
+                    <Text style={[styles.traitBarValue, { color: ratingColor(val) }]}>
+                      {val.toFixed(1)}
                     </Text>
                   </View>
                 );
               })}
             </View>
+
+            {/* End-of-Game Athletic Traits Rating (mandatory for non-DNP players) */}
+            {sp.status !== 'DNP' && session.status !== 'COMPLETED' && (
+              <View style={styles.athleticSection}>
+                <View style={styles.athleticHeaderRow}>
+                  <Text style={styles.athleticSectionTitle}>🏃 Rate Athletic Traits</Text>
+                  <Text style={styles.athleticRequired}>Required</Text>
+                </View>
+                <Text style={styles.athleticSectionHint}>
+                  Rated once for the full game (1.0–5.0). All three are required before you can finalise.
+                </Text>
+
+                {SLIDER_TRAITS.map((st) => {
+                  const currentVal = athleticRatings[sp.playerId]?.[st.key] ?? null;
+                  const STEPS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+                  const isSaving = savingRating === `${sp.playerId}:${st.key}`;
+                  return (
+                    <View key={st.key} style={styles.athleticCard}>
+                      <View style={styles.athleticTraitHeader}>
+                        <Text style={styles.athleticLabel}>{st.icon} {st.label}</Text>
+                        {currentVal != null ? (
+                          <View style={[styles.athleticBadge, { backgroundColor: ratingBg(currentVal) }]}>
+                            <Text style={[styles.athleticBadgeText, { color: ratingColor(currentVal) }]}>
+                              {currentVal.toFixed(1)} / 5
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.athleticNotRated}>Not rated</Text>
+                        )}
+                      </View>
+                      <Text style={styles.athleticDescription}>{st.description}</Text>
+                      <View style={styles.athleticSteps}>
+                        {STEPS.map((step) => (
+                          <TouchableOpacity
+                            key={step}
+                            disabled={isSaving}
+                            style={[
+                              styles.athleticStep,
+                              currentVal === step && styles.athleticStepActive,
+                            ]}
+                            onPress={() => setAthleticRating(sp.playerId, st.key, step)}
+                          >
+                            <Text
+                              style={[
+                                styles.athleticStepText,
+                                currentVal === step && styles.athleticStepTextActive,
+                              ]}
+                            >
+                              {Number.isInteger(step) ? step.toString() : step.toFixed(1)}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
 
             {/* Combined Session Notes */}
             {allNotes.length > 0 && (
@@ -1038,6 +1166,102 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 12,
     fontWeight: '800',
+  },
+
+  // End-of-game athletic traits rating
+  athleticSection: {
+    marginBottom: 14,
+    backgroundColor: 'rgba(99,102,241,0.06)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.25)',
+    padding: 12,
+  },
+  athleticHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  athleticSectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  athleticRequired: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  athleticSectionHint: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginBottom: 10,
+  },
+  athleticCard: {
+    marginBottom: 10,
+  },
+  athleticTraitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  athleticLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  athleticBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  athleticBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  athleticNotRated: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+  },
+  athleticDescription: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
+  athleticSteps: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  athleticStep: {
+    minWidth: 38,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.elevated,
+    alignItems: 'center',
+  },
+  athleticStepActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  athleticStepText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  athleticStepTextActive: {
+    color: '#fff',
   },
 
   // Notes section

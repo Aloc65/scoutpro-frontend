@@ -17,7 +17,7 @@ export const TRAITS = [
 export type TraitPosKey = typeof TRAITS[number]['posKey'];
 export type TraitNegKey = typeof TRAITS[number]['negKey'];
 
-/** Athletic/holistic traits rated per-quarter via slider (1.0-5.0) */
+/** Athletic/holistic traits rated ONCE at end of game via slider (1.0-5.0) */
 export const SLIDER_TRAITS = [
   { key: 'speedRating' as const, label: 'Speed', icon: '⚡', description: 'Raw pace, acceleration, and ability to break away from opponents' },
   { key: 'flexibilityRating' as const, label: 'Flexibility', icon: '🤸', description: 'Agility, body flexibility, and ability to adapt to different positions' },
@@ -82,6 +82,10 @@ export interface SessionPlayerData {
   status: PlayerStatus;
   injuryQuarter: number | null;
   injuryNotes: string | null;
+  // Athletic trait ratings — rated once at end of game (game-level, 1.0-5.0)
+  speedRating: number | null;
+  flexibilityRating: number | null;
+  gameAwarenessRating: number | null;
   player: {
     id: string;
     fullName: string;
@@ -133,6 +137,7 @@ export interface LiveScoutingSession {
   awayTeam: string;
   venue: string | null;
   competition: string | null;
+  state: string | null;
   gameDate: string;
   currentQuarter: number;
   status: 'ACTIVE' | 'COMPLETED' | 'ABANDONED';
@@ -158,6 +163,7 @@ export const liveScoutingApi = {
     awayTeam: string;
     venue?: string;
     competition?: string;
+    state?: string;
     gameDate: string;
   }) => api.post<LiveScoutingSession>('/api/live-scouting/sessions', data),
 
@@ -191,6 +197,9 @@ export const liveScoutingApi = {
 
   updatePlayerDetails: (sessionId: string, playerId: string, data: {
     jumperNumber?: number | null;
+    speedRating?: number | null;
+    flexibilityRating?: number | null;
+    gameAwarenessRating?: number | null;
   }) => api.patch<SessionPlayerData>(
     `/api/live-scouting/sessions/${sessionId}/players/${playerId}/details`,
     data,

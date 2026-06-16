@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingV
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors, ratingColor } from '../../src/theme/colors';
-import { Player, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, REPORT_VIEWING_METHODS, REPORT_VIEWING_METHOD_LABELS, ReportViewingMethod } from '../../src/types';
+import { Player, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, REPORT_VIEWING_METHODS, REPORT_VIEWING_METHOD_LABELS, ReportViewingMethod, AUSTRALIAN_STATES, getCompetitionsForState } from '../../src/types';
 import Input from '../../src/components/Input';
 import GradientButton from '../../src/components/GradientButton';
 import Card from '../../src/components/Card';
@@ -85,7 +85,8 @@ export default function NewReportScreen() {
   const [customOpponent, setCustomOpponent] = useState('');
   const [showOpponentDropdown, setShowOpponentDropdown] = useState(false);
   const [venue, setVenue] = useState('');
-  const [competition, setCompetition] = useState("Under 16's");
+  const [state, setState] = useState('');
+  const [competition, setCompetition] = useState('');
   const [representingTeam, setRepresentingTeam] = useState('');
   const [viewingMethod, setViewingMethod] = useState<ReportViewingMethod>('LIVE');
 
@@ -206,6 +207,7 @@ export default function NewReportScreen() {
         playerId: selectedPlayerId,
         matchDate: new Date(matchDate).toISOString(),
         opponent, venue: venue || undefined, competition: competition || undefined,
+        state: state || undefined,
         representingTeam: representingTeam || undefined,
         positionsPlayed, primaryPosition, viewingMethod, summary,
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
@@ -296,9 +298,32 @@ export default function NewReportScreen() {
               </View>
             )}
 
-            <Text style={styles.fieldLabel}>Competition</Text>
+            <Text style={styles.fieldLabel}>State / Territory</Text>
             <View style={styles.chipRow}>
-              {COMPETITIONS.map((c) => (
+              {AUSTRALIAN_STATES.map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => {
+                    const next = state === s ? '' : s;
+                    setState(next);
+                    if (competition && !getCompetitionsForState(next).includes(competition)) {
+                      setCompetition('');
+                    }
+                  }}
+                  style={[styles.chip, state === s && styles.chipActive]}>
+                  <Text style={[styles.chipText, state === s && { color: '#fff' }]}>{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>Competition</Text>
+            {!state && (
+              <Text style={styles.hintText}>
+                Select a State/Territory above to see its competitions. National Championships is always available.
+              </Text>
+            )}
+            <View style={styles.chipRow}>
+              {getCompetitionsForState(state).map((c) => (
                 <TouchableOpacity key={c} onPress={() => setCompetition(competition === c ? '' : c)}
                   style={[styles.chip, competition === c && styles.chipActive]}>
                   <Text style={[styles.chipText, competition === c && { color: '#fff' }]}>{c}</Text>
@@ -491,6 +516,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  hintText: { color: Colors.textMuted, fontSize: 12, marginBottom: 6, fontStyle: 'italic' },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border },
   viewingMethodChip: {
     paddingHorizontal: 12,

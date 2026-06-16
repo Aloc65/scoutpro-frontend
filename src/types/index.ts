@@ -18,12 +18,17 @@ export const REPORT_VIEWING_METHOD_LABELS: Record<ReportViewingMethod, string> =
 export const WATCH_LIST_SIGNED_STATUSES = ['Signed', 'Unsigned'] as const;
 export type SignedStatus = typeof WATCH_LIST_SIGNED_STATUSES[number];
 
-export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'NT'] as const;
+export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'ACT', 'NT'] as const;
 export type AustralianState = typeof AUSTRALIAN_STATES[number];
 
+// National Championships is a cross-state competition. It is selectable
+// independently of any state and is always offered as an option.
+export const NATIONAL_CHAMPIONSHIPS = 'National Championships';
+
 // Competitions are state-specific. Each state has its own predefined list below.
-// WA reuses the COMPETITIONS const above. States without a predefined list (TAS, NT)
-// are intentionally omitted — callers fall back to the free-text "Other Competition".
+// WA reuses the COMPETITIONS const above. States without a predefined list (TAS,
+// ACT, NT) are intentionally omitted — callers fall back to the free-text
+// "Other Competition" (plus the always-available National Championships option).
 export const STATE_COMPETITIONS: Record<string, readonly string[]> = {
   WA: COMPETITIONS,
   VIC: ['Talent League', 'APS School Football', 'AGS School Football', 'APS'],
@@ -32,19 +37,20 @@ export const STATE_COMPETITIONS: Record<string, readonly string[]> = {
   NSW: ['Talent League', 'VFL'],
 };
 
-// Deduplicated union of every state's predefined competitions. Used by the player
-// list filter's "All" option so users can filter by any competition across states.
+// Deduplicated union of every state's predefined competitions plus National
+// Championships. Used by the player list filter's "All" option so users can
+// filter by any competition across states.
 export const ALL_COMPETITIONS: string[] = Array.from(
-  new Set(Object.values(STATE_COMPETITIONS).flat()),
+  new Set([...Object.values(STATE_COMPETITIONS).flat(), NATIONAL_CHAMPIONSHIPS]),
 );
 
-// Returns the predefined competitions available for a given state.
-// Returns [] when no state is selected or the state has no predefined list,
-// in which case callers should fall back to the free-text "Other Competition".
+// Returns the predefined competitions available for a given state. National
+// Championships is always appended because it is selectable independently of
+// state. When no state is selected, only National Championships is returned.
 export function getCompetitionsForState(state: string | null | undefined): string[] {
-  if (!state) return [];
-  const comps = STATE_COMPETITIONS[state];
-  return comps && comps.length > 0 ? [...comps] : [];
+  const comps = state ? STATE_COMPETITIONS[state] : undefined;
+  const list = comps && comps.length > 0 ? [...comps] : [];
+  return [...list, NATIONAL_CHAMPIONSHIPS];
 }
 
 export interface User {
