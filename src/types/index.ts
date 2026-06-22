@@ -220,6 +220,8 @@ export interface ChampionDataColumn {
 
 export interface ChampionDataSeasonAverage {
   season: number | null;
+  grade?: string;
+  gradeDisplayName?: string;
   rows: number;
   averages: Record<string, number | null>;
 }

@@ -400,9 +400,9 @@ export default function PlayerDetailScreen() {
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
   const [avgRatings, setAvgRatings] = useState<Ratings | null>(null);
   const [championColumns, setChampionColumns] = useState<Array<{ key: string; label: string }>>([]);
-  const [championSeasonAverages, setChampionSeasonAverages] = useState<Array<{ season: number | null; rows: number; averages: Record<string, number | null> }>>([]);
+  const [championSeasonAverages, setChampionSeasonAverages] = useState<Array<{ season: number | null; grade?: string; gradeDisplayName?: string; rows: number; averages: Record<string, number | null> }>>([]);
   const [natChampColumns, setNatChampColumns] = useState<Array<{ key: string; label: string }>>([]);
-  const [natChampSeasonAverages, setNatChampSeasonAverages] = useState<Array<{ season: number | null; rows: number; averages: Record<string, number | null> }>>([]);
+  const [natChampSeasonAverages, setNatChampSeasonAverages] = useState<Array<{ season: number | null; grade?: string; gradeDisplayName?: string; rows: number; averages: Record<string, number | null> }>>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   // Edit player state
