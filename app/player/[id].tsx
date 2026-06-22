@@ -937,13 +937,16 @@ export default function PlayerDetailScreen() {
 
         <Card style={{ marginBottom: 16 }}>
           <Text style={styles.sectionTitle}>Champion Data Stats - Season Averages</Text>
+          <Text style={styles.statsAverageNote}>(All statistics shown are averages per game)</Text>
           {championSeasonAverages.length === 0 || championAverageColumns.length === 0 ? (
             <Text style={styles.statsSubtitle}>No Champion Data season averages imported for this player yet.</Text>
           ) : (
             <View style={styles.championSeasonTableWrap}>
               {championSeasonAverages.map((seasonRow) => (
-                <View key={`season-${seasonRow.season ?? 'unknown'}`} style={styles.championSeasonCard}>
-                  <Text style={styles.championSeasonHeading}>Season {seasonRow.season ?? 'Unknown'}</Text>
+                <View key={`season-${seasonRow.season ?? 'unknown'}-${seasonRow.grade ?? 'unknown'}`} style={styles.championSeasonCard}>
+                  <Text style={styles.championSeasonHeading}>
+                    {seasonRow.season ?? 'Unknown'} - {seasonRow.gradeDisplayName || seasonRow.grade || 'Unknown Grade'}
+                  </Text>
 
                   <ScrollView
                     horizontal
@@ -977,13 +980,16 @@ export default function PlayerDetailScreen() {
 
         <Card style={{ marginBottom: 16 }}>
           <Text style={styles.sectionTitle}>National Championships Stats - Season Averages</Text>
+          <Text style={styles.statsAverageNote}>(All statistics shown are averages per game)</Text>
           {natChampSeasonAverages.length === 0 || natChampAverageColumns.length === 0 ? (
             <Text style={styles.statsSubtitle}>No National Championships season averages imported for this player yet.</Text>
           ) : (
             <View style={styles.championSeasonTableWrap}>
               {natChampSeasonAverages.map((seasonRow) => (
-                <View key={`nc-season-${seasonRow.season ?? 'unknown'}`} style={styles.championSeasonCard}>
-                  <Text style={[styles.championSeasonHeading, { color: '#F59E0B' }]}>Season {seasonRow.season ?? 'Unknown'}</Text>
+                <View key={`nc-season-${seasonRow.season ?? 'unknown'}-${seasonRow.grade ?? 'unknown'}`} style={styles.championSeasonCard}>
+                  <Text style={[styles.championSeasonHeading, { color: '#F59E0B' }]}>
+                    {seasonRow.season ?? 'Unknown'} - {seasonRow.gradeDisplayName || 'National Championships'}
+                  </Text>
 
                   <ScrollView
                     horizontal
@@ -1391,6 +1397,7 @@ const styles = StyleSheet.create({
   ratingGroupTitle: { fontSize: 14, fontWeight: '800', color: Colors.accent, letterSpacing: 1, marginBottom: 10, marginTop: 4, textTransform: 'uppercase' },
   ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
   statsSubtitle: { fontSize: 13, color: Colors.textMuted, marginBottom: 12 },
+  statsAverageNote: { fontSize: 12, color: Colors.textMuted, fontStyle: 'italic', marginTop: -8, marginBottom: 12 },
   reportDownloadBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border },
   reportStatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   reportStatChip: { fontSize: 11, color: Colors.accent, backgroundColor: Colors.elevated, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontWeight: '600', overflow: 'hidden' },
