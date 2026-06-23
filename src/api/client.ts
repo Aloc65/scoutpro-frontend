@@ -294,7 +294,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
-async function uploadFile<T>(path: string, file: any): Promise<T> {
+async function uploadFile<T>(path: string, file: any, fields?: Record<string, string>): Promise<T> {
   const token = await getToken();
 
   if (token && isTokenExpired(token)) {
@@ -306,6 +306,13 @@ async function uploadFile<T>(path: string, file: any): Promise<T> {
 
   const formData = new FormData();
   formData.append('file', file);
+  if (fields) {
+    Object.entries(fields).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, value);
+      }
+    });
+  }
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData });
@@ -332,6 +339,6 @@ export const api = {
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-  upload: <T>(path: string, file: any) => uploadFile<T>(path, file),
+  upload: <T>(path: string, file: any, fields?: Record<string, string>) => uploadFile<T>(path, file, fields),
   baseUrl: BASE_URL,
 };

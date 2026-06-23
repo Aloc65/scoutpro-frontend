@@ -34,10 +34,25 @@ const DATA_SOURCES: Array<{ key: DataSource; label: string; icon: string; endpoi
   { key: 'national-championships', label: 'National Championships', icon: 'flag-outline', endpoint: '/api/national-championships/import', color: '#F59E0B' },
 ];
 
+// States/Territories used to resolve the competition grade for generic/ambiguous
+// filenames (e.g. "u18-2026.xlsx"). Optional — a descriptive filename
+// (e.g. "vic-u18-2026.xlsx" or "sanfl-league-2026.xlsx") is detected automatically.
+const STATES: Array<{ code: string; label: string }> = [
+  { code: 'WA', label: 'WA' },
+  { code: 'SA', label: 'SA' },
+  { code: 'VIC', label: 'VIC' },
+  { code: 'NSW', label: 'NSW' },
+  { code: 'QLD', label: 'QLD' },
+  { code: 'TAS', label: 'TAS' },
+  { code: 'ACT', label: 'ACT' },
+  { code: 'NT', label: 'NT' },
+];
+
 export default function DataImportScreen() {
   const { user } = useAuth();
   const [activeSource, setActiveSource] = useState<DataSource>('champion-data');
   const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [selectedState, setSelectedState] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<ImportResponse | null>(null);
 
@@ -98,7 +113,8 @@ export default function DataImportScreen() {
     try {
       setUploading(true);
       const uploadFile = await buildUploadFile(selectedFile);
-      const response = await api.upload<ImportResponse>(currentSource.endpoint, uploadFile);
+      const fields = selectedState ? { state: selectedState } : undefined;
+      const response = await api.upload<ImportResponse>(currentSource.endpoint, uploadFile, fields);
       setResult(response);
       showAlert('Import Complete', `${currentSource.label} import completed successfully.`);
     } catch (e: any) {
@@ -111,6 +127,7 @@ export default function DataImportScreen() {
   const handleSourceChange = (source: DataSource) => {
     setActiveSource(source);
     setSelectedFile(null);
+    setSelectedState(null);
     setResult(null);
   };
 
@@ -139,6 +156,31 @@ export default function DataImportScreen() {
           <Ionicons name="document-outline" size={18} color={Colors.textSecondary} />
           <Text style={styles.filePickerText}>{selectedFile ? selectedFile.name : `Select ${currentSource.label} file`}</Text>
         </TouchableOpacity>
+
+        {activeSource === 'champion-data' && (
+          <View style={styles.stateBlock}>
+            <Text style={styles.stateLabel}>State / Territory <Text style={styles.stateOptional}>(optional)</Text></Text>
+            <Text style={styles.stateHint}>
+              Select the state for generic filenames like “u18-2026.xlsx”. The correct competition (e.g. VIC → Talent League,
+              SA → SANFL U18s) will be applied. Skip this if your filename already names the competition.
+            </Text>
+            <View style={styles.stateGrid}>
+              {STATES.map((s) => {
+                const active = selectedState === s.code;
+                return (
+                  <TouchableOpacity
+                    key={s.code}
+                    style={[styles.statePill, active && { borderColor: currentSource.color, backgroundColor: `${currentSource.color}18` }]}
+                    onPress={() => setSelectedState(active ? null : s.code)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.statePillText, active && { color: currentSource.color }]}>{s.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         <GradientButton title={`Import ${currentSource.label}`} onPress={runImport} loading={uploading} style={{ marginTop: 14 }} />
 
@@ -215,6 +257,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filePickerText: { color: Colors.textSecondary, fontSize: 14, flex: 1 },
+  stateBlock: { marginTop: 16 },
+  stateLabel: { color: Colors.text, fontSize: 14, fontWeight: '700' },
+  stateOptional: { color: Colors.textMuted, fontSize: 12, fontWeight: '500' },
+  stateHint: { color: Colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 4, marginBottom: 10 },
+  stateGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statePill: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.elevated,
+  },
+  statePillText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '700' },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   progressText: { color: Colors.textSecondary, fontSize: 13 },
   kv: { color: Colors.textSecondary, fontSize: 14, marginBottom: 4 },
