@@ -85,12 +85,17 @@ export default function UsersScreen() {
   const [resetError, setResetError] = useState('');
   const [resetting, setResetting] = useState(false);
 
-  const fetchUsers = useCallback(async (status: 'all' | 'accepted' | 'not_accepted' = ndaFilter) => {
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
+
+  const fetchUsers = useCallback(async (status: 'all' | 'accepted' | 'not_accepted' = ndaFilter, silent = false) => {
     try {
       const data = await api.get<{ users: UserItem[] }>(`/api/users?ndaStatus=${status}`);
       setUsers(data.users);
+      setLastRefreshTime(new Date());
     } catch (e: any) {
-      setError(e.message || 'Failed to fetch users');
+      if (!silent) setError(e.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -98,6 +103,17 @@ export default function UsersScreen() {
   }, [ndaFilter]);
 
   useEffect(() => { fetchUsers(ndaFilter); }, [fetchUsers, ndaFilter]);
+
+  // Auto-refresh effect - refresh every 30 seconds when enabled
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchUsers(ndaFilter, true); // silent refresh
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, ndaFilter, fetchUsers]);
 
   const filteredUsers = useMemo(() => users, [users]);
 
@@ -358,11 +374,33 @@ export default function UsersScreen() {
       {/* Header area */}
       <View style={styles.header}>
         <Text style={styles.title}>User Management</Text>
-        <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add User</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={[styles.autoRefreshButton, autoRefresh && styles.autoRefreshButtonActive]} 
+            onPress={() => setAutoRefresh(!autoRefresh)}
+          >
+            <Ionicons 
+              name={autoRefresh ? "sync" : "sync-outline"} 
+              size={18} 
+              color={autoRefresh ? Colors.accent : Colors.textSecondary} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.addButtonText}>Add User</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Auto-refresh status */}
+      {autoRefresh && (
+        <View style={styles.autoRefreshStatus}>
+          <Ionicons name="sync-circle" size={14} color={Colors.accent} />
+          <Text style={styles.autoRefreshText}>
+            Auto-refresh enabled · Last updated {formatDateTime(lastRefreshTime.toISOString())}
+          </Text>
+        </View>
+      )}
 
       <Text style={styles.subtitle}>{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} shown ({users.length} total)</Text>
 
@@ -583,6 +621,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4,
   },
   title: { fontSize: 22, fontWeight: '700', color: Colors.text },
+  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  autoRefreshButton: {
+    width: 38, height: 38, borderRadius: 8, backgroundColor: Colors.elevated,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  autoRefreshButtonActive: {
+    backgroundColor: 'rgba(6, 182, 212, 0.15)',
+    borderColor: Colors.accent,
+  },
+  autoRefreshStatus: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 6,
+  },
+  autoRefreshText: {
+    fontSize: 11, color: Colors.textMuted, fontStyle: 'italic',
+  },
   subtitle: { fontSize: 13, color: Colors.textSecondary, paddingHorizontal: 16, marginBottom: 8 },
   filterRow: {
     flexDirection: 'row',
