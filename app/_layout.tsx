@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { LiveGameProvider } from '../src/context/LiveGameContext';
+import { InactivityManager } from '../src/context/InactivityManager';
 import { Colors } from '../src/theme/colors';
 import LegalFooter from '../src/components/LegalFooter';
 
@@ -61,15 +63,21 @@ function RootGuard() {
     );
   }
 
-  return <Slot />;
+  return (
+    <InactivityManager>
+      <Slot />
+    </InactivityManager>
+  );
 }
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="light" />
-      <RootGuard />
-      <LegalFooter />
+      <LiveGameProvider>
+        <StatusBar style="light" />
+        <RootGuard />
+        <LegalFooter />
+      </LiveGameProvider>
     </AuthProvider>
   );
 }

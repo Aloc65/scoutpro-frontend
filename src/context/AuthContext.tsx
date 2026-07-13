@@ -24,9 +24,23 @@ interface AuthState {
    * "Session expired, please log in again" message.
    */
   sessionExpired: boolean;
+  /**
+   * Why the user was last logged out involuntarily:
+   *  - 'expired'    → their auth token expired / was rejected by the server.
+   *  - 'inactivity' → the idle timer fired after 5 minutes of no activity.
+   *  - null         → no involuntary logout (or they logged out manually).
+   * The login screen uses this to show the right banner message.
+   */
+  sessionExpiredReason: 'expired' | 'inactivity' | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Log the user out because the inactivity timer fired. Saves the current
+   * route so they return to it after logging back in, and flags the reason
+   * so the login screen can explain why.
+   */
+  logoutDueToInactivity: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   acceptNda: () => Promise<void>;
   /** Returns true if a token is stored AND has not expired. */
@@ -39,9 +53,11 @@ const AuthContext = createContext<AuthState>({
   user: null,
   loading: true,
   sessionExpired: false,
+  sessionExpiredReason: null,
   login: async () => {},
   signup: async () => {},
   logout: async () => {},
+  logoutDueToInactivity: async () => {},
   changePassword: async () => {},
   acceptNda: async () => {},
   isSessionValid: async () => false,
@@ -81,6 +97,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionExpiredReason, setSessionExpiredReason] =
+    useState<'expired' | 'inactivity' | null>(null);
 
   const router = useRouter();
   const segments = useSegments();
@@ -105,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await removeToken();
         setUser(null);
         setSessionExpired(true);
+        setSessionExpiredReason('expired');
         setLoading(false);
         return;
       }
@@ -119,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // it when an actually-expired session was detected.
       if (isSessionExpiredError(err)) {
         setSessionExpired(true);
+        setSessionExpiredReason('expired');
       }
       await removeToken();
       setUser(null);
@@ -143,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await removeToken();
       setUser(null);
       setSessionExpired(true);
+      setSessionExpiredReason('expired');
       // Push the user to the login screen. The RootGuard would do this
       // anyway once `user` becomes null, but doing it here makes the
       // redirect immediate even if a guard effect hasn't run yet.
@@ -178,6 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[AuthContext] /api/auth/login user:', normalizedUser);
     setUser(normalizedUser);
     setSessionExpired(false);
+    setSessionExpiredReason(null);
   };
 
   const signup = async (name: string, email: string, password: string) => {
@@ -187,6 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[AuthContext] /api/signup user:', normalizedUser);
     setUser(normalizedUser);
     setSessionExpired(false);
+    setSessionExpiredReason(null);
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
@@ -213,6 +236,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearIntendedRoute();
     setUser(null);
     setSessionExpired(false);
+    setSessionExpiredReason(null);
+  };
+
+  const logoutDueToInactivity = async () => {
+    // Save the current route so we can bring the user back after re-login.
+    const currentRoute = buildCurrentRoute(segmentsRef.current);
+    if (
+      currentRoute &&
+      !SKIP_INTENDED_ROUTES.some(
+        (r) => currentRoute === r || currentRoute.startsWith(r + '?'),
+      )
+    ) {
+      await saveIntendedRoute(currentRoute);
+    }
+    await removeToken();
+    setUser(null);
+    setSessionExpired(true);
+    setSessionExpiredReason('inactivity');
+    try {
+      router.replace('/auth/login');
+    } catch (e) {
+      console.warn('[AuthContext] router.replace during inactivity logout failed:', e);
+    }
   };
 
   return (
@@ -221,9 +267,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         sessionExpired,
+        sessionExpiredReason,
         login,
         signup,
         logout,
+        logoutDueToInactivity,
         changePassword,
         acceptNda,
         isSessionValid,

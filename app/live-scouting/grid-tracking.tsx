@@ -23,6 +23,7 @@ import {
   calcTraitRating,
   PlayerStatus,
 } from '../../src/api/liveScouting';
+import { useLiveGame } from '../../src/context/LiveGameContext';
 
 const QUARTERS = [1, 2, 3, 4];
 const LABEL_COL_WIDTH = 130;
@@ -63,6 +64,18 @@ export default function GridTrackingScreen() {
   // Reload session on mount and when returning from add-players screen
   useFocusEffect(
     useCallback(() => { loadSession(); }, [loadSession])
+  );
+
+  // Suspend the inactivity auto-logout while a live game is in progress on
+  // this screen (only when the session is actually ACTIVE).
+  const { setLiveGameActive } = useLiveGame();
+  const isGameActive = session?.status === 'ACTIVE';
+  useFocusEffect(
+    useCallback(() => {
+      if (!isGameActive) return;
+      setLiveGameActive(true);
+      return () => setLiveGameActive(false);
+    }, [isGameActive, setLiveGameActive])
   );
 
   // Sync vertical scroll between left label column and right player columns

@@ -22,6 +22,7 @@ import {
   PlayerStatus,
 } from '../../src/api/liveScouting';
 import { isSessionExpiredError } from '../../src/api/client';
+import { useLiveGame } from '../../src/context/LiveGameContext';
 
 const QUARTERS = [1, 2, 3, 4];
 
@@ -77,6 +78,18 @@ export default function TrackingScreen() {
     useCallback(() => {
       loadSession();
     }, [loadSession])
+  );
+
+  // Suspend the inactivity auto-logout while a live game is in progress on
+  // this screen (only when the session is actually ACTIVE).
+  const { setLiveGameActive } = useLiveGame();
+  const isGameActive = session?.status === 'ACTIVE';
+  useFocusEffect(
+    useCallback(() => {
+      if (!isGameActive) return;
+      setLiveGameActive(true);
+      return () => setLiveGameActive(false);
+    }, [isGameActive, setLiveGameActive])
   );
 
   // All hooks must be called unconditionally

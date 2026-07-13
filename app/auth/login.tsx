@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 const ADMIN_EMAIL = 'lockyer4@bigpond.net.au';
 
 export default function LoginScreen() {
-  const { login, sessionExpired } = useAuth();
+  const { login, sessionExpired, sessionExpiredReason } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +55,9 @@ export default function LoginScreen() {
             <View style={styles.sessionExpiredBanner}>
               <Ionicons name="time-outline" size={16} color={Colors.amber} />
               <Text style={styles.sessionExpiredText}>
-                Your session has expired. Please log in again.
+                {sessionExpiredReason === 'inactivity'
+                  ? 'You were logged out after 5 minutes of inactivity. Please log in again.'
+                  : 'Your session has expired. Please log in again.'}
               </Text>
             </View>
           ) : null}
