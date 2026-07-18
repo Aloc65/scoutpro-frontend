@@ -706,7 +706,7 @@ const styles = StyleSheet.create({
   gridRowEven: { backgroundColor: 'rgba(255,255,255,0.02)' },
 
   gridLabelText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700' },
-  gridTraitLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700' },
+  gridTraitLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: '700' },
 
   gridHeaderCell: {
     width: PLAYER_COL_WIDTH, paddingHorizontal: 8, paddingVertical: 10,

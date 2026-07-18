@@ -845,8 +845,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border, marginBottom: 8,
   },
   traitLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  traitIcon: { fontSize: 18 },
-  traitLabel: { color: Colors.text, fontSize: 14, fontWeight: '700' },
+  traitIcon: { fontSize: 20 },
+  traitLabel: { color: Colors.text, fontSize: 17, fontWeight: '700' },
   traitControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   traitBtnPlus: {
     width: 44, height: 44, borderRadius: 12,
