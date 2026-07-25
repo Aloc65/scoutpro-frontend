@@ -105,8 +105,6 @@ export default function NewReportScreen() {
   const [gameStats, setGameStats] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [playerSearch, setPlayerSearch] = useState('');
-  const [fetchingStats, setFetchingStats] = useState(false);
-  const [fetchMessage, setFetchMessage] = useState('');
 
   const selectedPlayer = useMemo(() => players.find((p) => p.id === selectedPlayerId), [players, selectedPlayerId]);
 
@@ -123,60 +121,6 @@ export default function NewReportScreen() {
     }
     return selectedOpponentOption;
   }, [selectedOpponentOption, customOpponent]);
-
-  const fetchStatsFromWeb = async () => {
-    if (!selectedPlayer) {
-      showAlert('Missing Info', 'Please select a player first');
-      return;
-    }
-    if (!opponent) {
-      showAlert('Missing Info', 'Please select or enter the opponent');
-      return;
-    }
-    if (!matchDate) {
-      showAlert('Missing Info', 'Please select the match date');
-      return;
-    }
-    try {
-      setFetchingStats(true);
-      setFetchMessage('');
-      const result = await api.post<any>('/api/stats-fetcher/fetch', {
-        playerName: selectedPlayer.fullName,
-        team: selectedPlayer.team || undefined,
-        opponent,
-        matchDate,
-      });
-      if (result.error) {
-        setFetchMessage(result.error);
-        showAlert('Stats Not Found', result.error);
-      } else if (result.stats) {
-        const gs: Record<string, string> = {};
-        GAME_STAT_KEYS.forEach(([key]) => {
-          const val = result.stats[key];
-          gs[key] = val != null ? String(val) : '';
-        });
-        setGameStats(gs);
-        const note = result.matchInfo?.note;
-        const info = result.matchInfo?.versus
-          ? `Stats loaded: ${result.matchInfo.versus} (${result.matchInfo.round || ''} ${result.matchInfo.season || ''})`
-          : 'Stats loaded successfully';
-        let msg = note || info;
-        // If DOB was returned from WAFL, update the player
-        if (result.dateOfBirth && selectedPlayerId) {
-          try {
-            await api.patch(`/api/players/${selectedPlayerId}`, { dateOfBirth: result.dateOfBirth });
-            msg += ' • DOB updated';
-          } catch {}
-        }
-        setFetchMessage(msg);
-      }
-    } catch (e: any) {
-      setFetchMessage('Failed to fetch stats');
-      showAlert('Error', e.message || 'Failed to fetch stats from web');
-    } finally {
-      setFetchingStats(false);
-    }
-  };
 
   useEffect(() => {
     api.get<{ items: Player[] }>('/api/players?limit=200').then((d) => setPlayers(d.items)).catch(() => {});
@@ -400,26 +344,6 @@ export default function NewReportScreen() {
 
           {/* SECTION: Game Stats */}
           <Text style={styles.section}>Game Stats</Text>
-          <TouchableOpacity
-            style={[styles.fetchBtn, fetchingStats && { opacity: 0.6 }]}
-            onPress={fetchStatsFromWeb}
-            disabled={fetchingStats}
-            activeOpacity={0.7}
-          >
-            {fetchingStats ? (
-              <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
-            ) : (
-              <Text style={styles.fetchBtnIcon}>🌐</Text>
-            )}
-            <Text style={styles.fetchBtnText}>
-              {fetchingStats ? 'Fetching Stats...' : 'Fetch Stats from Web'}
-            </Text>
-          </TouchableOpacity>
-          {fetchMessage !== '' && (
-            <Text style={[styles.fetchMsg, fetchMessage.toLowerCase().includes('error') || fetchMessage.toLowerCase().includes('not found') || fetchMessage.toLowerCase().includes('failed') ? { color: Colors.error } : { color: Colors.green }]}>
-              {fetchMessage}
-            </Text>
-          )}
           <Card style={{ marginBottom: 16 }}>
             <View style={styles.statsGrid}>
               {GAME_STAT_KEYS.map(([key, label]) => (
@@ -543,10 +467,6 @@ const styles = StyleSheet.create({
   statInputWrap: { width: '30%', minWidth: 90, marginBottom: 8 },
   statInputLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 4, textAlign: 'center' },
   statInputBox: { backgroundColor: Colors.elevated, borderRadius: 10, overflow: 'hidden' },
-  fetchBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.accent, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, marginBottom: 10 },
-  fetchBtnIcon: { fontSize: 18, marginRight: 8 },
-  fetchBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  fetchMsg: { fontSize: 13, marginBottom: 10, textAlign: 'center', paddingHorizontal: 8 },
   stickyBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: Colors.card, borderTopWidth: 1, borderTopColor: Colors.border },
   ratingGroupTitle: { fontSize: 14, fontWeight: '800', color: Colors.accent, letterSpacing: 1, marginBottom: 10, marginTop: 4, textTransform: 'uppercase' },
   ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
