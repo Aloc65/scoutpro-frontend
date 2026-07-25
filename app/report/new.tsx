@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingV
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Colors, ratingColor } from '../../src/theme/colors';
-import { Player, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, REPORT_VIEWING_METHODS, REPORT_VIEWING_METHOD_LABELS, ReportViewingMethod, AUSTRALIAN_STATES, getCompetitionsForState } from '../../src/types';
+import { Player, POSITIONS, PROJECTIONS, REPORT_VIEWING_METHODS, REPORT_VIEWING_METHOD_LABELS, ReportViewingMethod, AUSTRALIAN_STATES, getCompetitionsForState } from '../../src/types';
 import Input from '../../src/components/Input';
 import GradientButton from '../../src/components/GradientButton';
 import Card from '../../src/components/Card';
@@ -102,7 +102,6 @@ export default function NewReportScreen() {
     kicking: 3, handball: 3, marking: 3, cleanBelowKnees: 3, workRate: 3, decisionMaking: 3,
     composure: 3, speed: 3, flexibility: 3, defensiveEffort: 3, contestWork: 3, gameAwareness: 3,
   });
-  const [gameStats, setGameStats] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [playerSearch, setPlayerSearch] = useState('');
 
@@ -142,11 +141,6 @@ export default function NewReportScreen() {
     }
     try {
       setSaving(true);
-      const statsPayload: any = {};
-      GAME_STAT_KEYS.forEach(([key]) => {
-        const v = gameStats[key];
-        if (v !== undefined && v !== '') statsPayload[key] = parseInt(v, 10);
-      });
       await api.post('/api/reports', {
         playerId: selectedPlayerId,
         matchDate: new Date(matchDate).toISOString(),
@@ -157,7 +151,6 @@ export default function NewReportScreen() {
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
         developmentAreas: developmentAreas || undefined,
         overallProjection: overallProjection || undefined,
-        ...statsPayload,
         ratings,
       });
       showAlert('Success', 'Report created!', () => router.back());
@@ -342,27 +335,6 @@ export default function NewReportScreen() {
             ))}
           </Card>
 
-          {/* SECTION: Game Stats */}
-          <Text style={styles.section}>Game Stats</Text>
-          <Card style={{ marginBottom: 16 }}>
-            <View style={styles.statsGrid}>
-              {GAME_STAT_KEYS.map(([key, label]) => (
-                <View key={key} style={styles.statInputWrap}>
-                  <Text style={styles.statInputLabel}>{label}</Text>
-                  <View style={styles.statInputBox}>
-                    <Input
-                      label=""
-                      value={gameStats[key] || ''}
-                      onChangeText={(v: string) => setGameStats({ ...gameStats, [key]: v.replace(/[^0-9]/g, '') })}
-                      keyboardType="numeric"
-                      style={{ marginBottom: 0 }}
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
-          </Card>
-
           {/* SECTION: Notes */}
           <Text style={styles.section}>Notes</Text>
           <Card style={{ marginBottom: 16 }}>
@@ -463,10 +435,6 @@ const styles = StyleSheet.create({
   },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statInputWrap: { width: '30%', minWidth: 90, marginBottom: 8 },
-  statInputLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 4, textAlign: 'center' },
-  statInputBox: { backgroundColor: Colors.elevated, borderRadius: 10, overflow: 'hidden' },
   stickyBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: Colors.card, borderTopWidth: 1, borderTopColor: Colors.border },
   ratingGroupTitle: { fontSize: 14, fontWeight: '800', color: Colors.accent, letterSpacing: 1, marginBottom: 10, marginTop: 4, textTransform: 'uppercase' },
   ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },

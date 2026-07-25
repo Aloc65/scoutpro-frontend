@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '../../../src/api/client';
 import { useAuth } from '../../../src/context/AuthContext';
 import { Colors, ratingColor } from '../../../src/theme/colors';
-import { FullReport, COMPETITIONS, POSITIONS, PROJECTIONS, GAME_STAT_KEYS, Player, SIGNING_STATUS_LABELS, SigningStatus, ReportViewingMethod, REPORT_VIEWING_METHODS, REPORT_VIEWING_METHOD_LABELS } from '../../../src/types';
+import { FullReport, COMPETITIONS, POSITIONS, PROJECTIONS, Player, SIGNING_STATUS_LABELS, SigningStatus, ReportViewingMethod, REPORT_VIEWING_METHODS, REPORT_VIEWING_METHOD_LABELS } from '../../../src/types';
 import Input from '../../../src/components/Input';
 import GradientButton from '../../../src/components/GradientButton';
 import Card from '../../../src/components/Card';
@@ -93,7 +93,6 @@ export default function EditReportScreen() {
   const [developmentAreas, setDevelopmentAreas] = useState('');
   const [overallProjection, setOverallProjection] = useState('');
   const [ratings, setRatings] = useState<Record<string, number>>({});
-  const [gameStats, setGameStats] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   const isoToDatePickerValue = (iso: string): string => {
@@ -147,9 +146,6 @@ export default function EditReportScreen() {
       const rat: Record<string, number> = {};
       RATING_KEYS.forEach(([key]) => { rat[key] = (r.ratings as any)?.[key] ?? 3; });
       setRatings(rat);
-      const gs: Record<string, string> = {};
-      GAME_STAT_KEYS.forEach(([key]) => { gs[key] = (r as any)[key] != null ? String((r as any)[key]) : ''; });
-      setGameStats(gs);
     }).catch(() => {});
   }, [id]);
 
@@ -172,12 +168,6 @@ export default function EditReportScreen() {
     }
     try {
       setSaving(true);
-      const statsPayload: any = {};
-      GAME_STAT_KEYS.forEach(([key]) => {
-        const v = gameStats[key];
-        if (v !== undefined && v !== '') statsPayload[key] = parseInt(v, 10);
-        else statsPayload[key] = null;
-      });
       await api.patch(`/api/reports/${id}`, {
         matchDate: new Date(matchDate).toISOString(),
         opponent, venue: venue || undefined, competition: competition || undefined,
@@ -186,7 +176,6 @@ export default function EditReportScreen() {
         strengths: strengths || undefined, weaknesses: weaknesses || undefined,
         developmentAreas: developmentAreas || undefined,
         overallProjection: overallProjection || undefined,
-        ...statsPayload,
         ratings,
       });
       showAlert('Saved', 'Report updated!');
@@ -258,20 +247,6 @@ export default function EditReportScreen() {
               <RatingBar key={key} label={label} value={(report.ratings as any)?.[key]} />
             ))}
           </Card>
-
-          {GAME_STAT_KEYS.some(([key]) => (report as any)[key] != null) && (
-            <Card style={{ marginBottom: 16 }}>
-              <Text style={styles.sectionTitle}>Game Stats</Text>
-              <View style={styles.statsViewGrid}>
-                {GAME_STAT_KEYS.map(([key, label]) => (
-                  <View key={key} style={styles.statViewItem}>
-                    <Text style={styles.statViewValue}>{(report as any)[key] != null ? (report as any)[key] : '—'}</Text>
-                    <Text style={styles.statViewLabel}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          )}
 
           <Card style={{ marginBottom: 16 }}>
             <Text style={styles.sectionTitle}>Summary</Text>
@@ -441,26 +416,6 @@ export default function EditReportScreen() {
             ))}
           </Card>
 
-          <Text style={styles.section}>Game Stats</Text>
-          <Card style={{ marginBottom: 16 }}>
-            <View style={styles.statsGrid}>
-              {GAME_STAT_KEYS.map(([key, label]) => (
-                <View key={key} style={styles.statInputWrap}>
-                  <Text style={styles.statInputLabel}>{label}</Text>
-                  <View style={styles.statInputBox}>
-                    <Input
-                      label=""
-                      value={gameStats[key] || ''}
-                      onChangeText={(v: string) => setGameStats({ ...gameStats, [key]: v.replace(/[^0-9]/g, '') })}
-                      keyboardType="numeric"
-                      style={{ marginBottom: 0 }}
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
-          </Card>
-
           <Text style={styles.section}>Notes</Text>
           <Card style={{ marginBottom: 16 }}>
             <View style={{ position: 'relative' }}>
@@ -560,14 +515,6 @@ const styles = StyleSheet.create({
   },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
-  statsViewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  statViewItem: { width: '30%', minWidth: 90, backgroundColor: Colors.elevated, borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  statViewValue: { fontSize: 22, fontWeight: '800', color: Colors.accent },
-  statViewLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 4, fontWeight: '600' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statInputWrap: { width: '30%', minWidth: 90, marginBottom: 8 },
-  statInputLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 4, textAlign: 'center' },
-  statInputBox: { backgroundColor: Colors.elevated, borderRadius: 10, overflow: 'hidden' },
   stickyBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: Colors.card, borderTopWidth: 1, borderTopColor: Colors.border },
   ratingGroupTitle: { fontSize: 14, fontWeight: '800', color: Colors.accent, letterSpacing: 1, marginBottom: 10, marginTop: 4, textTransform: 'uppercase' },
   ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
