@@ -9,6 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { WatchList } from '../../types';
+import { IS_WEB, attachGlobalDrag } from './dragWeb';
 import {
   STAGE_CONFIG,
   draftYearOf,
@@ -18,6 +19,47 @@ import {
 } from './pipeline';
 
 const ROW_HEIGHT = 60;
+
+// Controller the drag handles call into. Kept in a ref so each handle attaches
+// its web pointer listener exactly once (state updates during a drag must not
+// tear down and re-create the listener, which would drop the pointer capture).
+interface DragApi {
+  start: (index: number, clientY: number) => void;
+  move: (clientY: number) => void;
+  end: () => void;
+  tap: (index: number) => void;
+}
+
+// A single drag handle. On web it owns a Pointer Events drag bound once on
+// mount; on native it feeds the shared PanResponder via pressedIndexRef.
+function DragHandle({
+  index,
+  apiRef,
+  nativeHandlers,
+  setPressed,
+}: {
+  index: number;
+  apiRef: React.MutableRefObject<DragApi>;
+  nativeHandlers: any;
+  setPressed: (i: number) => void;
+}) {
+  const ref = useRef<any>(null);
+
+  // Web drag is handled by a single global window listener in TableView; the
+  // pressed handle is identified via its data-draghandle attribute (= row index).
+  const handlers = IS_WEB ? {} : nativeHandlers;
+  return (
+    <View
+      ref={ref}
+      style={styles.handleCol}
+      onTouchStart={() => setPressed(index)}
+      {...(IS_WEB ? { dataSet: { draghandle: String(index) } } : {})}
+      {...handlers}
+    >
+      <Ionicons name="reorder-three" size={22} color={Colors.textMuted} />
+    </View>
+  );
+}
 
 interface Props {
   items: WatchList[];
@@ -86,46 +128,96 @@ export default function TableView({ items, onRowPress, onReorder }: Props) {
     if (dragIndexRef.current === null) setOrder(items);
   }, [items]);
 
-  // A single, stable PanResponder shared by every drag handle. The active row
-  // is captured via `pressedIndexRef` (set on touch-start of each handle) so we
-  // never recreate the responder mid-gesture.
+  // ── Shared drag mechanics (used by both web pointer drag and native PanResponder) ──
+  const beginDrag = (index: number, listTop: number, clientY: number) => {
+    listTopRef.current = listTop;
+    dragIndexRef.current = index;
+    grabYRef.current = clientY - (listTop + index * ROW_HEIGHT);
+    setDragIndex(index);
+    setTargetIndex(index);
+    setFloatY(index * ROW_HEIGHT);
+  };
+
+  const moveDrag = (clientY: number) => {
+    const relY = clientY - listTopRef.current - grabYRef.current;
+    setFloatY(relY);
+    const n = orderRef.current.length;
+    let ti = Math.round(relY / ROW_HEIGHT);
+    if (ti < 0) ti = 0;
+    if (ti > n - 1) ti = n - 1;
+    setTargetIndex(ti);
+  };
+
+  const commitDrag = () => {
+    const from = dragIndexRef.current;
+    const to = targetIndexRef.current;
+    dragIndexRef.current = null;
+    setDragIndex(null);
+    setTargetIndex(null);
+    if (from !== null && to !== null && from !== to) {
+      setOrder((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        onReorderRef.current(next.map((i) => i.playerId));
+        return next;
+      });
+    }
+  };
+
+  // Web drag API — reads the list's viewport top synchronously via the DOM node.
+  const apiRef = useRef<DragApi>({
+    start: () => {},
+    move: () => {},
+    end: () => {},
+    tap: () => {},
+  });
+  apiRef.current = {
+    start: (index, clientY) => {
+      const node: any = listRef.current;
+      const listTop =
+        node && typeof node.getBoundingClientRect === 'function'
+          ? node.getBoundingClientRect().top
+          : listTopRef.current;
+      beginDrag(index, listTop, clientY);
+    },
+    move: (clientY) => moveDrag(clientY),
+    end: () => commitDrag(),
+    tap: (index) => onRowPress(orderRef.current[index]),
+  };
+
+  // ── Web: single global pointer-drag controller ──────────────────────────
+  // react-native-web swallows native pointer events at its root, so per-handle
+  // listeners never fire. We attach ONE window listener and hit-test the pressed
+  // handle via its data-draghandle attribute (= row index).
+  useEffect(() => {
+    if (!IS_WEB) return;
+    return attachGlobalDrag(
+      'draghandle',
+      {
+        onStart: (id, _x, y) => apiRef.current.start(parseInt(id, 10), y),
+        onMove: (_x, y) => apiRef.current.move(y),
+        onEnd: () => apiRef.current.end(),
+        onTap: (id) => apiRef.current.tap(parseInt(id, 10)),
+      },
+      6,
+    );
+  }, []);
+
+  // A single, stable PanResponder shared by every drag handle (native only).
+  // The active row is captured via `pressedIndexRef` (set on touch-start of
+  // each handle) so we never recreate the responder mid-gesture.
   const responder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => !IS_WEB,
       onPanResponderGrant: (e) => {
         const index = pressedIndexRef.current;
-        listRef.current?.measureInWindow((_x, y) => { listTopRef.current = y; });
-        dragIndexRef.current = index;
-        grabYRef.current = e.nativeEvent.pageY - (listTopRef.current + index * ROW_HEIGHT);
-        setDragIndex(index);
-        setTargetIndex(index);
-        setFloatY(index * ROW_HEIGHT);
+        listRef.current?.measureInWindow((_x, y) => {
+          beginDrag(index, y, e.nativeEvent.pageY);
+        });
       },
-      onPanResponderMove: (e) => {
-        const relY = e.nativeEvent.pageY - listTopRef.current - grabYRef.current;
-        setFloatY(relY);
-        const n = orderRef.current.length;
-        let ti = Math.round(relY / ROW_HEIGHT);
-        if (ti < 0) ti = 0;
-        if (ti > n - 1) ti = n - 1;
-        setTargetIndex(ti);
-      },
-      onPanResponderRelease: () => {
-        const from = dragIndexRef.current;
-        const to = targetIndexRef.current;
-        dragIndexRef.current = null;
-        setDragIndex(null);
-        setTargetIndex(null);
-        if (from !== null && to !== null && from !== to) {
-          setOrder((prev) => {
-            const next = [...prev];
-            const [moved] = next.splice(from, 1);
-            next.splice(to, 0, moved);
-            onReorderRef.current(next.map((i) => i.playerId));
-            return next;
-          });
-        }
-      },
+      onPanResponderMove: (e) => moveDrag(e.nativeEvent.pageY),
+      onPanResponderRelease: () => commitDrag(),
       onPanResponderTerminate: () => {
         dragIndexRef.current = null;
         setDragIndex(null);
@@ -155,13 +247,12 @@ export default function TableView({ items, onRowPress, onReorder }: Props) {
             <View key={item.id} style={[styles.rowAbsolute, { top: index * ROW_HEIGHT }, isDragging && styles.rowDim]}>
               {showInsertLine && <View style={styles.insertLine} />}
               <View style={[styles.row, active && styles.rowActive]}>
-                <View
-                  style={styles.handleCol}
-                  onTouchStart={() => { pressedIndexRef.current = index; }}
-                  {...responder.panHandlers}
-                >
-                  <Ionicons name="reorder-three" size={22} color={Colors.textMuted} />
-                </View>
+                <DragHandle
+                  index={index}
+                  apiRef={apiRef}
+                  nativeHandlers={responder.panHandlers}
+                  setPressed={(i) => { pressedIndexRef.current = i; }}
+                />
                 <TouchableOpacity style={styles.rowTouchable} activeOpacity={0.7} onPress={() => onRowPress(item)}>
                   <RowContent item={item} />
                 </TouchableOpacity>

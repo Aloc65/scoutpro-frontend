@@ -1,15 +1,15 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   PanResponder,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { PIPELINE_STAGES, PipelineStage, WatchList } from '../../types';
+import { IS_WEB, attachGlobalDrag } from './dragWeb';
 import {
   STAGE_CONFIG,
   draftYearOf,
@@ -74,14 +74,17 @@ function BoardCard({
   onTap: (item: WatchList) => void;
   hidden: boolean;
 }) {
-  const cardRef = useRef<View>(null);
+  const cardRef = useRef<any>(null);
   const movedRef = useRef(false);
 
+  // ── Native: PanResponder ──
+  // (Web drag is handled by a single global window listener in BoardView; see
+  // attachGlobalDrag in dragWeb.ts and the dataSet tag on the card root below.)
   const responder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => !IS_WEB,
       onMoveShouldSetPanResponder: (_e, g) =>
-        Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
+        !IS_WEB && (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD),
       onPanResponderGrant: () => {
         movedRef.current = false;
       },
@@ -89,8 +92,7 @@ function BoardCard({
         if (!movedRef.current && (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD)) {
           movedRef.current = true;
           const { pageX, pageY } = e.nativeEvent;
-          // Measure this card to compute the grab offset within it.
-          cardRef.current?.measureInWindow((x, y) => {
+          cardRef.current?.measureInWindow((x: number, y: number) => {
             onDragStart(item, pageX, pageY, pageX - x, pageY - y);
           });
         }
@@ -113,8 +115,15 @@ function BoardCard({
     }),
   ).current;
 
+  const nativeHandlers = IS_WEB ? {} : responder.panHandlers;
+
   return (
-    <View ref={cardRef} {...responder.panHandlers} style={[hidden && styles.cardHidden]}>
+    <View
+      ref={cardRef}
+      {...nativeHandlers}
+      {...(IS_WEB ? { dataSet: { dragcard: item.playerId } } : {})}
+      style={[hidden && styles.cardHidden]}
+    >
       <CardBody item={item} />
     </View>
   );
@@ -183,6 +192,33 @@ export default function BoardView({ items, onCardPress, onStageChange }: Props) 
       onStageChange(dragged.playerId, dropStage);
     }
   };
+
+  // ── Web: single global pointer-drag controller ──────────────────────────
+  // react-native-web swallows native pointer events at its root, so per-card
+  // listeners never fire. We attach ONE window listener and hit-test the pressed
+  // card via its data-dragcard attribute (see attachGlobalDrag / BoardCard).
+  const ctlRef = useRef({ handleDragStart, handleDragMove, handleDragEnd, onCardPress, items });
+  ctlRef.current = { handleDragStart, handleDragMove, handleDragEnd, onCardPress, items };
+
+  useEffect(() => {
+    if (!IS_WEB) return;
+    return attachGlobalDrag(
+      'dragcard',
+      {
+        onStart: (id, x, y, grabX, grabY) => {
+          const it = ctlRef.current.items.find((i) => i.playerId === id);
+          if (it) ctlRef.current.handleDragStart(it, x, y, grabX, grabY);
+        },
+        onMove: (x, y) => ctlRef.current.handleDragMove(x, y),
+        onEnd: (x) => ctlRef.current.handleDragEnd(x),
+        onTap: (id) => {
+          const it = ctlRef.current.items.find((i) => i.playerId === id);
+          if (it) ctlRef.current.onCardPress(it);
+        },
+      },
+      DRAG_THRESHOLD,
+    );
+  }, []);
 
   return (
     <View style={{ flex: 1 }}>
