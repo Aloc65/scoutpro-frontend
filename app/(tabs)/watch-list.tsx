@@ -12,79 +12,124 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, getToken } from '../../src/api/client';
-import { AFL_TEAMS } from '../../src/constants/aflTeams';
 import EmptyState from '../../src/components/EmptyState';
-import GradientButton from '../../src/components/GradientButton';
 import { Colors } from '../../src/theme/colors';
 import { showAlert } from '../../src/utils/alert';
-import { SignedStatus, WatchList, AUSTRALIAN_STATES } from '../../src/types';
+import { PipelineStage, WatchList, AUSTRALIAN_STATES } from '../../src/types';
+import BoardView from '../../src/features/watchlist/BoardView';
+import TableView from '../../src/features/watchlist/TableView';
+import QuickViewSheet from '../../src/features/watchlist/QuickViewSheet';
+import { hasActiveAflInterest } from '../../src/features/watchlist/pipeline';
 
-const SIGNED_FILTER_OPTIONS = ['All', 'Signed', 'Unsigned'] as const;
+type ViewMode = 'board' | 'table';
+const VIEW_MODE_KEY = 'watchlist_view_mode';
 const STATE_FILTER_OPTIONS = ['All', ...AUSTRALIAN_STATES] as const;
-const SORT_OPTIONS = [
-  { key: 'surname', label: 'Surname' },
-  { key: 'club', label: 'Club' },
-] as const;
 
-type SortMode = (typeof SORT_OPTIONS)[number]['key'];
+// Module-level caches so selections survive navigating away/back within a session.
+let cachedViewMode: ViewMode = 'board';
+let persistedStateFilter = 'All';
+let persistedDraftYear = 'All';
 
-// Module-level memory so the selected state filter is preserved when the user
-// navigates away from the Watch List tab and comes back (the screen unmounts in
-// the stack navigator, so component state alone would reset to 'All').
-let persistedStateFilter: string = 'All';
+// ─── Small dropdown (modal picker) ───────────────────────────────────
+function Dropdown({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={styles.dropdownLabel}>{label}</Text>
+      <TouchableOpacity style={styles.dropdown} onPress={() => setOpen(true)}>
+        <Text style={styles.dropdownValue} numberOfLines={1}>{value}</Text>
+        <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
+      </TouchableOpacity>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setOpen(false)}>
+          <View style={styles.pickerCard}>
+            <Text style={styles.pickerTitle}>{label}</Text>
+            <ScrollView style={{ maxHeight: 320 }}>
+              {options.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.pickerOption, value === opt && styles.pickerOptionActive]}
+                  onPress={() => { onChange(opt); setOpen(false); }}
+                >
+                  <Text style={[styles.pickerOptionText, value === opt && styles.pickerOptionTextActive]}>{opt}</Text>
+                  {value === opt && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+}
 
 export default function WatchListScreen() {
   const [items, setItems] = useState<WatchList[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
-  const [signedStatus, setSignedStatus] = useState<(typeof SIGNED_FILTER_OPTIONS)[number]>('All');
-  const [stateFilter, setStateFilterState] = useState<string>(persistedStateFilter);
-  const [draftYear, setDraftYear] = useState<string>('All');
-
-  // Persist the selection at module scope so it survives navigation away/back.
-  const setStateFilter = useCallback((value: string) => {
-    persistedStateFilter = value;
-    setStateFilterState(value);
-  }, []);
-  const [availableDraftYears, setAvailableDraftYears] = useState<string[]>(['All']);
-  const [sortBy, setSortBy] = useState<SortMode>('surname');
   const [exporting, setExporting] = useState(false);
 
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<WatchList | null>(null);
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [editSignedStatus, setEditSignedStatus] = useState<SignedStatus>('Unsigned');
-  const [editTeams, setEditTeams] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>(cachedViewMode);
+  const [search, setSearch] = useState('');
+  const [stateFilter, setStateFilter] = useState(persistedStateFilter);
+  const [draftYear, setDraftYear] = useState(persistedDraftYear);
+  const [availableDraftYears, setAvailableDraftYears] = useState<string[]>(['All']);
+  const [aflOnly, setAflOnly] = useState(false);
+
+  const [quickViewEntry, setQuickViewEntry] = useState<WatchList | null>(null);
+
+  // Load persisted view mode once.
+  useEffect(() => {
+    AsyncStorage.getItem(VIEW_MODE_KEY).then((v) => {
+      if (v === 'board' || v === 'table') {
+        cachedViewMode = v;
+        setViewMode(v);
+      }
+    });
+  }, []);
+
+  const setViewModePersisted = useCallback((mode: ViewMode) => {
+    cachedViewMode = mode;
+    setViewMode(mode);
+    AsyncStorage.setItem(VIEW_MODE_KEY, mode).catch(() => {});
+  }, []);
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
     if (search.trim()) params.set('search', search.trim());
-    if (signedStatus !== 'All') params.set('signedStatus', signedStatus);
     if (stateFilter !== 'All') params.set('state', stateFilter);
     if (draftYear !== 'All') params.set('draftYear', draftYear);
-    params.set('sortBy', sortBy);
-    const query = params.toString();
-    return query ? `?${query}` : '';
-  }, [draftYear, search, signedStatus, stateFilter, sortBy]);
+    params.set('sortBy', 'rank');
+    const q = params.toString();
+    return q ? `?${q}` : '';
+  }, [search, stateFilter, draftYear]);
 
   const load = useCallback(async () => {
     try {
-      const query = buildQueryString();
-      const data = await api.get<{ items: WatchList[]; total: number }>(`/api/watch-list${query}`);
-      const nextItems = data.items || [];
-      setItems(nextItems);
+      const data = await api.get<{ items: WatchList[]; total: number }>(`/api/watch-list${buildQueryString()}`);
+      const next = data.items || [];
+      setItems(next);
 
-      const nextYears = nextItems
-        .map((item) => item.draftYear)
-        .filter((value): value is number => typeof value === 'number')
+      const years = next
+        .map((i) => i.draftYear)
+        .filter((v): v is number => typeof v === 'number')
         .map(String);
-
-      if (nextYears.length > 0) {
+      if (years.length > 0) {
         setAvailableDraftYears((prev) => {
-          const merged = Array.from(new Set([...prev.filter((year) => year !== 'All'), ...nextYears])).sort(
-            (a, b) => Number(a) - Number(b)
+          const merged = Array.from(new Set([...prev.filter((y) => y !== 'All'), ...years])).sort(
+            (a, b) => Number(a) - Number(b),
           );
           return ['All', ...merged];
         });
@@ -96,9 +141,7 @@ export default function WatchListScreen() {
     }
   }, [buildQueryString]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -106,65 +149,82 @@ export default function WatchListScreen() {
     setRefreshing(false);
   };
 
-  const draftYearOptions = useMemo(() => {
-    if (draftYear === 'All' || availableDraftYears.includes(draftYear)) {
-      return availableDraftYears;
-    }
+  // Persist filter selections at module scope.
+  const changeState = (v: string) => { persistedStateFilter = v; setStateFilter(v); };
+  const changeDraftYear = (v: string) => { persistedDraftYear = v; setDraftYear(v); };
 
-    const merged = Array.from(new Set([...availableDraftYears.filter((year) => year !== 'All'), draftYear])).sort(
-      (a, b) => Number(a) - Number(b)
-    );
+  const aflInterestCount = useMemo(
+    () => items.filter((i) => hasActiveAflInterest(i)).length,
+    [items],
+  );
 
-    return ['All', ...merged];
-  }, [availableDraftYears, draftYear]);
+  const visibleItems = useMemo(
+    () => (aflOnly ? items.filter((i) => hasActiveAflInterest(i)) : items),
+    [items, aflOnly],
+  );
 
-  const startEdit = (item: WatchList) => {
-    setEditingItem(item);
-    setEditSignedStatus(item.signedStatus || 'Unsigned');
-    setEditTeams(item.aflTeamsInterested || []);
-    setEditOpen(true);
-  };
+  // ─── Stage change (board drag) — optimistic ───────────────────────
+  const handleStageChange = useCallback(
+    async (playerId: string, newStage: PipelineStage) => {
+      const prev = items;
+      setItems((cur) =>
+        cur.map((i) =>
+          i.playerId === playerId
+            ? { ...i, stage: newStage, signedStatus: newStage === 'SIGNED' ? 'Signed' : 'Unsigned' }
+            : i,
+        ),
+      );
+      try {
+        const updated = await api.patch<WatchList>(`/api/watch-list/${playerId}/stage`, { stage: newStage });
+        setItems((cur) => cur.map((i) => (i.playerId === playerId ? { ...i, ...updated } : i)));
+      } catch (e: any) {
+        setItems(prev); // revert
+        showAlert('Error', e.message || 'Failed to change stage');
+      }
+    },
+    [items],
+  );
 
-  const toggleTeam = (team: string) => {
-    setEditTeams((prev) => (prev.includes(team) ? prev.filter((t) => t !== team) : [...prev, team]));
-  };
+  // ─── Reorder (table drag) ──────────────────────────────────────────
+  const handleReorder = useCallback(
+    async (orderedPlayerIds: string[]) => {
+      try {
+        const body: any = { orderedPlayerIds };
+        if (draftYear !== 'All') body.draftYear = Number(draftYear);
+        await api.patch(`/api/watch-list/reorder`, body);
+        await load();
+      } catch (e: any) {
+        showAlert('Error', e.message || 'Failed to save new order');
+        await load();
+      }
+    },
+    [draftYear, load],
+  );
 
-  const saveEdit = async () => {
-    if (!editingItem) return;
-    try {
-      setSavingEdit(true);
-      const updated = await api.patch<WatchList>(`/api/watch-list/${editingItem.id}`, {
-        signedStatus: editSignedStatus,
-        aflTeamsInterested: editTeams,
-      });
-      setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      setEditOpen(false);
-      setEditingItem(null);
-      showAlert('Success', 'Watch list entry updated.');
-    } catch (e: any) {
-      showAlert('Error', e.message || 'Failed to update watch list entry');
-    } finally {
-      setSavingEdit(false);
-    }
-  };
+  const handleEntryChanged = useCallback((updated: WatchList) => {
+    setItems((cur) => cur.map((i) => (i.playerId === updated.playerId ? { ...i, ...updated } : i)));
+  }, []);
 
   const exportExcel = async () => {
     try {
       setExporting(true);
       const token = await getToken();
-      const query = buildQueryString();
-      const res = await fetch(`${api.baseUrl}/api/watch-list/export${query}`, {
+      // Reflect the AFL-interest chip in the export via query params.
+      const params = new URLSearchParams(buildQueryString().replace(/^\?/, ''));
+      if (aflOnly) {
+        params.set('hasAflInterest', 'true');
+        params.set('signedStatus', 'Unsigned');
+      }
+      const q = params.toString();
+      const res = await fetch(`${api.baseUrl}/api/watch-list/export${q ? `?${q}` : ''}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.message || `Export failed: ${res.status}`);
       }
-
       const blob = await res.blob();
       const filename = `watch-list-${new Date().toISOString().slice(0, 10)}.xlsx`;
-
       if (Platform.OS === 'web') {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -185,19 +245,57 @@ export default function WatchListScreen() {
     }
   };
 
-  const clearFilters = () => {
-    setSearch('');
-    setSignedStatus('All');
-    setStateFilter('All');
-    setDraftYear('All');
-    setSortBy('surname');
-  };
+  const draftYearOptions = useMemo(() => {
+    if (draftYear === 'All' || availableDraftYears.includes(draftYear)) return availableDraftYears;
+    const merged = Array.from(new Set([...availableDraftYears.filter((y) => y !== 'All'), draftYear])).sort(
+      (a, b) => Number(a) - Number(b),
+    );
+    return ['All', ...merged];
+  }, [availableDraftYears, draftYear]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.filterWrap}>
+      {/* ─── Shared header ─── */}
+      <View style={styles.header}>
+        {/* Segmented control + export */}
+        <View style={styles.topRow}>
+          <View style={styles.segmented}>
+            {(['board', 'table'] as ViewMode[]).map((mode) => {
+              const active = viewMode === mode;
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  style={[styles.segment, active && styles.segmentActive]}
+                  onPress={() => setViewModePersisted(mode)}
+                >
+                  <Ionicons
+                    name={mode === 'board' ? 'grid-outline' : 'list-outline'}
+                    size={15}
+                    color={active ? '#fff' : Colors.textSecondary}
+                  />
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                    {mode === 'board' ? 'Board' : 'Table'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity style={[styles.exportBtn, exporting && styles.disabled]} onPress={exportExcel} disabled={exporting}>
+            {exporting ? (
+              <ActivityIndicator size="small" color={Colors.text} />
+            ) : (
+              <>
+                <Ionicons name="download-outline" size={16} color={Colors.text} />
+                <Text style={styles.exportBtnText}>Export</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Search */}
         <View style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color={Colors.textMuted} />
+          <Ionicons name="search" size={16} color={Colors.textMuted} />
           <TextInput
             value={search}
             onChangeText={setSearch}
@@ -207,338 +305,105 @@ export default function WatchListScreen() {
           />
         </View>
 
-        <Text style={styles.filterLabel}>State</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.draftYearTabsRow}>
-          {STATE_FILTER_OPTIONS.map((s) => {
-            const isActive = stateFilter === s;
-            return (
-              <TouchableOpacity
-                key={s}
-                style={[styles.draftYearTab, isActive && styles.draftYearTabActive]}
-                onPress={() => setStateFilter(s)}
-              >
-                <Text style={[styles.draftYearTabText, isActive && styles.draftYearTabTextActive]}>{s}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        <Text style={styles.filterLabel}>Draft Year</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.draftYearTabsRow}>
-          {draftYearOptions.map((year) => {
-            const isActive = draftYear === year;
-            return (
-              <TouchableOpacity
-                key={year}
-                style={[styles.draftYearTab, isActive && styles.draftYearTabActive]}
-                onPress={() => setDraftYear(year)}
-              >
-                <Text style={[styles.draftYearTabText, isActive && styles.draftYearTabTextActive]}>{year}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        <Text style={styles.filterLabel}>Signed Status</Text>
-        <View style={styles.filterTabsRow}>
-          {SIGNED_FILTER_OPTIONS.map((option) => {
-            const isActive = signedStatus === option;
-            return (
-              <TouchableOpacity
-                key={option}
-                style={[styles.filterTab, isActive && styles.filterTabActive]}
-                onPress={() => setSignedStatus(option)}
-              >
-                <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>{option}</Text>
-              </TouchableOpacity>
-            );
-          })}
+        {/* Dropdown filters */}
+        <View style={styles.filtersRow}>
+          <Dropdown label="State" value={stateFilter} options={[...STATE_FILTER_OPTIONS]} onChange={changeState} />
+          <Dropdown label="Draft Year" value={draftYear} options={draftYearOptions} onChange={changeDraftYear} />
         </View>
 
-        <Text style={styles.filterLabel}>Sort By</Text>
-        <View style={styles.inlineRow}>
-          {SORT_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.key}
-              style={[styles.chip, sortBy === option.key && styles.chipActive]}
-              onPress={() => setSortBy(option.key)}
-            >
-              <Text style={[styles.chipText, sortBy === option.key && styles.chipTextActive]}>{option.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.topActions}>
-          <Text style={styles.countText}>{items.length} players in watch list</Text>
-          <TouchableOpacity onPress={clearFilters}>
-            <Text style={styles.clearText}>Clear filters</Text>
+        {/* AFL-interest count chip */}
+        {aflInterestCount > 0 && (
+          <TouchableOpacity
+            style={[styles.aflChip, aflOnly && styles.aflChipActive]}
+            onPress={() => setAflOnly((v) => !v)}
+          >
+            <Ionicons name="flame" size={14} color={aflOnly ? '#fff' : Colors.orange} />
+            <Text style={[styles.aflChipText, aflOnly && { color: '#fff' }]}>
+              {aflInterestCount} unsigned with AFL interest
+            </Text>
+            {aflOnly && <Ionicons name="close" size={14} color="#fff" />}
           </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.exportBtn, exporting && styles.disabled]}
-          onPress={exportExcel}
-          disabled={exporting}
-        >
-          {exporting ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="download-outline" size={18} color="#fff" />
-              <Text style={styles.exportBtnText}>Export to Excel</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        )}
       </View>
 
+      {/* ─── Content ─── */}
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : items.length === 0 ? (
         <EmptyState icon="eye-outline" message="No players in watch list yet" />
+      ) : viewMode === 'board' ? (
+        <BoardView items={visibleItems} onCardPress={setQuickViewEntry} onStageChange={handleStageChange} />
       ) : (
         <ScrollView
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
-          contentContainerStyle={{ padding: 16, paddingTop: 0, paddingBottom: 32 }}
+          contentContainerStyle={{ paddingTop: 8 }}
         >
-          <ScrollView horizontal showsHorizontalScrollIndicator>
-            <View style={styles.table}>
-              <View style={[styles.row, styles.headerRow]}>
-                <Text style={[styles.cell, styles.headerCell, styles.nameCol]}>Player Name</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.clubCol]}>Club</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.stateCol]}>State</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.yearCol]}>Draft Year</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.statusCol]}>Signed Status</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.teamsCol]}>AFL Teams Interested</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.actionCol]}>Action</Text>
-              </View>
-
-              {items.map((item) => (
-                <View key={item.id} style={styles.row}>
-                  <Text style={[styles.cell, styles.nameCol]}>{item.player?.fullName || '—'}</Text>
-                  <Text style={[styles.cell, styles.clubCol]}>{item.player?.team || '—'}</Text>
-                  <Text style={[styles.cell, styles.stateCol]}>{item.player?.state || '—'}</Text>
-                  <Text style={[styles.cell, styles.yearCol]}>{item.draftYear || '—'}</Text>
-                  <Text style={[styles.cell, styles.statusCol]}>{item.signedStatus}</Text>
-                  <Text style={[styles.cell, styles.teamsCol]} numberOfLines={2}>
-                    {(item.aflTeamsInterested || []).join(', ') || '—'}
-                  </Text>
-                  <View style={[styles.cell, styles.actionCol]}>
-                    <TouchableOpacity style={styles.editBtn} onPress={() => startEdit(item)}>
-                      <Ionicons name="create-outline" size={14} color={Colors.accent} />
-                      <Text style={styles.editBtnText}>Edit</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
+          <TableView items={visibleItems} onRowPress={setQuickViewEntry} onReorder={handleReorder} />
         </ScrollView>
       )}
 
-      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Edit Watch List</Text>
-            <Text style={styles.modalSubtitle}>{editingItem?.player?.fullName}</Text>
-
-            <Text style={styles.modalSectionTitle}>Signed Status</Text>
-            <View style={styles.inlineRow}>
-              {(['Signed', 'Unsigned'] as SignedStatus[]).map((status) => (
-                <TouchableOpacity
-                  key={status}
-                  style={[styles.chip, editSignedStatus === status && styles.chipActive]}
-                  onPress={() => setEditSignedStatus(status)}
-                >
-                  <Text style={[styles.chipText, editSignedStatus === status && styles.chipTextActive]}>{status}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.modalSectionTitle}>AFL Teams Interested</Text>
-            <ScrollView style={{ maxHeight: 220 }}>
-              <View style={styles.teamsWrap}>
-                {AFL_TEAMS.map((team) => {
-                  const selected = editTeams.includes(team);
-                  return (
-                    <TouchableOpacity
-                      key={team}
-                      style={[styles.teamChip, selected && styles.teamChipSelected]}
-                      onPress={() => toggleTeam(team)}
-                    >
-                      <Text style={[styles.teamChipText, selected && styles.teamChipTextSelected]}>{team}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            <GradientButton title="Save" onPress={saveEdit} loading={savingEdit} style={{ marginTop: 16 }} />
-            <TouchableOpacity style={styles.modalCancel} onPress={() => setEditOpen(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <QuickViewSheet
+        visible={!!quickViewEntry}
+        entry={quickViewEntry}
+        onClose={() => setQuickViewEntry(null)}
+        onEntryChanged={handleEntryChanged}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  filterWrap: { padding: 16, gap: 8 },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.elevated,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-  },
-  searchInput: { flex: 1, color: Colors.text, paddingVertical: 10, marginLeft: 8 },
-  filterLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 4 },
-  draftYearTabsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 2,
-    paddingRight: 4,
-  },
-  draftYearTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: Colors.elevated,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  draftYearTabActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  draftYearTabText: {
-    color: Colors.textSecondary,
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  draftYearTabTextActive: {
-    color: '#fff',
-  },
-  inlineRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  filterTabsRow: { flexDirection: 'row', gap: 8 },
-  filterTab: {
-    flex: 1,
-    minWidth: 0,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.elevated,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  filterTabActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterTabText: { color: Colors.textSecondary, fontWeight: '700', fontSize: 13 },
-  filterTabTextActive: { color: '#fff' },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
-    backgroundColor: Colors.elevated,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  chipText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 12 },
-  chipTextActive: { color: '#fff' },
-  topActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  countText: { color: Colors.textMuted, fontSize: 12 },
-  clearText: { color: Colors.accent, fontSize: 12, fontWeight: '700' },
+  header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 10 },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  segmented: { flexDirection: 'row', backgroundColor: Colors.elevated, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: Colors.border },
+  segment: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 16, paddingVertical: 7, borderRadius: 8 },
+  segmentActive: { backgroundColor: Colors.primary },
+  segmentText: { color: Colors.textSecondary, fontWeight: '700', fontSize: 13 },
+  segmentTextActive: { color: '#fff' },
   exportBtn: {
-    marginTop: 8,
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9,
   },
-  exportBtnText: { color: '#fff', fontWeight: '700' },
-  disabled: { opacity: 0.7 },
+  exportBtnText: { color: Colors.text, fontWeight: '700', fontSize: 13 },
+  disabled: { opacity: 0.6 },
+
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.elevated,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: 12, paddingHorizontal: 12,
+  },
+  searchInput: { flex: 1, color: Colors.text, paddingVertical: 9, marginLeft: 8 },
+
+  filtersRow: { flexDirection: 'row', gap: 10 },
+  dropdownLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 4 },
+  dropdown: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  dropdownValue: { color: Colors.text, fontWeight: '600', fontSize: 13, flex: 1 },
+
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 40 },
+  pickerCard: { backgroundColor: Colors.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.border },
+  pickerTitle: { color: Colors.text, fontWeight: '800', fontSize: 15, marginBottom: 10 },
+  pickerOption: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, paddingHorizontal: 10, borderRadius: 8,
+  },
+  pickerOptionActive: { backgroundColor: Colors.elevated },
+  pickerOptionText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  pickerOptionTextActive: { color: Colors.text },
+
+  aflChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    backgroundColor: 'rgba(249,115,22,0.12)', borderWidth: 1, borderColor: 'rgba(249,115,22,0.4)',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,
+  },
+  aflChipActive: { backgroundColor: Colors.orange, borderColor: Colors.orange },
+  aflChipText: { color: Colors.orange, fontWeight: '700', fontSize: 12 },
+
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  table: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: Colors.card,
-  },
-  row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border },
-  headerRow: { backgroundColor: Colors.elevated },
-  cell: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderRightWidth: 1,
-    borderRightColor: Colors.border,
-    color: Colors.textSecondary,
-    fontSize: 13,
-  },
-  headerCell: { color: Colors.text, fontWeight: '700' },
-  nameCol: { width: 180 },
-  clubCol: { width: 130 },
-  stateCol: { width: 70 },
-  yearCol: { width: 90 },
-  statusCol: { width: 110 },
-  teamsCol: { width: 260 },
-  actionCol: { width: 90, alignItems: 'center', justifyContent: 'center' },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(6,182,212,0.12)',
-  },
-  editBtnText: { color: Colors.accent, fontWeight: '700', fontSize: 12 },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: Colors.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '85%',
-  },
-  modalTitle: { color: Colors.text, fontSize: 18, fontWeight: '800' },
-  modalSubtitle: { color: Colors.textSecondary, marginTop: 4, marginBottom: 12 },
-  modalSectionTitle: { color: Colors.text, fontWeight: '700', marginTop: 8, marginBottom: 8 },
-  teamsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  teamChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 16,
-    backgroundColor: Colors.elevated,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  teamChipSelected: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-  },
-  teamChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  teamChipTextSelected: { color: '#fff' },
-  modalCancel: { alignItems: 'center', marginTop: 10 },
-  modalCancelText: { color: Colors.textSecondary, fontWeight: '600' },
 });

@@ -18,6 +18,39 @@ export const REPORT_VIEWING_METHOD_LABELS: Record<ReportViewingMethod, string> =
 export const WATCH_LIST_SIGNED_STATUSES = ['Signed', 'Unsigned'] as const;
 export type SignedStatus = typeof WATCH_LIST_SIGNED_STATUSES[number];
 
+// ─── Recruitment pipeline ────────────────────────────────────────────
+// Ordered funnel stages. Order here defines column order on the Board and
+// the "advance" order in the quick-view stage selector.
+export const PIPELINE_STAGES = [
+  'NOT_CONTACTED',
+  'INITIAL_CALL',
+  'FAMILY_MEETING',
+  'OFFER_MADE',
+  'SIGNED',
+] as const;
+export type PipelineStage = typeof PIPELINE_STAGES[number];
+
+export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
+  NOT_CONTACTED: 'Not Contacted',
+  INITIAL_CALL: 'Initial Call',
+  FAMILY_MEETING: 'Family Meeting',
+  OFFER_MADE: 'Offer Made',
+  SIGNED: 'Signed',
+};
+
+// A single contact-history entry. `stageAfter` is set when the entry was
+// created by a stage change (null for a manually logged contact).
+export interface ContactLogEntry {
+  id: string;
+  playerId: string;
+  userId: string;
+  occurredAt: string;
+  note: string;
+  stageAfter: PipelineStage | null;
+  createdAt: string;
+  user?: { id: string; name: string | null; email: string | null } | null;
+}
+
 export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'ACT', 'NT'] as const;
 export type AustralianState = typeof AUSTRALIAN_STATES[number];
 
@@ -91,11 +124,22 @@ export interface WatchList {
   createdAt: string;
   updatedAt: string;
   draftYear: number | null;
+  // Recruitment pipeline fields
+  stage: PipelineStage;
+  priorityRank: number | null;
+  aflInterestClub: string | null;
+  aflInterestNotedAt: string | null;
+  lastContactAt: string | null;
+  // Quick-view metrics (only populated by GET /watch-list/player/:playerId)
+  reportCount?: number;
+  avgRating?: number | null;
+  primaryPosition?: string | null;
   player: {
     id: string;
     fullName: string;
     team: string | null;
     dateOfBirth: string | null;
+    draftYear?: number | null;
     competition: string | null;
     state: AustralianState | null;
   };
