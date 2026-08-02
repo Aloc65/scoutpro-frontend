@@ -29,14 +29,16 @@ export default function AppLayout() {
         headerStyle: { backgroundColor: Colors.card },
         headerTintColor: Colors.text,
         headerTitle: () => (
-          <View style={styles.headerBrand}>
-            <Image source={require('../../assets/ffs-scouting-logo.jpeg')} style={styles.logo} resizeMode="contain" />
+          <View style={styles.headerTitleContainer}>
+            <View style={styles.headerBrand}>
+              <Image source={require('../../assets/ffs-scouting-logo.jpeg')} style={styles.logo} resizeMode="contain" />
+            </View>
+            <NavigationMenu isAdmin={user?.role === 'ADMIN'} />
           </View>
         ),
         headerTitleAlign: 'left',
         headerRight: () => (
           <View style={styles.headerRight}>
-            <NavigationMenu isAdmin={user?.role === 'ADMIN'} />
             <TouchableOpacity onPress={confirmLogout} style={styles.logoutBtn}>
               <Ionicons name="log-out-outline" size={18} color={Colors.error} />
               <Text style={styles.logoutText}>Logout</Text>
@@ -62,6 +64,12 @@ export default function AppLayout() {
 }
 
 const styles = StyleSheet.create({
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    flex: 1,
+  },
   headerBrand: {
     justifyContent: 'center',
     alignItems: 'flex-start',
@@ -77,7 +85,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginRight: 10,
-    maxWidth: 380,
   },
   logoutBtn: {
     flexDirection: 'row',
