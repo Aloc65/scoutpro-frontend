@@ -70,6 +70,26 @@ export const CONTACT_TYPE_LABELS: Record<ContactType, string> = {
   OTHER: 'Other',
 };
 
+// Follow-up item (player needing attention: never contacted or stale contact).
+export interface FollowUpItem {
+  playerId: string;
+  playerName: string;
+  team: string | null;
+  state: AustralianState | null;
+  stage: PipelineStage;
+  aflTeamsInterested: string[];
+  aflInterestClub: string | null;
+  hasAflInterest: boolean;
+  lastContactAt: string | null;
+  reason: string; // "Never contacted" or "Last contact X weeks ago"
+}
+
+export interface FollowUpsResponse {
+  items: FollowUpItem[];
+  total: number;
+  homeStateUnset?: boolean;
+}
+
 export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'ACT', 'NT'] as const;
 export type AustralianState = typeof AUSTRALIAN_STATES[number];
 

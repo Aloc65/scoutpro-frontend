@@ -5,10 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api/client';
 import { useAuth } from '../../src/context/AuthContext';
 import { Colors } from '../../src/theme/colors';
-import { DashboardData, UpcomingGame } from '../../src/types';
+import { DashboardData, UpcomingGame, FollowUpsResponse, AUSTRALIAN_STATES } from '../../src/types';
 import Card from '../../src/components/Card';
 import ProjectionBadge from '../../src/components/ProjectionBadge';
 import GradientButton from '../../src/components/GradientButton';
+import { getFollowUps } from '../../src/api/watchList';
 
 /** Group games by their display date string */
 function groupByDate(games: UpcomingGame[]): Record<string, UpcomingGame[]> {
@@ -24,9 +25,12 @@ export default function DashboardScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [followUps, setFollowUps] = useState<FollowUpsResponse | null>(null);
+  const [followUpsScope, setFollowUpsScope] = useState<'mine' | 'all'>('mine');
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
+  const isAdmin = user?.role === 'ADMIN';
 
   const load = useCallback(async () => {
     try {
@@ -35,9 +39,22 @@ export default function DashboardScreen() {
     } catch {}
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const loadFollowUps = useCallback(async () => {
+    try {
+      const f = await getFollowUps(followUpsScope);
+      setFollowUps(f);
+    } catch {
+      setFollowUps(null);
+    }
+  }, [followUpsScope]);
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  useEffect(() => { load(); loadFollowUps(); }, [load, loadFollowUps]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([load(), loadFollowUps()]);
+    setRefreshing(false);
+  };
 
   const upcoming = data?.upcomingGames;
   const gameGroups = upcoming?.games ? groupByDate(upcoming.games) : {};
@@ -123,6 +140,86 @@ export default function DashboardScreen() {
           </View>
         ))
       )}
+
+      {/* ── Key Follow-ups ── */}
+      <View style={styles.followUpsHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <Ionicons name="chatbubbles" size={20} color={Colors.amber} />
+          <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>
+            Key Follow-ups{followUpsScope === 'mine' && user?.homeState ? ` · ${user.homeState}` : ''}
+          </Text>
+        </View>
+        {isAdmin && (
+          <TouchableOpacity
+            onPress={() => setFollowUpsScope(followUpsScope === 'mine' ? 'all' : 'mine')}
+            style={styles.scopeToggle}
+          >
+            <Text style={styles.scopeToggleText}>
+              {followUpsScope === 'mine' ? 'View all states' : 'View my state'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {followUps?.homeStateUnset && (
+        <Card style={styles.warningCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="warning-outline" size={20} color={Colors.amber} />
+            <Text style={styles.warningText}>Set your home state to see scoped follow-ups</Text>
+          </View>
+        </Card>
+      )}
+
+      {followUps && followUps.total === 0 ? (
+        <Card style={styles.emptyCard}>
+          <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+            <Ionicons name="checkmark-circle-outline" size={36} color={Colors.green} />
+            <Text style={{ fontSize: 14, color: Colors.textSecondary, marginTop: 8 }}>
+              All caught up! No follow-ups needed.
+            </Text>
+          </View>
+        </Card>
+      ) : (
+        <>
+          {followUps?.items.slice(0, 4).map((item) => (
+            <Card
+              key={item.playerId}
+              onPress={() => router.push(`/player/${item.playerId}`)}
+              style={styles.followUpCard}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {item.hasAflInterest && (
+                      <View style={styles.aflDot} />
+                    )}
+                    <Text style={styles.followUpPlayerName}>{item.playerName}</Text>
+                    {followUpsScope === 'all' && item.state && (
+                      <View style={styles.stateBadge}>
+                        <Text style={styles.stateBadgeText}>{item.state}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.followUpMeta}>
+                    {item.team || 'No team'} • {item.reason}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+              </View>
+            </Card>
+          ))}
+          {followUps && followUps.total > 4 && (
+            <TouchableOpacity
+              onPress={() => router.push('/watch-lists')}
+              style={styles.viewMoreLink}
+            >
+              <Text style={styles.viewMoreText}>
+                + {followUps.total - 4} more · View full watch list
+              </Text>
+            </TouchableOpacity>
+          )}
+        </>
+      )}
       
       <GradientButton title="+ Quick Add Report" onPress={() => router.push('/report/new')} style={{ marginBottom: 24, marginTop: 12 }} />
 
@@ -171,4 +268,19 @@ const styles = StyleSheet.create({
   sessionActiveText: { fontSize: 12, color: Colors.green, marginLeft: 6, fontWeight: '600' },
   sessionCreate: { flexDirection: 'row', alignItems: 'center' },
   sessionCreateText: { fontSize: 12, color: Colors.accent, marginLeft: 6, fontWeight: '600' },
+
+  // Follow-ups section
+  followUpsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 24 },
+  scopeToggle: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.elevated },
+  scopeToggleText: { fontSize: 12, color: Colors.accent, fontWeight: '700' },
+  warningCard: { marginBottom: 12, padding: 12, backgroundColor: Colors.amber + '15', borderLeftWidth: 3, borderLeftColor: Colors.amber },
+  warningText: { fontSize: 13, color: Colors.amber, marginLeft: 8, fontWeight: '600' },
+  followUpCard: { marginBottom: 10, padding: 14 },
+  followUpPlayerName: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  followUpMeta: { fontSize: 13, color: Colors.textSecondary, marginTop: 3 },
+  aflDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.error },
+  stateBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: Colors.primary + '20' },
+  stateBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase' },
+  viewMoreLink: { alignItems: 'center', paddingVertical: 12, marginBottom: 12 },
+  viewMoreText: { fontSize: 13, color: Colors.accent, fontWeight: '600' },
 });

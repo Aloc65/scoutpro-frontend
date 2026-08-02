@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { Colors } from '../theme/colors';
+import { getFollowUps } from '../api/watchList';
 
 interface NavigationMenuProps {
   isAdmin: boolean;
@@ -90,6 +91,7 @@ export default function NavigationMenu({ isAdmin }: NavigationMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [adminOpen, setAdminOpen] = useState(false);
+  const [followUpsCount, setFollowUpsCount] = useState(0);
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(-8)).current;
 
@@ -100,6 +102,19 @@ export default function NavigationMenu({ isAdmin }: NavigationMenuProps) {
   const isAdminRoute = useMemo(() => {
     return adminItems.some((item) => getIsActive(pathname, item));
   }, [pathname, adminItems]);
+
+  // Fetch follow-ups count for badge
+  useEffect(() => {
+    const loadFollowUpsCount = async () => {
+      try {
+        const data = await getFollowUps('mine');
+        setFollowUpsCount(data.total);
+      } catch {
+        setFollowUpsCount(0);
+      }
+    };
+    loadFollowUpsCount();
+  }, [pathname]); // Refresh when navigating
 
   useEffect(() => {
     if (adminOpen) {
@@ -137,6 +152,7 @@ export default function NavigationMenu({ isAdmin }: NavigationMenuProps) {
       >
         {PRIMARY_TABS.map((tab) => {
           const active = getIsActive(pathname, tab);
+          const showBadge = tab.key === 'watch-lists' && followUpsCount > 0;
           return (
             <TouchableOpacity
               key={tab.key}
@@ -150,6 +166,11 @@ export default function NavigationMenu({ isAdmin }: NavigationMenuProps) {
                 color={active ? Colors.primary : Colors.textSecondary}
               />
               <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+              {showBadge && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{followUpsCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -330,5 +351,20 @@ const styles = StyleSheet.create({
   },
   dropdownItemTextActive: {
     color: Colors.accent,
+  },
+  badge: {
+    backgroundColor: Colors.amber,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 2,
+  },
+  badgeText: {
+    color: Colors.background,
+    fontSize: 10,
+    fontWeight: '800',
   },
 });
