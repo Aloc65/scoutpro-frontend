@@ -10,9 +10,9 @@ const getBaseUrl = () => {
     if (host.includes('railway.app') || host.includes('up.railway.app')) {
       return RAILWAY_BACKEND_URL;
     }
-    // If accessed via Abacus preview URL, use the backend preview URL
+    // If accessed via Abacus preview URL, use the Railway backend
     if (host.includes('preview.abacusai.app')) {
-      return 'https://aa50c4e62.na105.preview.abacusai.app';
+      return RAILWAY_BACKEND_URL;
     }
     // Local development or any other web host — always use Railway backend
     return RAILWAY_BACKEND_URL;
