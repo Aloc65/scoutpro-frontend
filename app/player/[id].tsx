@@ -7,9 +7,9 @@ import {
   Player,
   Ratings,
   GAME_STAT_KEYS,
-  Meeting,
-  MEETING_TYPE_LABELS,
-  MeetingType,
+  ContactLogEntry,
+  CONTACT_TYPE_LABELS,
+  ContactType,
   SIGNING_STATUS_LABELS,
   ChampionDataPlayerResponse,
   NationalChampionshipsPlayerResponse,
@@ -20,12 +20,12 @@ import RatingBar from '../../src/components/RatingBar';
 import ProjectionBadge from '../../src/components/ProjectionBadge';
 import GradientButton from '../../src/components/GradientButton';
 import EmptyState from '../../src/components/EmptyState';
-import MeetingForm from '../../src/components/MeetingForm';
+import ContactForm, { ContactFormData } from '../../src/components/ContactForm';
 import EditPlayerForm from '../../src/components/EditPlayerForm';
 import PositionalAnalysis from '../../src/components/PositionalAnalysis';
 import AflPlayerComparison from '../../src/components/AflPlayerComparison';
 // DatePicker no longer used for DOB – using text input instead
-import { getMeetingsByPlayer, createMeeting, updateMeeting, deleteMeeting } from '../../src/api/meetings';
+import { getContactLog, createContactLogEntry, updateContactLogEntry, deleteContactLogEntry } from '../../src/api/contactLog';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { downloadReportPdf } from '../../src/utils/downloadReportPdf';
@@ -43,7 +43,7 @@ const TRAITS_LABELS: [keyof Ratings, string][] = [
 
 const RATING_LABELS: [keyof Ratings, string][] = [...FUNDAMENTALS_LABELS, ...TRAITS_LABELS];
 
-const MEETING_TYPE_ICONS: Record<MeetingType, string> = {
+const CONTACT_TYPE_ICONS: Record<ContactType, string> = {
   INITIAL: 'person-add-outline',
   FOLLOW_UP: 'refresh-outline',
   CONTRACT: 'document-text-outline',
@@ -51,7 +51,7 @@ const MEETING_TYPE_ICONS: Record<MeetingType, string> = {
   OTHER: 'ellipsis-horizontal-outline',
 };
 
-const MEETING_TYPE_COLORS: Record<MeetingType, string> = {
+const CONTACT_TYPE_COLORS: Record<ContactType, string> = {
   INITIAL: Colors.accent,
   FOLLOW_UP: Colors.primary,
   CONTRACT: Colors.amber,
@@ -415,10 +415,10 @@ export default function PlayerDetailScreen() {
   const [dobMessage, setDobMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [dobError, setDobError] = useState<string | null>(null);
 
-  // Meeting state
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [meetingFormVisible, setMeetingFormVisible] = useState(false);
-  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  // Contact history state
+  const [contactLog, setContactLog] = useState<ContactLogEntry[]>([]);
+  const [contactFormVisible, setContactFormVisible] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<ContactLogEntry | null>(null);
 
   // Watch list state
   const [watchListEntry, setWatchListEntry] = useState<WatchList | null>(null);
@@ -456,50 +456,50 @@ export default function PlayerDetailScreen() {
     } catch {}
   }, [id]);
 
-  const loadMeetings = useCallback(async () => {
+  const loadContactLog = useCallback(async () => {
     try {
-      const m = await getMeetingsByPlayer(id!);
-      // Sort most recent first
-      const sorted = [...m].sort((a, b) =>
-        new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime()
+      const entries = await getContactLog(id!);
+      // Backend returns most recent first; keep defensive sort.
+      const sorted = [...entries].sort((a, b) =>
+        new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
       );
-      setMeetings(sorted);
+      setContactLog(sorted);
     } catch {
-      // Meetings endpoint may not exist yet - gracefully handle
-      setMeetings([]);
+      // Contact-log endpoint may not exist yet - gracefully handle
+      setContactLog([]);
     }
   }, [id]);
 
-  useEffect(() => { load(); loadMeetings(); }, [load, loadMeetings]);
+  useEffect(() => { load(); loadContactLog(); }, [load, loadContactLog]);
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([load(), loadMeetings()]);
+    await Promise.all([load(), loadContactLog()]);
     setRefreshing(false);
   };
 
-  const handleSaveMeeting = async (data: any) => {
-    if (editingMeeting) {
-      await updateMeeting(editingMeeting.id, data);
+  const handleSaveContact = async (data: ContactFormData) => {
+    if (editingEntry) {
+      await updateContactLogEntry(id!, editingEntry.id, data);
     } else {
-      await createMeeting({ ...data, playerId: id });
+      await createContactLogEntry(id!, data);
     }
-    setMeetingFormVisible(false);
-    setEditingMeeting(null);
-    await loadMeetings();
+    setContactFormVisible(false);
+    setEditingEntry(null);
+    await loadContactLog();
   };
 
-  const handleEditMeeting = (meeting: Meeting) => {
-    setEditingMeeting(meeting);
-    setMeetingFormVisible(true);
+  const handleEditContact = (entry: ContactLogEntry) => {
+    setEditingEntry(entry);
+    setContactFormVisible(true);
   };
 
-  const handleDeleteMeeting = (meeting: Meeting) => {
+  const handleDeleteContact = (entry: ContactLogEntry) => {
     const doDelete = async () => {
       try {
-        await deleteMeeting(meeting.id);
-        await loadMeetings();
+        await deleteContactLogEntry(id!, entry.id);
+        await loadContactLog();
       } catch (e: any) {
-        const msg = e.message || 'Failed to delete meeting';
+        const msg = e.message || 'Failed to delete contact entry';
         if (Platform.OS === 'web') {
           window.alert(msg);
         } else {
@@ -509,13 +509,13 @@ export default function PlayerDetailScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to delete this meeting?')) {
+      if (window.confirm('Are you sure you want to delete this contact entry?')) {
         doDelete();
       }
     } else {
       Alert.alert(
-        'Delete Meeting',
-        'Are you sure you want to delete this meeting?',
+        'Delete Contact',
+        'Are you sure you want to delete this contact entry?',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Delete', style: 'destructive', onPress: doDelete },
@@ -524,9 +524,9 @@ export default function PlayerDetailScreen() {
     }
   };
 
-  const openAddMeeting = () => {
-    setEditingMeeting(null);
-    setMeetingFormVisible(true);
+  const openAddContact = () => {
+    setEditingEntry(null);
+    setContactFormVisible(true);
   };
 
   const handleUpdatePlayer = async (data: Partial<Player>) => {
@@ -1081,89 +1081,106 @@ export default function PlayerDetailScreen() {
           );
         })}
 
-        {/* ═══════════ MEETINGS SECTION ═══════════ */}
+        {/* ═══════════ CONTACT HISTORY SECTION ═══════════ */}
         <View style={styles.meetingsSectionHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.sectionTitle}>
-              Meetings ({meetings.length})
+              Contact History ({contactLog.length})
             </Text>
           </View>
-          <TouchableOpacity style={styles.addMeetingBtn} onPress={openAddMeeting} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.addMeetingBtn} onPress={openAddContact} activeOpacity={0.8}>
             <Ionicons name="add-circle-outline" size={18} color="#fff" />
-            <Text style={styles.addMeetingBtnText}>Add Meeting</Text>
+            <Text style={styles.addMeetingBtnText}>Log Contact</Text>
           </TouchableOpacity>
         </View>
 
-        {meetings.length === 0 && (
-          <EmptyState icon="calendar-outline" message="No meetings recorded" />
+        {contactLog.length === 0 && (
+          <EmptyState icon="calendar-outline" message="No contact recorded" />
         )}
 
-        {meetings.map((m) => (
-          <Card key={m.id} style={{ marginBottom: 10 }}>
-            {/* Meeting header */}
-            <View style={styles.meetingHeader}>
-              <View style={[styles.meetingTypeBadge, { backgroundColor: `${MEETING_TYPE_COLORS[m.meetingType]}20` }]}>
-                <Ionicons
-                  name={MEETING_TYPE_ICONS[m.meetingType] as any}
-                  size={14}
-                  color={MEETING_TYPE_COLORS[m.meetingType]}
-                />
-                <Text style={[styles.meetingTypeBadgeText, { color: MEETING_TYPE_COLORS[m.meetingType] }]}>
-                  {MEETING_TYPE_LABELS[m.meetingType]}
+        {contactLog.map((entry) => {
+          // Auto-generated stage-change entries render as compact read-only chips.
+          if (entry.stageAfter != null) {
+            return (
+              <View key={entry.id} style={styles.stageChangeRow}>
+                <Ionicons name="git-branch-outline" size={14} color={Colors.textMuted} />
+                <Text style={styles.stageChangeText} numberOfLines={2}>
+                  {entry.note}
                 </Text>
+                <Text style={styles.stageChangeDate}>{formatDateAU(entry.occurredAt)}</Text>
               </View>
-              <Text style={styles.meetingDate}>{formatDateAU(m.meetingDate)}</Text>
-            </View>
+            );
+          }
 
-            {/* Notes preview */}
-            <Text style={styles.meetingNotes} numberOfLines={3}>
-              {m.notes}
-            </Text>
+          // Manual / meeting-style entries render as full cards with edit/delete.
+          const type = (entry.contactType as ContactType) || 'OTHER';
+          return (
+            <Card key={entry.id} style={{ marginBottom: 10 }}>
+              {/* Header */}
+              <View style={styles.meetingHeader}>
+                <View style={[styles.meetingTypeBadge, { backgroundColor: `${CONTACT_TYPE_COLORS[type]}20` }]}>
+                  <Ionicons
+                    name={CONTACT_TYPE_ICONS[type] as any}
+                    size={14}
+                    color={CONTACT_TYPE_COLORS[type]}
+                  />
+                  <Text style={[styles.meetingTypeBadgeText, { color: CONTACT_TYPE_COLORS[type] }]}>
+                    {CONTACT_TYPE_LABELS[type]}
+                  </Text>
+                </View>
+                <Text style={styles.meetingDate}>{formatDateAU(entry.occurredAt)}</Text>
+              </View>
 
-            {/* Meta info */}
-            <View style={styles.meetingMetaRow}>
-              {m.attendees && (
-                <View style={styles.meetingMetaItem}>
-                  <Ionicons name="people-outline" size={13} color={Colors.textMuted} />
-                  <Text style={styles.meetingMetaText}>{m.attendees}</Text>
+              {/* Notes preview */}
+              <Text style={styles.meetingNotes} numberOfLines={3}>
+                {entry.note}
+              </Text>
+
+              {/* Meta info */}
+              <View style={styles.meetingMetaRow}>
+                {entry.attendees && (
+                  <View style={styles.meetingMetaItem}>
+                    <Ionicons name="people-outline" size={13} color={Colors.textMuted} />
+                    <Text style={styles.meetingMetaText}>{entry.attendees}</Text>
+                  </View>
+                )}
+                {entry.location && (
+                  <View style={styles.meetingMetaItem}>
+                    <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
+                    <Text style={styles.meetingMetaText}>{entry.location}</Text>
+                  </View>
+                )}
+              </View>
+
+              {entry.actionItems && (
+                <View style={styles.actionItemsBox}>
+                  <Text style={styles.actionItemsLabel}>Action Items</Text>
+                  <Text style={styles.actionItemsText}>{entry.actionItems}</Text>
                 </View>
               )}
-              {m.location && (
-                <View style={styles.meetingMetaItem}>
-                  <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-                  <Text style={styles.meetingMetaText}>{m.location}</Text>
-                </View>
-              )}
-            </View>
 
-            {m.actionItems && (
-              <View style={styles.actionItemsBox}>
-                <Text style={styles.actionItemsLabel}>Action Items</Text>
-                <Text style={styles.actionItemsText}>{m.actionItems}</Text>
+              {/* Edit / Delete */}
+              <View style={styles.meetingActions}>
+                <TouchableOpacity
+                  style={styles.meetingActionBtn}
+                  onPress={() => handleEditContact(entry)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="create-outline" size={16} color={Colors.accent} />
+                  <Text style={[styles.meetingActionText, { color: Colors.accent }]}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.meetingActionBtn}
+                  onPress={() => handleDeleteContact(entry)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="trash-outline" size={16} color={Colors.error} />
+                  <Text style={[styles.meetingActionText, { color: Colors.error }]}>Delete</Text>
+                </TouchableOpacity>
               </View>
-            )}
-
-            {/* Edit / Delete */}
-            <View style={styles.meetingActions}>
-              <TouchableOpacity
-                style={styles.meetingActionBtn}
-                onPress={() => handleEditMeeting(m)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="create-outline" size={16} color={Colors.accent} />
-                <Text style={[styles.meetingActionText, { color: Colors.accent }]}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.meetingActionBtn}
-                onPress={() => handleDeleteMeeting(m)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="trash-outline" size={16} color={Colors.error} />
-                <Text style={[styles.meetingActionText, { color: Colors.error }]}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
 
         {/* Return to Main Menu */}
         <TouchableOpacity
@@ -1176,12 +1193,12 @@ export default function PlayerDetailScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Meeting Form Modal */}
-      <MeetingForm
-        visible={meetingFormVisible}
-        meeting={editingMeeting}
-        onSave={handleSaveMeeting}
-        onClose={() => { setMeetingFormVisible(false); setEditingMeeting(null); }}
+      {/* Contact Form Modal */}
+      <ContactForm
+        visible={contactFormVisible}
+        entry={editingEntry}
+        onSave={handleSaveContact}
+        onClose={() => { setContactFormVisible(false); setEditingEntry(null); }}
       />
 
       {/* Edit Player Modal */}
@@ -1501,6 +1518,29 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
+  },
+
+  // ── Contact history: stage-change chips ──
+  stageChangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.elevated,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.textMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  stageChangeText: {
+    flex: 1,
+    color: Colors.textSecondary,
+    fontSize: 12,
+  },
+  stageChangeDate: {
+    color: Colors.textMuted,
+    fontSize: 11,
   },
 
   // ── Meetings ──

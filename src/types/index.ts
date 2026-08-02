@@ -47,9 +47,28 @@ export interface ContactLogEntry {
   occurredAt: string;
   note: string;
   stageAfter: PipelineStage | null;
+  // Unified contact/meeting fields (merged from the legacy `meeting` model).
+  // All optional: quick watch-list touchpoints leave these null.
+  contactType?: ContactType | null;
+  attendees?: string | null;
+  location?: string | null;
+  actionItems?: string | null;
   createdAt: string;
+  updatedAt?: string;
   user?: { id: string; name: string | null; email: string | null } | null;
 }
+
+// Type of a contact/meeting touchpoint (reused from the legacy meeting model).
+export const CONTACT_TYPES = ['INITIAL', 'FOLLOW_UP', 'CONTRACT', 'REVIEW', 'OTHER'] as const;
+export type ContactType = typeof CONTACT_TYPES[number];
+
+export const CONTACT_TYPE_LABELS: Record<ContactType, string> = {
+  INITIAL: 'Initial Meeting',
+  FOLLOW_UP: 'Follow Up',
+  CONTRACT: 'Contract Discussion',
+  REVIEW: 'Review',
+  OTHER: 'Other',
+};
 
 export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'ACT', 'NT'] as const;
 export type AustralianState = typeof AUSTRALIAN_STATES[number];
