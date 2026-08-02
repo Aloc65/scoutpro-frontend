@@ -8,12 +8,14 @@ import { Colors } from '../../src/theme/colors';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/api/client';
 import { showAlert, showConfirm } from '../../src/utils/alert';
+import { AUSTRALIAN_STATES } from '../../src/types';
 
 interface UserItem {
   id: string;
   email: string;
   name: string;
   role: 'ADMIN' | 'SCOUT';
+  homeState?: string | null;
   createdAt: string;
   lastLoginAt: string | null;
   acceptedNdaAt: string | null;
@@ -61,9 +63,10 @@ interface UserForm {
   name: string;
   role: 'ADMIN' | 'SCOUT';
   password: string;
+  homeState: string | null;
 }
 
-const EMPTY_FORM: UserForm = { email: '', name: '', role: 'SCOUT', password: '' };
+const EMPTY_FORM: UserForm = { email: '', name: '', role: 'SCOUT', password: '', homeState: null };
 
 export default function UsersScreen() {
   const { user } = useAuth();
@@ -131,7 +134,7 @@ export default function UsersScreen() {
 
   const openEditModal = (u: UserItem) => {
     setEditingUser(u);
-    setForm({ email: u.email, name: u.name, role: u.role, password: '' });
+    setForm({ email: u.email, name: u.name, role: u.role, password: '', homeState: u.homeState ?? null });
     setError('');
     setModalVisible(true);
   };
@@ -157,7 +160,7 @@ export default function UsersScreen() {
     setSaving(true);
     try {
       if (editingUser) {
-        const body: any = { email: form.email, name: form.name, role: form.role };
+        const body: any = { email: form.email, name: form.name, role: form.role, homeState: form.homeState };
         if (form.password.length > 0) body.password = form.password;
         await api.put(`/api/users/${editingUser.id}`, body);
         showSuccess(`User "${form.name}" updated successfully`);
@@ -306,6 +309,10 @@ export default function UsersScreen() {
                 <Text style={[styles.roleBadgeText, item.role === 'ADMIN' ? styles.roleBadgeTextAdmin : styles.roleBadgeTextScout]}>
                   {item.role}
                 </Text>
+              </View>
+              <View style={styles.stateBadge}>
+                <Ionicons name="location-outline" size={11} color={Colors.textSecondary} />
+                <Text style={styles.stateBadgeText}>{item.homeState || 'All states'}</Text>
               </View>
               <View style={styles.lastLoginContainer}>
                 <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
@@ -516,6 +523,29 @@ export default function UsersScreen() {
                 </TouchableOpacity>
               </View>
 
+              {/* Home State Selector */}
+              <Text style={styles.label}>Home State</Text>
+              <Text style={styles.helperText}>
+                Scopes this user's dashboard & fixtures. "None" = unscoped (sees all states).
+              </Text>
+              <View style={styles.stateSelector}>
+                <TouchableOpacity
+                  style={[styles.stateChip, form.homeState === null && styles.stateChipActive]}
+                  onPress={() => setForm({ ...form, homeState: null })}
+                >
+                  <Text style={[styles.stateChipText, form.homeState === null && styles.stateChipTextActive]}>None</Text>
+                </TouchableOpacity>
+                {AUSTRALIAN_STATES.map((s) => (
+                  <TouchableOpacity
+                    key={s}
+                    style={[styles.stateChip, form.homeState === s && styles.stateChipActive]}
+                    onPress={() => setForm({ ...form, homeState: s })}
+                  >
+                    <Text style={[styles.stateChipText, form.homeState === s && styles.stateChipTextActive]}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               {/* Password */}
               <Text style={styles.label}>
                 Password {editingUser ? '(leave blank to keep current)' : ''}
@@ -705,6 +735,8 @@ const styles = StyleSheet.create({
   roleBadgeText: { fontSize: 11, fontWeight: '700' },
   roleBadgeTextAdmin: { color: Colors.primary },
   roleBadgeTextScout: { color: Colors.accent },
+  stateBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  stateBadgeText: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary },
   lastLoginContainer: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
   },
@@ -816,6 +848,15 @@ const styles = StyleSheet.create({
   roleOptionActiveAdmin: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   roleOptionText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 14 },
   roleOptionTextActive: { color: '#fff' },
+  helperText: { color: Colors.textMuted, fontSize: 12, marginBottom: 8, marginTop: -2 },
+  stateSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  stateChip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: 'transparent',
+  },
+  stateChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  stateChipText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  stateChipTextActive: { color: '#fff' },
   saveButton: {
     backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 14,
     alignItems: 'center', marginTop: 24, marginBottom: 20,

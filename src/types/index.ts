@@ -94,6 +94,8 @@ export interface User {
   mustChangePassword?: boolean;
   acceptedNdaAt?: string | null;
   ndaVersion?: string;
+  // Home state/territory this user scouts. Null = unscoped (sees everything).
+  homeState?: AustralianState | null;
 }
 
 export interface Player {
