@@ -2,7 +2,7 @@ export const Colors = {
   background: '#0D0D12',
   card: '#14141B',
   elevated: '#1C1C26',
-  primary: '#4F46E5',
+  primary: '#1E40AF',  // Navy blue (was indigo #4F46E5)
   accent: '#06B6D4',
   text: '#E8E8ED',
   textSecondary: '#9494A3',
@@ -12,7 +12,7 @@ export const Colors = {
   amber: '#F59E0B',
   green: '#10B981',
   orange: '#F97316',
-  gradientStart: '#4F46E5',
+  gradientStart: '#1E40AF',  // Updated to match new primary
   gradientEnd: '#06B6D4',
 };
 

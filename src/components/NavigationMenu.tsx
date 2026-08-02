@@ -6,6 +6,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,26 +23,43 @@ type MenuItem = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   href: string;
-  adminOnly?: boolean;
 };
 
-const PRIMARY_ITEMS: MenuItem[] = [
+type AdminGroup = {
+  label: string;
+  items: MenuItem[];
+};
+
+// Primary tabs - visible to all users
+const PRIMARY_TABS: MenuItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'home-outline', href: '/dashboard' },
   { key: 'live-scouting', label: 'Live Scouting', icon: 'american-football-outline', href: '/live-scouting/sessions' },
   { key: 'reports', label: 'Reports', icon: 'document-text-outline', href: '/reports' },
   { key: 'players', label: 'Players', icon: 'people-outline', href: '/players' },
   { key: 'watch-lists', label: 'Watch Lists', icon: 'eye-outline', href: '/watch-lists' },
-  { key: 'users', label: 'Users', icon: 'person-outline', href: '/users', adminOnly: true },
 ];
 
-const SECONDARY_ITEMS: MenuItem[] = [
-  { key: 'fixtures', label: 'Fixtures', icon: 'calendar-outline', href: '/fixtures' },
-  { key: 'export', label: 'Export', icon: 'download-outline', href: '/export' },
-  { key: 'weekly-reports', label: 'Weekly Reports', icon: 'mail-outline', href: '/weekly-reports', adminOnly: true },
-  { key: 'data-import', label: 'Data Import', icon: 'cloud-upload-outline', href: '/data-import', adminOnly: true },
-  { key: 'audit-logs', label: 'Audit Logs', icon: 'receipt-outline', href: '/audit-logs', adminOnly: true },
-  { key: 'security-alerts', label: 'Security Alerts', icon: 'shield-checkmark-outline', href: '/security-alerts', adminOnly: true },
-  { key: 'backups', label: 'Backups & Archiving', icon: 'cloud-upload-outline', href: '/backups', adminOnly: true },
+// Admin dropdown groups - only visible to admins
+const ADMIN_GROUPS: AdminGroup[] = [
+  {
+    label: 'Oversight',
+    items: [
+      { key: 'users', label: 'Users', icon: 'person-outline', href: '/users' },
+    ],
+  },
+  {
+    label: 'Scheduling',
+    items: [
+      { key: 'fixtures', label: 'Fixtures', icon: 'calendar-outline', href: '/fixtures' },
+    ],
+  },
+  {
+    label: 'Data',
+    items: [
+      { key: 'export', label: 'Export', icon: 'download-outline', href: '/export' },
+      { key: 'data-import', label: 'Data Import', icon: 'cloud-upload-outline', href: '/data-import' },
+    ],
+  },
 ];
 
 const getIsActive = (pathname: string, item: MenuItem): boolean => {
@@ -71,22 +89,20 @@ const getIsActive = (pathname: string, item: MenuItem): boolean => {
 export default function NavigationMenu({ isAdmin }: NavigationMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(-8)).current;
 
-  const primaryItems = useMemo(
-    () => PRIMARY_ITEMS.filter((item) => !item.adminOnly || isAdmin),
-    [isAdmin],
-  );
+  const adminItems = useMemo(() => {
+    return ADMIN_GROUPS.flatMap((group) => group.items);
+  }, []);
 
-  const secondaryItems = useMemo(
-    () => SECONDARY_ITEMS.filter((item) => !item.adminOnly || isAdmin),
-    [isAdmin],
-  );
+  const isAdminRoute = useMemo(() => {
+    return adminItems.some((item) => getIsActive(pathname, item));
+  }, [pathname, adminItems]);
 
   useEffect(() => {
-    if (open) {
+    if (adminOpen) {
       Animated.parallel([
         Animated.timing(fade, { toValue: 1, duration: 150, useNativeDriver: true }),
         Animated.timing(slide, { toValue: 0, duration: 180, useNativeDriver: true }),
@@ -96,111 +112,166 @@ export default function NavigationMenu({ isAdmin }: NavigationMenuProps) {
 
     fade.setValue(0);
     slide.setValue(-8);
-  }, [open, fade, slide]);
+  }, [adminOpen, fade, slide]);
 
   useEffect(() => {
-    setOpen(false);
+    setAdminOpen(false);
   }, [pathname]);
 
-  const toggle = () => setOpen((value) => !value);
-  const close = () => setOpen(false);
+  const toggleAdmin = () => setAdminOpen((value) => !value);
+  const closeAdmin = () => setAdminOpen(false);
 
   const navigate = (href: string) => {
-    close();
+    closeAdmin();
     if (pathname !== href) {
       router.push(href as never);
     }
   };
 
   return (
-    <View>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Open navigation menu"
-        onPress={toggle}
-        style={[styles.iconButton, open && styles.iconButtonOpen]}
+    <View style={styles.container}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabsContainer}
       >
-        <Ionicons name={open ? 'close' : 'menu'} size={22} color={Colors.text} />
-      </TouchableOpacity>
+        {PRIMARY_TABS.map((tab) => {
+          const active = getIsActive(pathname, tab);
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              accessibilityRole="button"
+              onPress={() => navigate(tab.href)}
+              style={[styles.tab, active && styles.tabActive]}
+            >
+              <Ionicons
+                name={tab.icon}
+                size={16}
+                color={active ? Colors.primary : Colors.textSecondary}
+              />
+              <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
 
-      <Modal
-        animationType="none"
-        transparent
-        visible={open}
-        onRequestClose={close}
-        statusBarTranslucent={Platform.OS === 'android'}
-      >
-        <Pressable style={styles.overlay} onPress={close}>
-          <Animated.View
-            style={[
-              styles.menu,
-              {
-                opacity: fade,
-                transform: [{ translateY: slide }],
-              },
-            ]}
-          >
-            <Pressable onPress={(event) => event.stopPropagation()}>
-              {primaryItems.map((item) => {
-                const active = getIsActive(pathname, item);
-                return (
-                  <TouchableOpacity
-                    key={item.key}
-                    accessibilityRole="button"
-                    onPress={() => navigate(item.href)}
-                    style={[styles.menuItem, active && styles.menuItemActive]}
-                  >
-                    <Ionicons
-                      name={item.icon}
-                      size={18}
-                      color={active ? Colors.accent : Colors.textSecondary}
-                    />
-                    <Text style={[styles.menuItemText, active && styles.menuItemTextActive]}>{item.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+        {isAdmin && (
+          <>
+            <View style={styles.divider} />
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Admin menu"
+              onPress={toggleAdmin}
+              style={[styles.tab, isAdminRoute && styles.tabActive]}
+            >
+              <Ionicons
+                name="settings-outline"
+                size={16}
+                color={isAdminRoute ? Colors.primary : Colors.textSecondary}
+              />
+              <Text style={[styles.tabText, isAdminRoute && styles.tabTextActive]}>Admin</Text>
+              <Ionicons
+                name={adminOpen ? 'chevron-up' : 'chevron-down'}
+                size={14}
+                color={isAdminRoute ? Colors.primary : Colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </>
+        )}
+      </ScrollView>
 
-              {secondaryItems.length > 0 ? <View style={styles.divider} /> : null}
-
-              {secondaryItems.map((item) => {
-                const active = getIsActive(pathname, item);
-                return (
-                  <TouchableOpacity
-                    key={item.key}
-                    accessibilityRole="button"
-                    onPress={() => navigate(item.href)}
-                    style={[styles.menuItem, active && styles.menuItemActive]}
-                  >
-                    <Ionicons
-                      name={item.icon}
-                      size={18}
-                      color={active ? Colors.accent : Colors.textSecondary}
-                    />
-                    <Text style={[styles.menuItemText, active && styles.menuItemTextActive]}>{item.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
+      {isAdmin && (
+        <Modal
+          animationType="none"
+          transparent
+          visible={adminOpen}
+          onRequestClose={closeAdmin}
+          statusBarTranslucent={Platform.OS === 'android'}
+        >
+          <Pressable style={styles.overlay} onPress={closeAdmin}>
+            <Animated.View
+              style={[
+                styles.dropdown,
+                {
+                  opacity: fade,
+                  transform: [{ translateY: slide }],
+                },
+              ]}
+            >
+              <Pressable onPress={(event) => event.stopPropagation()}>
+                {ADMIN_GROUPS.map((group, groupIndex) => (
+                  <View key={group.label}>
+                    {groupIndex > 0 && <View style={styles.groupDivider} />}
+                    <Text style={styles.groupLabel}>{group.label}</Text>
+                    {group.items.map((item) => {
+                      const active = getIsActive(pathname, item);
+                      return (
+                        <TouchableOpacity
+                          key={item.key}
+                          accessibilityRole="button"
+                          onPress={() => navigate(item.href)}
+                          style={[styles.dropdownItem, active && styles.dropdownItemActive]}
+                        >
+                          <Ionicons
+                            name={item.icon}
+                            size={16}
+                            color={active ? Colors.accent : Colors.textSecondary}
+                          />
+                          <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>
+                            {item.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ))}
+              </Pressable>
+            </Animated.View>
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  iconButton: {
-    height: 38,
-    width: 38,
-    borderRadius: 10,
+  container: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.elevated,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  iconButtonOpen: {
-    borderColor: 'rgba(6, 182, 212, 0.45)',
+  tabsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minHeight: 36,
+  },
+  tabActive: {
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.primary,
+  },
+  tabText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: Colors.border,
+    marginHorizontal: 8,
   },
   overlay: {
     flex: 1,
@@ -209,8 +280,8 @@ const styles = StyleSheet.create({
     paddingTop: 66,
     paddingRight: 14,
   },
-  menu: {
-    width: 250,
+  dropdown: {
+    width: 220,
     backgroundColor: Colors.card,
     borderRadius: 12,
     borderWidth: 1,
@@ -222,31 +293,41 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 18,
   },
-  divider: {
+  groupLabel: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  groupDivider: {
     height: 1,
     backgroundColor: Colors.border,
     marginVertical: 6,
     marginHorizontal: 12,
   },
-  menuItem: {
-    minHeight: 44,
+  dropdownItem: {
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
     marginHorizontal: 6,
-    marginVertical: 2,
+    marginVertical: 1,
   },
-  menuItemActive: {
+  dropdownItemActive: {
     backgroundColor: 'rgba(6, 182, 212, 0.14)',
   },
-  menuItemText: {
+  dropdownItemText: {
     color: Colors.text,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
-  menuItemTextActive: {
+  dropdownItemTextActive: {
     color: Colors.accent,
   },
 });
