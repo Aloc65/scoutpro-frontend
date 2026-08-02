@@ -148,6 +148,7 @@ export default function NavigationMenu({ isAdmin }: NavigationMenuProps) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.scrollView}
         contentContainerStyle={styles.tabsContainer}
       >
         {PRIMARY_TABS.map((tab) => {
@@ -258,6 +259,12 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
+  scrollView: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   tabsContainer: {
     flexDirection: 'row',
