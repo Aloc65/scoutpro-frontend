@@ -59,6 +59,7 @@ const ADMIN_GROUPS: AdminGroup[] = [
     items: [
       { key: 'export', label: 'Export', icon: 'download-outline', href: '/export' },
       { key: 'data-import', label: 'Data Import', icon: 'cloud-upload-outline', href: '/data-import' },
+      { key: 'weekly-reports', label: 'Weekly Reports', icon: 'document-text-outline', href: '/weekly-reports' },
     ],
   },
 ];
