@@ -263,8 +263,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   scrollView: {
-    flexGrow: 0,
-    flexShrink: 1,
+    flex: 1,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -306,7 +305,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'flex-end',
-    paddingTop: 66,
+    paddingTop: 108,
     paddingRight: 14,
   },
   dropdown: {
