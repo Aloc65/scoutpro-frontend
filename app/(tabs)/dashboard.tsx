@@ -59,11 +59,30 @@ export default function DashboardScreen() {
   const upcoming = data?.upcomingGames;
   const gameGroups = upcoming?.games ? groupByDate(upcoming.games) : {};
 
-  /* ── Full expanded game card (mobile only) ── */
-  const renderFullGameCard = (game: UpcomingGame) => (
+  /* ── Responsive fixtures grid ──────────────────────────────────────
+   * Emulates `grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))`.
+   * Phone collapses to a single (tappable, full-width) column; tablet/desktop
+   * flow into 2–4 columns so all games are visible at once instead of a long
+   * full-width stack that scrolls for two screens. */
+  const GRID_GAP = 10;
+  const gridColumns = width < 600 ? 1 : width < 900 ? 2 : width < 1200 ? 3 : 4;
+  const gridInnerWidth = Math.min(width, 1200) - 32; // ScrollView horizontal padding (16 each side)
+  const gridCardWidth =
+    gridColumns === 1
+      ? '100%'
+      : Math.floor((gridInnerWidth - GRID_GAP * (gridColumns - 1)) / gridColumns);
+
+  const renderGamesGrid = (games: UpcomingGame[]) => (
+    <View style={styles.gamesGrid}>
+      {games.map((game) => renderFullGameCard(game, gridCardWidth))}
+    </View>
+  );
+
+  /* ── Full expanded game card ── */
+  const renderFullGameCard = (game: UpcomingGame, cardWidth: number | string) => (
     <Card
       key={game.id}
-      style={styles.gameCard}
+      style={[styles.gameCard, { width: cardWidth as any }]}
       onPress={() => router.push(game.sessionId ? '/live-scouting/sessions' : '/live-scouting/new-session')}
     >
       <View style={styles.gameTopRow}>
@@ -109,7 +128,7 @@ export default function DashboardScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ padding: 16, paddingBottom: 32, maxWidth: 1200, alignSelf: 'center' as any, width: '100%' as any }}
+      contentContainerStyle={{ padding: 16, paddingBottom: 32, maxWidth: 1200, width: '100%', marginHorizontal: 'auto' as any }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
     >
       <Text style={styles.greeting}>Hello, {user?.name} 👋</Text>
@@ -136,7 +155,7 @@ export default function DashboardScreen() {
         Object.entries(gameGroups).map(([dateLabel, games]) => (
           <View key={dateLabel} style={{ marginBottom: 12 }}>
             <Text style={styles.dateGroupLabel}>{dateLabel}</Text>
-            {games.map(renderFullGameCard)}
+            {renderGamesGrid(games)}
           </View>
         ))
       )}
@@ -185,7 +204,17 @@ export default function DashboardScreen() {
             <Card
               key={item.playerId}
               onPress={() => router.push(`/player/${item.playerId}`)}
-              style={styles.followUpCard}
+              style={[
+                styles.followUpCard,
+                {
+                  // Left-border accent: red = AFL interest / urgent, amber = stale contact.
+                  // Single-sided border ⇒ square corners on that edge.
+                  borderLeftWidth: 4,
+                  borderLeftColor: item.hasAflInterest ? Colors.error : Colors.amber,
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                },
+              ]}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}>
@@ -252,7 +281,8 @@ const styles = StyleSheet.create({
   weekendLabel: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
   dateGroupLabel: { fontSize: 14, fontWeight: '700', color: Colors.textSecondary, marginBottom: 8, marginTop: 4 },
   emptyCard: { marginBottom: 20 },
-  gameCard: { marginBottom: 10, padding: 14 },
+  gamesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  gameCard: { padding: 14 },
   gameTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   compBadge: { backgroundColor: Colors.primary + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   compBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase' },
