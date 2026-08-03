@@ -15,6 +15,7 @@ export const AFL_TEAMS = [
   'Richmond',
   'St Kilda',
   'Sydney',
+  'Tasmania',
   'West Coast',
   'Western Bulldogs',
 ] as const;
