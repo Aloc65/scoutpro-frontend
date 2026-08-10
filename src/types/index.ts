@@ -446,6 +446,66 @@ export interface DashboardData {
   activity?: ScoutingActivity;
 }
 
+// ─── Weekly Watch Plan ───────────────────────────────────────────────
+
+export interface WeeklyWatchPlanGame {
+  id: string;
+  competition: string;
+  round: string;
+  homeTeam: string;
+  awayTeam: string;
+  venue: string | null;
+  date: string;
+  time: string | null;
+}
+
+export interface WeeklyWatchPlanEntry {
+  id: string;
+  playerId: string;
+  playerName: string;
+  team: string | null;
+  photoUrl: string | null;
+  draftYear: number | null;
+  position: string | null;
+  priority: number | null;
+  notes: string | null;
+  assignedScoutId: string | null;
+  assignedScoutName: string | null;
+  fixtureId: string | null;
+  fixtureLabel: string | null;
+  fixtureDate: string | null;
+}
+
+export interface WeeklyWatchPlan {
+  weekendAnchor: string;
+  weekendStart: string;
+  weekendEnd: string;
+  weekendLabel: string;
+  totalEntries: number;
+  entries: WeeklyWatchPlanEntry[];
+  games: WeeklyWatchPlanGame[];
+}
+
+export interface WeeklyWatchPlanCandidate {
+  playerId: string;
+  playerName: string;
+  team: string | null;
+  photoUrl: string | null;
+  draftYear: number | null;
+  state: AustralianState | null;
+  position: string | null;
+  stage: PipelineStage;
+  aflInterestClub: string | null;
+  playsThisWeekend: boolean;
+  inPlan: boolean;
+}
+
+export interface WeeklyWatchPlanCandidates {
+  weekendLabel: string;
+  teamsPlaying: string[];
+  candidates: WeeklyWatchPlanCandidate[];
+}
+
 // ─── Live Scouting Types ─────────────────────────────────────────────
 
 export const SCOUTING_TRAITS = [

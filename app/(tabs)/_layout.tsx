@@ -16,6 +16,7 @@ export default function AppLayout() {
       <Stack.Screen name="watch-list" options={{ title: 'Watch List' }} />
       <Stack.Screen name="watch-lists" options={{ title: 'Watch Lists' }} />
       <Stack.Screen name="fixtures" options={{ title: 'Fixtures' }} />
+      <Stack.Screen name="weekly-watch-plan" options={{ title: 'Weekly Watch Plan' }} />
       <Stack.Screen name="export" options={{ title: 'Export' }} />
       <Stack.Screen name="data-import" options={{ title: 'Data Import' }} />
       <Stack.Screen name="users" options={{ title: 'Users' }} />

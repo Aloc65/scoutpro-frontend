@@ -52,6 +52,7 @@ const ADMIN_GROUPS: AdminGroup[] = [
     label: 'Scheduling',
     items: [
       { key: 'fixtures', label: 'Fixtures', icon: 'calendar-outline', href: '/fixtures' },
+      { key: 'weekly-watch-plan', label: 'Weekly Watch Plan', icon: 'star-outline', href: '/weekly-watch-plan' },
     ],
   },
   {
