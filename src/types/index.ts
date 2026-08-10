@@ -412,12 +412,38 @@ export interface UpcomingGamesData {
   totalGames: number;
 }
 
+export interface DashboardKPIs {
+  watchListCount: number;
+  followUpsDue: number;
+  strongProspects: number;
+}
+
+export interface PlayerToWatch {
+  playerId: string;
+  playerName: string;
+  team: string | null;
+  photoUrl: string | null;
+  draftYear: number | null;
+  position: string | null;
+  stage: PipelineStage;
+}
+
+export interface ScoutingActivity {
+  reportsThisMonth: number;
+  playersWatched: number;
+  clubsCovered: number;
+  scoutingSessions: number;
+}
+
 export interface DashboardData {
   totalPlayers: number;
   totalReports: number;
   myReports: number;
   recentReports: ReportListItem[];
   upcomingGames?: UpcomingGamesData;
+  kpis?: DashboardKPIs;
+  playersToWatch?: PlayerToWatch[];
+  activity?: ScoutingActivity;
 }
 
 // ─── Live Scouting Types ─────────────────────────────────────────────
