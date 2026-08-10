@@ -377,17 +377,27 @@ export default function DashboardScreen() {
               <Text style={styles.viewAllLink}>View all →</Text>
             </TouchableOpacity>
           </View>
-          {data?.recentReports?.slice(0, 8).map((r) => (
-            <Card key={r.id} onPress={() => router.push(`/report/${r.id}/edit`)} style={styles.reportCard}>
-              <View style={styles.reportHeader}>
-                <Text style={styles.reportPlayerName} numberOfLines={1}>{r.playerName}</Text>
-                {r.overallProjection && <ProjectionBadge value={r.overallProjection} />}
-              </View>
-              <Text style={styles.reportMeta}>vs {r.opponent}</Text>
-              <Text style={styles.reportMeta}>{new Date(r.matchDate).toLocaleDateString()}</Text>
-              <Text style={styles.reportScout}>{r.scoutName}</Text>
+          {data?.recentReports && data.recentReports.length === 0 ? (
+            <Card style={styles.emptyReportsCard}>
+              <Ionicons name="document-text-outline" size={36} color={Colors.textMuted} />
+              <Text style={styles.emptyReportsText}>No reports in the last 7 days</Text>
+              <TouchableOpacity onPress={() => router.push('/report/new')} style={styles.emptyReportsAction}>
+                <Text style={styles.emptyReportsActionText}>Create first report</Text>
+              </TouchableOpacity>
             </Card>
-          ))}
+          ) : (
+            data?.recentReports?.slice(0, 8).map((r) => (
+              <Card key={r.id} onPress={() => router.push(`/report/${r.id}/edit`)} style={styles.reportCard}>
+                <View style={styles.reportHeader}>
+                  <Text style={styles.reportPlayerName} numberOfLines={1}>{r.playerName}</Text>
+                  {r.overallProjection && <ProjectionBadge value={r.overallProjection} />}
+                </View>
+                <Text style={styles.reportMeta}>vs {r.opponent}</Text>
+                <Text style={styles.reportMeta}>{new Date(r.matchDate).toLocaleDateString()}</Text>
+                <Text style={styles.reportScout}>{r.scoutName}</Text>
+              </Card>
+            ))
+          )}
         </View>
       </ScrollView>
     );
@@ -541,16 +551,26 @@ export default function DashboardScreen() {
             <Text style={styles.viewAllLink}>View all →</Text>
           </TouchableOpacity>
         </View>
-        {data?.recentReports?.slice(0, 5).map((r) => (
-          <Card key={r.id} onPress={() => router.push(`/report/${r.id}/edit`)} style={styles.reportCard}>
-            <View style={styles.reportHeader}>
-              <Text style={styles.reportPlayerName} numberOfLines={1}>{r.playerName}</Text>
-              {r.overallProjection && <ProjectionBadge value={r.overallProjection} />}
-            </View>
-            <Text style={styles.reportMeta}>vs {r.opponent} • {new Date(r.matchDate).toLocaleDateString()}</Text>
-            <Text style={styles.reportScout}>{r.scoutName}</Text>
+        {data?.recentReports && data.recentReports.length === 0 ? (
+          <Card style={styles.emptyReportsCard}>
+            <Ionicons name="document-text-outline" size={36} color={Colors.textMuted} />
+            <Text style={styles.emptyReportsText}>No reports in the last 7 days</Text>
+            <TouchableOpacity onPress={() => router.push('/report/new')} style={styles.emptyReportsAction}>
+              <Text style={styles.emptyReportsActionText}>Create first report</Text>
+            </TouchableOpacity>
           </Card>
-        ))}
+        ) : (
+          data?.recentReports?.slice(0, 5).map((r) => (
+            <Card key={r.id} onPress={() => router.push(`/report/${r.id}/edit`)} style={styles.reportCard}>
+              <View style={styles.reportHeader}>
+                <Text style={styles.reportPlayerName} numberOfLines={1}>{r.playerName}</Text>
+                {r.overallProjection && <ProjectionBadge value={r.overallProjection} />}
+              </View>
+              <Text style={styles.reportMeta}>vs {r.opponent} • {new Date(r.matchDate).toLocaleDateString()}</Text>
+              <Text style={styles.reportScout}>{r.scoutName}</Text>
+            </Card>
+          ))
+        )}
       </View>
 
       {/* Scouting Activity Snapshot */}
@@ -894,5 +914,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
+  },
+  emptyReportsCard: {
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyReportsText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptyReportsAction: {
+    marginTop: 8,
+  },
+  emptyReportsActionText: {
+    fontSize: 13,
+    color: Colors.accent,
+    fontWeight: '600',
   },
 });
