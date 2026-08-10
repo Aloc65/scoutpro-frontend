@@ -23,16 +23,6 @@ function initials(name: string): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
 }
 
-function formatShortDate(iso: string | null): string {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
-  } catch {
-    return '';
-  }
-}
-
 export default function WeeklyWatchPlanScreen() {
   const { user } = useAuth();
   const { width } = useWindowDimensions();
@@ -239,7 +229,7 @@ export default function WeeklyWatchPlanScreen() {
             <View style={styles.detailRow}>
               <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
               <Text style={styles.detailText} numberOfLines={1}>
-                {entry.fixtureLabel}{entry.fixtureDate ? ` · ${formatShortDate(entry.fixtureDate)}` : ''}
+                {entry.fixtureLabel}{entry.fixtureDate ? ` · ${entry.fixtureDate}` : ''}
               </Text>
             </View>
           )}
@@ -413,7 +403,7 @@ export default function WeeklyWatchPlanScreen() {
                       onPress={() => setEditFixtureId(g.id)}
                     >
                       <Text style={[styles.optionText, active && styles.optionTextActive]} numberOfLines={1}>
-                        {g.homeTeam} v {g.awayTeam}  ·  {formatShortDate(g.date)}
+                        {g.homeTeam} v {g.awayTeam}  ·  {g.date}
                       </Text>
                       {active && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
                     </TouchableOpacity>
