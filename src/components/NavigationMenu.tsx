@@ -63,6 +63,14 @@ const ADMIN_GROUPS: AdminGroup[] = [
       { key: 'weekly-reports', label: 'Weekly Reports', icon: 'document-text-outline', href: '/weekly-reports' },
     ],
   },
+  {
+    label: 'Security',
+    items: [
+      { key: 'audit-logs', label: 'Audit Logs', icon: 'list-outline', href: '/audit-logs' },
+      { key: 'security-alerts', label: 'Security Alerts', icon: 'shield-outline', href: '/security-alerts' },
+      { key: 'backups', label: 'Backups', icon: 'save-outline', href: '/backups' },
+    ],
+  },
 ];
 
 const getIsActive = (pathname: string, item: MenuItem): boolean => {
