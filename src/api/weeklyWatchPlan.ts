@@ -41,9 +41,13 @@ export async function removeWatchPlanEntry(id: string) {
   return api.delete(`/api/weekly-watch-plan/${id}`);
 }
 
-/** Auto-add all watch-list players whose team plays this weekend (admin). */
-export async function autoPopulateWatchPlan(): Promise<{ added: number }> {
-  return api.post('/api/weekly-watch-plan/auto-populate', {});
+/**
+ * Auto-add all watch-list players whose team plays this weekend (admin).
+ * When a state is supplied, only players in that state are added.
+ */
+export async function autoPopulateWatchPlan(state?: string): Promise<{ added: number }> {
+  const qs = state ? `?state=${encodeURIComponent(state)}` : '';
+  return api.post(`/api/weekly-watch-plan/auto-populate${qs}`, {});
 }
 
 /** Clear the entire plan for this weekend (admin). */

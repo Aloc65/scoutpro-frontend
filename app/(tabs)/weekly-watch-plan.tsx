@@ -15,6 +15,7 @@ import {
 } from '../../src/api/weeklyWatchPlan';
 import {
   WeeklyWatchPlan, WeeklyWatchPlanEntry, WeeklyWatchPlanCandidate, WeeklyWatchPlanGame,
+  AUSTRALIAN_STATES, AustralianState,
 } from '../../src/types';
 
 interface ScoutOption { id: string; name: string; }
@@ -35,6 +36,10 @@ export default function WeeklyWatchPlanScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [onlyPlaying, setOnlyPlaying] = useState(false);
+  // State-based filter: null = all states. Defaults to the admin's home state.
+  const [selectedState, setSelectedState] = useState<AustralianState | null>(
+    (user?.homeState as AustralianState) ?? null,
+  );
 
   // Edit modal
   const [editEntry, setEditEntry] = useState<WeeklyWatchPlanEntry | null>(null);
@@ -113,9 +118,10 @@ export default function WeeklyWatchPlanScreen() {
   const handleAutoPopulate = async () => {
     try {
       setBusy(true);
-      const res = await autoPopulateWatchPlan();
+      const res = await autoPopulateWatchPlan(selectedState ?? undefined);
       await load();
-      showAlert('Auto-populate', `Added ${res.added} player${res.added === 1 ? '' : 's'} whose team plays this weekend.`);
+      const scope = selectedState ? ` in ${selectedState}` : '';
+      showAlert('Auto-populate', `Added ${res.added} player${res.added === 1 ? '' : 's'}${scope} whose team plays this weekend.`);
     } catch (e: any) {
       showAlert('Error', e.message || 'Failed to auto-populate');
     } finally {
@@ -190,7 +196,14 @@ export default function WeeklyWatchPlanScreen() {
     );
   }
 
-  const filteredCandidates = onlyPlaying ? candidates.filter((c) => c.playsThisWeekend) : candidates;
+  const filteredCandidates = candidates.filter(
+    (c) =>
+      (!onlyPlaying || c.playsThisWeekend) &&
+      (!selectedState || c.state === selectedState),
+  );
+  const filteredEntries = (plan?.entries ?? []).filter(
+    (e) => !selectedState || e.state === selectedState,
+  );
   const games: WeeklyWatchPlanGame[] = plan?.games ?? [];
 
   const renderPhoto = (photoUrl: string | null, name: string, size = 44) => (
@@ -308,6 +321,35 @@ export default function WeeklyWatchPlanScreen() {
           </View>
         </View>
 
+        {/* State filter */}
+        <View style={styles.stateFilterWrap}>
+          <Text style={styles.stateFilterLabel}>State</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.stateChips}
+          >
+            <TouchableOpacity
+              style={[styles.stateChip, !selectedState && styles.stateChipActive]}
+              onPress={() => setSelectedState(null)}
+            >
+              <Text style={[styles.stateChipText, !selectedState && styles.stateChipTextActive]}>All</Text>
+            </TouchableOpacity>
+            {AUSTRALIAN_STATES.map((s) => {
+              const active = selectedState === s;
+              return (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.stateChip, active && styles.stateChipActive]}
+                  onPress={() => setSelectedState(s)}
+                >
+                  <Text style={[styles.stateChipText, active && styles.stateChipTextActive]}>{s}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         {/* Action bar */}
         <View style={styles.actionBar}>
           <TouchableOpacity style={styles.actionBtn} onPress={handleAutoPopulate} disabled={busy}>
@@ -327,16 +369,18 @@ export default function WeeklyWatchPlanScreen() {
         {/* Current plan */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>This Week's Plan</Text>
-          <View style={styles.countChip}><Text style={styles.countChipText}>{plan?.entries.length ?? 0}</Text></View>
+          <View style={styles.countChip}><Text style={styles.countChipText}>{filteredEntries.length}</Text></View>
         </View>
-        {plan && plan.entries.length > 0 ? (
+        {filteredEntries.length > 0 ? (
           <View style={isWide ? styles.grid : undefined}>
-            {plan.entries.map(renderEntry)}
+            {filteredEntries.map(renderEntry)}
           </View>
         ) : (
           <Card style={styles.emptyCard}>
             <Ionicons name="clipboard-outline" size={36} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>No players selected yet.</Text>
+            <Text style={styles.emptyText}>
+              {selectedState ? `No players selected in ${selectedState} yet.` : 'No players selected yet.'}
+            </Text>
             <Text style={styles.emptySub}>Use “Auto-populate” or add players from the list below.</Text>
           </Card>
         )}
@@ -479,6 +523,17 @@ const styles = StyleSheet.create({
   },
   title: { color: Colors.text, fontSize: 24, fontWeight: '800' },
   subtitle: { color: Colors.textSecondary, fontSize: 14, marginTop: 2 },
+
+  stateFilterWrap: { marginBottom: 16 },
+  stateFilterLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  stateChips: { gap: 8, paddingRight: 8 },
+  stateChip: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surfaceHigh,
+  },
+  stateChipActive: { borderColor: Colors.accent, backgroundColor: 'rgba(59, 130, 246, 0.14)' },
+  stateChipText: { color: Colors.textMuted, fontSize: 13, fontWeight: '700' },
+  stateChipTextActive: { color: Colors.accent },
 
   actionBar: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   actionBtn: {

@@ -466,6 +466,7 @@ export interface WeeklyWatchPlanEntry {
   team: string | null;
   photoUrl: string | null;
   draftYear: number | null;
+  state: AustralianState | null;
   position: string | null;
   priority: number | null;
   notes: string | null;
