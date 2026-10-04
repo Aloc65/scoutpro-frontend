@@ -71,7 +71,7 @@ function CardBody({
             hitSlop={6}
             {...(IS_WEB ? { dataSet: { nodrag: '1' } } : {})}
           >
-            <PriorityBadge priority={item.priority ?? null} compact />
+            <PriorityBadge priority={item.priority ?? null} compact editable />
           </Pressable>
         ) : (
           <PriorityBadge priority={item.priority ?? null} compact />

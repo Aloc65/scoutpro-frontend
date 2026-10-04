@@ -273,7 +273,7 @@ export default function TableView({ items, onRowPress, onReorder, onEditPriority
                   onPress={(e: any) => { e?.stopPropagation?.(); onEditPriority?.(item); }}
                   {...(IS_WEB ? { dataSet: { nodrag: '1' } } : {})}
                 >
-                  <PriorityBadge priority={item.priority ?? null} compact />
+                  <PriorityBadge priority={item.priority ?? null} compact editable={!!onEditPriority} />
                 </Pressable>
               </View>
             </View>
@@ -340,8 +340,8 @@ const styles = StyleSheet.create({
   stagePill: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 3, alignItems: 'center' },
   stagePillText: { fontSize: 10, fontWeight: '700' },
   lastCol: { color: Colors.textMuted, fontSize: 11, textAlign: 'right' },
-  priorityCol: { width: 76, textAlign: 'center' },
-  priorityCell: { width: 76, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  priorityCol: { width: 104, textAlign: 'center' },
+  priorityCell: { width: 104, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
   insertLine: {
     position: 'absolute', top: 2, left: 0, right: 0, height: 3,
     backgroundColor: Colors.accent, borderRadius: 2,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { priorityBadgeLabel } from '../types';
 
@@ -24,15 +25,18 @@ const TIER_COLOR: Record<number, string> = {
 export default function PriorityBadge({
   priority,
   compact = false,
+  editable = false,
   style,
 }: {
   priority: number | null | undefined;
   compact?: boolean;
+  /** Shows a pencil + 'Set priority' when unset, signalling it is tappable. */
+  editable?: boolean;
   style?: any;
 }) {
   const isSet = priority != null && TIER_COLOR[priority] != null;
   const color = isSet ? TIER_COLOR[priority as number] : Colors.textMuted;
-  const label = priorityBadgeLabel(priority);
+  const label = editable && !isSet ? 'Set priority' : priorityBadgeLabel(priority);
 
   return (
     <View
@@ -51,12 +55,17 @@ export default function PriorityBadge({
       <Text style={[styles.text, { color, fontSize: compact ? 10 : 12 }]} numberOfLines={1}>
         {label}
       </Text>
+      {editable ? (
+        <Ionicons name="pencil" size={compact ? 10 : 12} color={color} style={{ marginLeft: 4 }} />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 7,
     borderWidth: 1,
     alignSelf: 'flex-start',
