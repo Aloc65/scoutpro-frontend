@@ -884,7 +884,11 @@ export default function PlayerDetailScreen() {
               >
                 <Ionicons name="flag-outline" size={14} color={Colors.accent} />
                 <Text style={styles.dobLabel}>Priority</Text>
-                <PriorityBadge priority={watchListEntry.priority ?? null} compact editable />
+                <PriorityBadge priority={watchListEntry.priority ?? null} compact />
+                <View style={styles.priorityChangeBtn}>
+                  <Ionicons name="create-outline" size={13} color="#fff" />
+                  <Text style={styles.priorityChangeText}>Change</Text>
+                </View>
               </TouchableOpacity>
             ) : (
               <View style={styles.dobItem}>
@@ -1360,6 +1364,11 @@ const styles = StyleSheet.create({
   name: { fontSize: 22, fontWeight: '800', color: Colors.text },
   permissionBadgeRow: { marginTop: 8, marginBottom: 2 },
   info: { fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
+  priorityChangeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 6,
+    backgroundColor: Colors.primary, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3,
+  },
+  priorityChangeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   dobRow: {
     flexDirection: 'row',
     alignItems: 'center',
