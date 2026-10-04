@@ -20,6 +20,9 @@ import Card from '../../src/components/Card';
 import RatingBar from '../../src/components/RatingBar';
 import ContactPermissionBadge from '../../src/components/ContactPermissionBadge';
 import ContactPermissionSection from '../../src/features/players/ContactPermissionSection';
+import PriorityBadge from '../../src/components/PriorityBadge';
+import PriorityEditorSheet from '../../src/features/watchlist/PriorityEditorSheet';
+import { updatePriority } from '../../src/api/watchList';
 import { overallRatingLabel } from '../../src/features/watchlist/pipeline';
 import ProjectionBadge from '../../src/components/ProjectionBadge';
 import GradientButton from '../../src/components/GradientButton';
@@ -427,6 +430,20 @@ export default function PlayerDetailScreen() {
   // Watch list state
   const [watchListEntry, setWatchListEntry] = useState<WatchList | null>(null);
   const [watchListLoading, setWatchListLoading] = useState(false);
+  const [priorityEditOpen, setPriorityEditOpen] = useState(false);
+
+  const handleSavePriority = async (playerId: string, priority: number | null, reason: string | null) => {
+    const previous = watchListEntry;
+    try {
+      const updated = await updatePriority(playerId, priority, reason);
+      setWatchListEntry((cur) => (cur ? { ...cur, ...updated, player: cur.player ?? updated.player } : cur));
+    } catch (e: any) {
+      setWatchListEntry(previous);
+      const msg = e?.response?.data?.message || e?.message || 'Could not save priority';
+      if (Platform.OS === 'web') window.alert(String(msg)); else Alert.alert('Error', String(msg));
+      throw e;
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -858,7 +875,32 @@ export default function PlayerDetailScreen() {
                 </View>
               </>
             )}
+            <View style={styles.dobDivider} />
+            {watchListEntry ? (
+              <TouchableOpacity
+                style={styles.dobItem}
+                onPress={() => setPriorityEditOpen(true)}
+                accessibilityLabel="Edit watch list priority"
+              >
+                <Ionicons name="flag-outline" size={14} color={Colors.accent} />
+                <Text style={styles.dobLabel}>Priority</Text>
+                <PriorityBadge priority={watchListEntry.priority ?? null} compact editable />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.dobItem}>
+                <Ionicons name="flag-outline" size={14} color={Colors.textMuted} />
+                <Text style={styles.dobLabel}>Priority</Text>
+                <Text style={[styles.dobValue, { color: Colors.textMuted }]}>Not on watch list</Text>
+              </View>
+            )}
           </View>
+
+          <PriorityEditorSheet
+            visible={priorityEditOpen}
+            entry={watchListEntry}
+            onClose={() => setPriorityEditOpen(false)}
+            onSave={handleSavePriority}
+          />
 
           {/* DOB validation error */}
           {dobError && dobEditing && (
