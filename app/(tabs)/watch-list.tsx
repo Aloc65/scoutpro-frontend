@@ -21,16 +21,48 @@ import { PipelineStage, WatchList, AUSTRALIAN_STATES } from '../../src/types';
 import BoardView from '../../src/features/watchlist/BoardView';
 import TableView from '../../src/features/watchlist/TableView';
 import QuickViewSheet from '../../src/features/watchlist/QuickViewSheet';
+import PriorityEditorSheet from '../../src/features/watchlist/PriorityEditorSheet';
 import { hasActiveAflInterest } from '../../src/features/watchlist/pipeline';
+import { updatePriority as apiUpdatePriority } from '../../src/api/watchList';
 
 type ViewMode = 'board' | 'table';
 const VIEW_MODE_KEY = 'watchlist_view_mode';
 const STATE_FILTER_OPTIONS = ['All', ...AUSTRALIAN_STATES] as const;
 
+// Sort options (label -> backend sortBy value). "Priority first" is the default;
+// "Manual order" preserves the drag-reorder ranking as a separate option.
+const SORT_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Priority first', value: 'priority' },
+  { label: 'Manual order', value: 'rank' },
+  { label: 'Surname', value: 'surname' },
+  { label: 'Club', value: 'club' },
+];
+// Priority filter (label -> backend `priority` param; '' = no filter).
+const PRIORITY_FILTER_OPTIONS: { label: string; value: string }[] = [
+  { label: 'All', value: '' },
+  { label: 'High', value: '1' },
+  { label: 'Medium', value: '2' },
+  { label: 'Monitor', value: '3' },
+  { label: 'Hold', value: '4' },
+  { label: 'Not set', value: 'none' },
+];
+// Contact-permission filter (label -> backend `contactPermission` param).
+const CONTACT_FILTER_OPTIONS: { label: string; value: string }[] = [
+  { label: 'All', value: '' },
+  { label: 'Allowed', value: 'ALLOWED' },
+  { label: 'Not allowed', value: 'NOT_ALLOWED' },
+  { label: 'Unconfirmed', value: 'NOT_RECORDED' },
+];
+const labelToValue = (opts: { label: string; value: string }[], label: string) =>
+  opts.find((o) => o.label === label)?.value ?? '';
+
 // Module-level caches so selections survive navigating away/back within a session.
 let cachedViewMode: ViewMode = 'board';
 let persistedStateFilter = 'All';
 let persistedDraftYear = 'All';
+let persistedSort = 'Priority first';
+let persistedPriorityFilter = 'All';
+let persistedContactFilter = 'All';
 
 // ─── Small dropdown (modal picker) ───────────────────────────────────
 function Dropdown({
@@ -87,8 +119,12 @@ export default function WatchListScreen() {
   const [draftYear, setDraftYear] = useState(persistedDraftYear);
   const [availableDraftYears, setAvailableDraftYears] = useState<string[]>(['All']);
   const [aflOnly, setAflOnly] = useState(false);
+  const [sortLabel, setSortLabel] = useState(persistedSort);
+  const [priorityFilter, setPriorityFilter] = useState(persistedPriorityFilter);
+  const [contactFilter, setContactFilter] = useState(persistedContactFilter);
 
   const [quickViewEntry, setQuickViewEntry] = useState<WatchList | null>(null);
+  const [priorityEditEntry, setPriorityEditEntry] = useState<WatchList | null>(null);
 
   // Load persisted view mode once.
   useEffect(() => {
@@ -111,10 +147,15 @@ export default function WatchListScreen() {
     if (search.trim()) params.set('search', search.trim());
     if (stateFilter !== 'All') params.set('state', stateFilter);
     if (draftYear !== 'All') params.set('draftYear', draftYear);
-    params.set('sortBy', 'rank');
+    const sortBy = labelToValue(SORT_OPTIONS, sortLabel) || 'priority';
+    params.set('sortBy', sortBy);
+    const priorityVal = labelToValue(PRIORITY_FILTER_OPTIONS, priorityFilter);
+    if (priorityVal) params.set('priority', priorityVal);
+    const contactVal = labelToValue(CONTACT_FILTER_OPTIONS, contactFilter);
+    if (contactVal) params.set('contactPermission', contactVal);
     const q = params.toString();
     return q ? `?${q}` : '';
-  }, [search, stateFilter, draftYear]);
+  }, [search, stateFilter, draftYear, sortLabel, priorityFilter, contactFilter]);
 
   const load = useCallback(async () => {
     try {
@@ -152,6 +193,54 @@ export default function WatchListScreen() {
   // Persist filter selections at module scope.
   const changeState = (v: string) => { persistedStateFilter = v; setStateFilter(v); };
   const changeDraftYear = (v: string) => { persistedDraftYear = v; setDraftYear(v); };
+  const changeSort = (v: string) => { persistedSort = v; setSortLabel(v); };
+  const changePriorityFilter = (v: string) => { persistedPriorityFilter = v; setPriorityFilter(v); };
+  const changeContactFilter = (v: string) => { persistedContactFilter = v; setContactFilter(v); };
+
+  const filtersActive =
+    !!search.trim() ||
+    stateFilter !== 'All' ||
+    draftYear !== 'All' ||
+    priorityFilter !== 'All' ||
+    contactFilter !== 'All' ||
+    aflOnly ||
+    sortLabel !== 'Priority first';
+
+  const resetFilters = () => {
+    persistedStateFilter = 'All';
+    persistedDraftYear = 'All';
+    persistedSort = 'Priority first';
+    persistedPriorityFilter = 'All';
+    persistedContactFilter = 'All';
+    setSearch('');
+    setStateFilter('All');
+    setDraftYear('All');
+    setSortLabel('Priority first');
+    setPriorityFilter('All');
+    setContactFilter('All');
+    setAflOnly(false);
+  };
+
+  // ─── Inline priority change — save then refetch so cards reposition ──
+  const handleSavePriority = useCallback(
+    async (playerId: string, priority: number | null, reason: string | null) => {
+      const prev = items;
+      // Optimistic update so the badge changes immediately.
+      setItems((cur) =>
+        cur.map((i) => (i.playerId === playerId ? { ...i, priority, priorityReason: reason } : i)),
+      );
+      try {
+        await apiUpdatePriority(playerId, priority, reason);
+        // Refetch to re-apply the server's priority-first ordering.
+        await load();
+      } catch (e: any) {
+        setItems(prev); // restore previous value on failure
+        showAlert('Error', e.message || 'Failed to update priority');
+        throw e;
+      }
+    },
+    [items, load],
+  );
 
   const aflInterestCount = useMemo(
     () => items.filter((i) => hasActiveAflInterest(i)).length,
@@ -309,6 +398,32 @@ export default function WatchListScreen() {
         <View style={styles.filtersRow}>
           <Dropdown label="State" value={stateFilter} options={[...STATE_FILTER_OPTIONS]} onChange={changeState} />
           <Dropdown label="Draft Year" value={draftYear} options={draftYearOptions} onChange={changeDraftYear} />
+          <Dropdown
+            label="Sort by"
+            value={sortLabel}
+            options={SORT_OPTIONS.map((o) => o.label)}
+            onChange={changeSort}
+          />
+        </View>
+        <View style={styles.filtersRow}>
+          <Dropdown
+            label="Priority"
+            value={priorityFilter}
+            options={PRIORITY_FILTER_OPTIONS.map((o) => o.label)}
+            onChange={changePriorityFilter}
+          />
+          <Dropdown
+            label="Contact permission"
+            value={contactFilter}
+            options={CONTACT_FILTER_OPTIONS.map((o) => o.label)}
+            onChange={changeContactFilter}
+          />
+          {filtersActive && (
+            <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
+              <Ionicons name="close-circle" size={15} color={Colors.textSecondary} />
+              <Text style={styles.resetBtnText}>Reset</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* AFL-interest count chip */}
@@ -334,13 +449,23 @@ export default function WatchListScreen() {
       ) : items.length === 0 ? (
         <EmptyState icon="eye-outline" message="No players in watch list yet" />
       ) : viewMode === 'board' ? (
-        <BoardView items={visibleItems} onCardPress={setQuickViewEntry} onStageChange={handleStageChange} />
+        <BoardView
+          items={visibleItems}
+          onCardPress={setQuickViewEntry}
+          onStageChange={handleStageChange}
+          onEditPriority={setPriorityEditEntry}
+        />
       ) : (
         <ScrollView
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
           contentContainerStyle={{ paddingTop: 8 }}
         >
-          <TableView items={visibleItems} onRowPress={setQuickViewEntry} onReorder={handleReorder} />
+          <TableView
+            items={visibleItems}
+            onRowPress={setQuickViewEntry}
+            onReorder={handleReorder}
+            onEditPriority={setPriorityEditEntry}
+          />
         </ScrollView>
       )}
 
@@ -349,6 +474,13 @@ export default function WatchListScreen() {
         entry={quickViewEntry}
         onClose={() => setQuickViewEntry(null)}
         onEntryChanged={handleEntryChanged}
+      />
+
+      <PriorityEditorSheet
+        visible={!!priorityEditEntry}
+        entry={priorityEditEntry}
+        onClose={() => setPriorityEditEntry(null)}
+        onSave={handleSavePriority}
       />
     </View>
   );
@@ -377,7 +509,12 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: Colors.text, paddingVertical: 9, marginLeft: 8 },
 
-  filtersRow: { flexDirection: 'row', gap: 10 },
+  filtersRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
+  resetBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 10,
+  },
+  resetBtnText: { color: Colors.textSecondary, fontWeight: '700', fontSize: 12 },
   dropdownLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 4 },
   dropdown: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

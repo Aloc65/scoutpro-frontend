@@ -20,6 +20,8 @@ import {
   PIPELINE_STAGES,
   PipelineStage,
   WatchList,
+  isContactAllowed,
+  CONTACT_PERMISSION_LABELS,
 } from '../../types';
 import {
   STAGE_CONFIG,
@@ -29,6 +31,23 @@ import {
   isStale,
   lastContactLabel,
 } from './pipeline';
+import ContactPermissionBadge from '../../components/ContactPermissionBadge';
+import PriorityBadge from '../../components/PriorityBadge';
+import { updatePriority as apiUpdatePriority } from '../../api/watchList';
+
+// Stages whose purpose is to initiate / progress direct contact with the player
+// or their family. Moving INTO one of these while permission is not ALLOWED must
+// surface a prominent warning (but never block the move).
+const CONTACT_STAGES: PipelineStage[] = ['INITIAL_CALL', 'FAMILY_MEETING', 'OFFER_MADE'];
+
+// Inline priority tier choices (incl. the explicit "Not set" = null).
+const PRIORITY_CHOICES: { value: number | null; label: string }[] = [
+  { value: 1, label: 'High' },
+  { value: 2, label: 'Medium' },
+  { value: 3, label: 'Monitor' },
+  { value: 4, label: 'Hold' },
+  { value: null, label: 'Not set' },
+];
 
 interface Props {
   visible: boolean;
@@ -66,6 +85,10 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
   const [aflOpen, setAflOpen] = useState(false);
   const [savingAfl, setSavingAfl] = useState(false);
 
+  // Priority editor.
+  const [priorityOpen, setPriorityOpen] = useState(false);
+  const [savingPriority, setSavingPriority] = useState(false);
+
   const playerId = entry?.playerId ?? null;
 
   const loadDetail = useCallback(async () => {
@@ -93,6 +116,7 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
       setLogOpen(false);
       setLogNote('');
       setAflOpen(false);
+      setPriorityOpen(false);
       loadDetail();
     }
   }, [visible, entry, loadDetail]);
@@ -159,6 +183,21 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
     }
   };
 
+  const setPriority = async (value: number | null) => {
+    if (!playerId) return;
+    setSavingPriority(true);
+    try {
+      const updated = await apiUpdatePriority(playerId, value, current.priorityReason ?? null);
+      setDetail(updated);
+      onEntryChanged(updated);
+      setPriorityOpen(false);
+    } catch (e: any) {
+      showAlert('Error', e.message || 'Failed to update priority');
+    } finally {
+      setSavingPriority(false);
+    }
+  };
+
   const goToProfile = () => {
     onClose();
     router.push(`/player/${current.playerId}` as any);
@@ -169,6 +208,10 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
   };
 
   const showAflBanner = hasActiveAflInterest(current) || !!current.aflInterestClub;
+  const permissionValue = player?.contactPermission ?? 'NOT_RECORDED';
+  const permissionAllowed = isContactAllowed(permissionValue);
+  // Warn when moving into a contact-initiating stage without permission.
+  const stageWarn = !!pendingStage && CONTACT_STAGES.includes(pendingStage) && !permissionAllowed;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -193,6 +236,16 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
           </View>
 
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+            {/* Agent-contact permission — most prominent indicator, shown first */}
+            <View style={styles.permissionRow}>
+              <ContactPermissionBadge permission={permissionValue} size="lg" />
+              {player?.contactConfirmedAt ? (
+                <Text style={styles.permissionMeta}>
+                  Confirmed {formatContactDate(player.contactConfirmedAt)}
+                </Text>
+              ) : null}
+            </View>
+
             {/* AFL interest banner */}
             {showAflBanner ? (
               <TouchableOpacity style={styles.aflBanner} onPress={() => setAflOpen((v) => !v)} activeOpacity={0.8}>
@@ -269,6 +322,17 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
                 <Text style={styles.noteComposerTitle}>
                   Move to {STAGE_CONFIG[pendingStage].label}
                 </Text>
+                {stageWarn && (
+                  <View style={styles.stageWarn}>
+                    <Ionicons name="warning" size={16} color={Colors.error} />
+                    <Text style={styles.stageWarnText}>
+                      Agent contact is not confirmed for this player
+                      ({CONTACT_PERMISSION_LABELS[permissionValue]}). Moving to this stage does not
+                      grant permission — do not approach the player or their family until permission
+                      is recorded as allowed.
+                    </Text>
+                  </View>
+                )}
                 <TextInput
                   value={stageNote}
                   onChangeText={setStageNote}
@@ -292,6 +356,40 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
               </View>
             )}
 
+            {/* Priority tier (per-watchlist-entry; inline-editable) */}
+            <View style={styles.historyHeader}>
+              <Text style={styles.sectionLabel}>Priority</Text>
+              <TouchableOpacity style={styles.logBtn} onPress={() => setPriorityOpen((v) => !v)}>
+                <Ionicons name="pencil" size={14} color={Colors.accent} />
+                <Text style={styles.logBtnText}>{priorityOpen ? 'Close' : 'Edit'}</Text>
+              </TouchableOpacity>
+            </View>
+            {!priorityOpen ? (
+              <View style={styles.priorityDisplay}>
+                <PriorityBadge priority={current.priority ?? null} />
+                {current.priorityReason ? (
+                  <Text style={styles.priorityReason} numberOfLines={2}>{current.priorityReason}</Text>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.priorityChoices}>
+                {PRIORITY_CHOICES.map((opt) => {
+                  const active = (current.priority ?? null) === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.label}
+                      style={[styles.priorityChoice, active && styles.priorityChoiceActive]}
+                      onPress={() => setPriority(opt.value)}
+                      disabled={savingPriority}
+                    >
+                      <PriorityBadge priority={opt.value} compact />
+                    </TouchableOpacity>
+                  );
+                })}
+                {savingPriority && <ActivityIndicator size="small" color={Colors.accent} />}
+              </View>
+            )}
+
             {/* Metrics */}
             <View style={styles.metricsRow}>
               <View style={styles.metric}>
@@ -306,20 +404,40 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
                 <Text style={styles.metricValue}>
                   {current.avgRating != null ? current.avgRating.toFixed(1) : '—'}
                 </Text>
-                <Text style={styles.metricLabel}>Avg Rating</Text>
+                <Text style={styles.metricLabel}>
+                  {current.avgRating != null ? 'Overall / 5' : 'Not rated'}
+                </Text>
               </View>
             </View>
 
             {/* Contact history */}
             <View style={styles.historyHeader}>
               <Text style={styles.sectionLabel}>Contact History</Text>
-              <TouchableOpacity style={styles.logBtn} onPress={() => setLogOpen((v) => !v)}>
-                <Ionicons name="add" size={16} color={Colors.accent} />
-                <Text style={styles.logBtnText}>Log contact</Text>
-              </TouchableOpacity>
+              {permissionAllowed ? (
+                <TouchableOpacity style={styles.logBtn} onPress={() => setLogOpen((v) => !v)}>
+                  <Ionicons name="add" size={16} color={Colors.accent} />
+                  <Text style={styles.logBtnText}>Log contact</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.logBtnDisabled}>
+                  <Ionicons name="lock-closed" size={14} color={Colors.textMuted} />
+                  <Text style={styles.logBtnDisabledText}>Log contact</Text>
+                </View>
+              )}
             </View>
 
-            {logOpen && (
+            {!permissionAllowed && (
+              <View style={styles.contactBlocked}>
+                <Ionicons name="hand-left" size={15} color={Colors.error} />
+                <Text style={styles.contactBlockedText}>
+                  Logging contact is disabled — agent contact is not allowed for this player
+                  ({CONTACT_PERMISSION_LABELS[permissionValue]}). Record permission as allowed on the
+                  player profile before approaching.
+                </Text>
+              </View>
+            )}
+
+            {permissionAllowed && logOpen && (
               <View style={styles.noteComposer}>
                 <TextInput
                   value={logNote}
@@ -437,6 +555,32 @@ const styles = StyleSheet.create({
   aflChipClear: { borderColor: 'rgba(239,68,68,0.5)' },
   aflChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
 
+  permissionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12,
+  },
+  permissionMeta: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  stageWarn: {
+    flexDirection: 'row', gap: 8, alignItems: 'flex-start',
+    backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.5)',
+    borderRadius: 10, padding: 10, marginBottom: 10,
+  },
+  stageWarnText: { flex: 1, color: Colors.error, fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  priorityDisplay: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  priorityReason: { color: Colors.textSecondary, fontSize: 12, flex: 1 },
+  priorityChoices: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  priorityChoice: {
+    paddingVertical: 4, paddingHorizontal: 4, borderRadius: 8,
+    borderWidth: 1, borderColor: 'transparent',
+  },
+  priorityChoiceActive: { borderColor: Colors.accent, backgroundColor: Colors.elevated },
+  logBtnDisabled: { flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.6 },
+  logBtnDisabledText: { color: Colors.textMuted, fontWeight: '700', fontSize: 13 },
+  contactBlocked: {
+    flexDirection: 'row', gap: 8, alignItems: 'flex-start',
+    backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
+    borderRadius: 10, padding: 10, marginTop: 4, marginBottom: 4,
+  },
+  contactBlockedText: { flex: 1, color: Colors.error, fontSize: 12, fontWeight: '600', lineHeight: 17 },
   sectionLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 12, marginBottom: 8 },
   stageRow: { flexDirection: 'row', gap: 6 },
   stagePill: {

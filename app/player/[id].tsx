@@ -14,9 +14,13 @@ import {
   ChampionDataPlayerResponse,
   NationalChampionshipsPlayerResponse,
   WatchList,
+  isContactAllowed,
 } from '../../src/types';
 import Card from '../../src/components/Card';
 import RatingBar from '../../src/components/RatingBar';
+import ContactPermissionBadge from '../../src/components/ContactPermissionBadge';
+import ContactPermissionSection from '../../src/features/players/ContactPermissionSection';
+import { overallRatingLabel } from '../../src/features/watchlist/pipeline';
 import ProjectionBadge from '../../src/components/ProjectionBadge';
 import GradientButton from '../../src/components/GradientButton';
 import EmptyState from '../../src/components/EmptyState';
@@ -738,6 +742,10 @@ export default function PlayerDetailScreen() {
                   <Text style={styles.editPlayerBtnText}>Edit</Text>
                 </TouchableOpacity>
               </View>
+              {/* Agent-contact permission — most prominent status, directly under the name */}
+              <View style={styles.permissionBadgeRow}>
+                <ContactPermissionBadge permission={player.contactPermission} size="lg" />
+              </View>
               {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
             </View>
           </View>
@@ -903,6 +911,14 @@ export default function PlayerDetailScreen() {
           </View>
         </Card>
 
+        {/* ═══════════ AGENT CONTACT PERMISSION SECTION ═══════════ */}
+        <ContactPermissionSection
+          player={player}
+          playerId={id!}
+          canManage={canEditNotes}
+          onUpdated={load}
+        />
+
         {/* ═══════════ GENERAL NOTES SECTION ═══════════ */}
         <GeneralNotesSection
           player={player}
@@ -913,7 +929,23 @@ export default function PlayerDetailScreen() {
 
         {avgRatings && (
           <Card style={{ marginBottom: 16 }}>
-            <Text style={styles.sectionTitle}>Average Ratings</Text>
+            <View style={styles.ratingHeaderRow}>
+              <Text style={styles.sectionTitle}>Average Ratings</Text>
+              {(() => {
+                const vals = RATING_LABELS
+                  .map(([key]) => avgRatings[key] as number | null)
+                  .filter((v): v is number => v != null);
+                const overall = vals.length
+                  ? vals.reduce((a, b) => a + b, 0) / vals.length
+                  : null;
+                return (
+                  <View style={styles.overallRatingBadge}>
+                    <Text style={styles.overallRatingLabel}>Overall</Text>
+                    <Text style={styles.overallRatingValue}>{overallRatingLabel(overall)}</Text>
+                  </View>
+                );
+              })()}
+            </View>
             <Text style={styles.ratingGroupTitle}>FUNDAMENTALS</Text>
             {FUNDAMENTALS_LABELS.map(([key, label]) => (
               <RatingBar key={key} label={label} value={avgRatings[key] as number | null} />
@@ -1088,11 +1120,28 @@ export default function PlayerDetailScreen() {
               Contact History ({contactLog.length})
             </Text>
           </View>
-          <TouchableOpacity style={styles.addMeetingBtn} onPress={openAddContact} activeOpacity={0.8}>
-            <Ionicons name="add-circle-outline" size={18} color="#fff" />
-            <Text style={styles.addMeetingBtnText}>Log Contact</Text>
-          </TouchableOpacity>
+          {isContactAllowed(player.contactPermission) ? (
+            <TouchableOpacity style={styles.addMeetingBtn} onPress={openAddContact} activeOpacity={0.8}>
+              <Ionicons name="add-circle-outline" size={18} color="#fff" />
+              <Text style={styles.addMeetingBtnText}>Log Contact</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.addMeetingBtnDisabled}>
+              <Ionicons name="lock-closed" size={16} color={Colors.textMuted} />
+              <Text style={styles.addMeetingBtnDisabledText}>Log Contact</Text>
+            </View>
+          )}
         </View>
+
+        {!isContactAllowed(player.contactPermission) && (
+          <View style={styles.contactBlockedBanner}>
+            <Ionicons name="alert-circle" size={16} color={Colors.error} />
+            <Text style={styles.contactBlockedText}>
+              Logging a contact is disabled because agent contact is not allowed for this player.
+              Record agent contact permission as “Agent contact allowed” above before approaching.
+            </Text>
+          </View>
+        )}
 
         {contactLog.length === 0 && (
           <EmptyState icon="calendar-outline" message="No contact recorded" />
@@ -1267,6 +1316,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   name: { fontSize: 22, fontWeight: '800', color: Colors.text },
+  permissionBadgeRow: { marginTop: 8, marginBottom: 2 },
   info: { fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
   dobRow: {
     flexDirection: 'row',
@@ -1411,6 +1461,31 @@ const styles = StyleSheet.create({
   },
   notes: { fontSize: 13, color: Colors.textMuted, marginTop: 8, fontStyle: 'italic' },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 12 },
+  ratingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  overallRatingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  overallRatingLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  overallRatingValue: { fontSize: 15, fontWeight: '800', color: Colors.accent },
   ratingGroupTitle: { fontSize: 14, fontWeight: '800', color: Colors.accent, letterSpacing: 1, marginBottom: 10, marginTop: 4, textTransform: 'uppercase' },
   ratingDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
   statsSubtitle: { fontSize: 13, color: Colors.textMuted, marginBottom: 12 },
@@ -1564,6 +1639,40 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
+  },
+  addMeetingBtnDisabled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    opacity: 0.7,
+  },
+  addMeetingBtnDisabledText: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  contactBlockedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.3)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  contactBlockedText: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.text,
+    lineHeight: 18,
   },
   meetingHeader: {
     flexDirection: 'row',

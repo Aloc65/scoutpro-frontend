@@ -121,11 +121,15 @@ export function attachGlobalDrag(
     // up to the data-* wrapper reliably. We fall back to e.target just in case.
     const byPoint = document.elementFromPoint(e.clientX, e.clientY) as Element | null;
     if (byPoint && typeof byPoint.closest === 'function') {
+      // Presses inside an opt-out zone (e.g. the inline priority control) must
+      // NOT start a card drag/tap — let the control handle its own click.
+      if (byPoint.closest('[data-nodrag]')) return null;
       const hit = byPoint.closest(selector) as HTMLElement | null;
       if (hit) return hit;
     }
     const target = e.target as Element | null;
     if (target && typeof target.closest === 'function') {
+      if (target.closest('[data-nodrag]')) return null;
       return target.closest(selector) as HTMLElement | null;
     }
     return null;

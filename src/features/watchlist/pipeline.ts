@@ -62,3 +62,12 @@ export function formatContactDate(iso: string): string {
 export function draftYearOf(item: WatchList): number | null {
   return item.draftYear ?? item.player?.draftYear ?? null;
 }
+
+// Rating scale label (overall rating is the mean of trait sliders, scale 1–5).
+export const RATING_SCALE_MAX = 5;
+
+/** Overall rating display, e.g. "3.8 / 5" or "Not rated" for missing (never 0). */
+export function overallRatingLabel(avgRating: number | null | undefined): string {
+  if (avgRating == null) return 'Not rated';
+  return `${avgRating.toFixed(1)} / ${RATING_SCALE_MAX}`;
+}

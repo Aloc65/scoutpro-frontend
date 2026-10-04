@@ -18,6 +18,62 @@ export const REPORT_VIEWING_METHOD_LABELS: Record<ReportViewingMethod, string> =
 export const WATCH_LIST_SIGNED_STATUSES = ['Signed', 'Unsigned'] as const;
 export type SignedStatus = typeof WATCH_LIST_SIGNED_STATUSES[number];
 
+// ─── Agent contact permission (AFL approach control) ──────────────────
+// Player-level control, shared across every view/watchlist. Independent of
+// stage, priority, rating and AFL interest — none of those override it.
+export const CONTACT_PERMISSIONS = ['ALLOWED', 'NOT_ALLOWED', 'NOT_RECORDED'] as const;
+export type ContactPermission = typeof CONTACT_PERMISSIONS[number];
+
+// Exact badge copy (text + colour) required by the brief.
+export const CONTACT_PERMISSION_LABELS: Record<ContactPermission, string> = {
+  ALLOWED: 'Agent contact allowed',
+  NOT_ALLOWED: 'Do not approach',
+  NOT_RECORDED: 'Permission unconfirmed: do not approach',
+};
+
+// Short label for compact contexts (chips/filters).
+export const CONTACT_PERMISSION_SHORT_LABELS: Record<ContactPermission, string> = {
+  ALLOWED: 'Contact allowed',
+  NOT_ALLOWED: 'Do not approach',
+  NOT_RECORDED: 'Unconfirmed',
+};
+
+// Whether an approach-initiating action is permitted for a permission value.
+export function isContactAllowed(permission: ContactPermission | null | undefined): boolean {
+  return permission === 'ALLOWED';
+}
+
+// One audit-history row for a player's contact permission.
+export interface ContactPermissionAudit {
+  id: string;
+  playerId: string;
+  permission: ContactPermission;
+  confirmedAt: string | null;
+  source: string | null;
+  note: string | null;
+  recordedById: string | null;
+  recordedByName: string | null;
+  recordedAt: string;
+}
+
+// ─── Per-watchlist-entry priority tier ────────────────────────────────
+// 1 High / 2 Medium / 3 Monitor / 4 Hold / null = Not set.
+export const PRIORITY_TIERS = [1, 2, 3, 4] as const;
+export type PriorityTier = typeof PRIORITY_TIERS[number];
+
+export const PRIORITY_LABELS: Record<number, string> = {
+  1: 'High',
+  2: 'Medium',
+  3: 'Monitor',
+  4: 'Hold',
+};
+
+// Compact badge label, e.g. "P1 · High". null -> "Not set".
+export function priorityBadgeLabel(priority: number | null | undefined): string {
+  if (priority == null || !PRIORITY_LABELS[priority]) return 'Not set';
+  return `P${priority} · ${PRIORITY_LABELS[priority]}`;
+}
+
 // ─── Recruitment pipeline ────────────────────────────────────────────
 // Ordered funnel stages. Order here defines column order on the Board and
 // the "advance" order in the quick-view stage selector.
@@ -155,6 +211,13 @@ export interface Player {
   photoUrl: string | null;
   photoLastUpdated: string | null;
   createdAt: string;
+  // Agent contact permission (player-level, shared across all views).
+  contactPermission?: ContactPermission;
+  contactConfirmedAt?: string | null;
+  contactSource?: string | null;
+  contactRecordedById?: string | null;
+  contactRecordedByName?: string | null;
+  contactRecordedAt?: string | null;
 }
 
 export interface WatchList {
@@ -168,12 +231,16 @@ export interface WatchList {
   // Recruitment pipeline fields
   stage: PipelineStage;
   priorityRank: number | null;
+  // Per-watchlist-entry priority tier (1 High..4 Hold, null = Not set) + reason.
+  priority: number | null;
+  priorityReason: string | null;
   aflInterestClub: string | null;
   aflInterestNotedAt: string | null;
   lastContactAt: string | null;
+  // Overall rating (avg of trait sliders, 1dp) — included on every list item.
+  avgRating?: number | null;
   // Quick-view metrics (only populated by GET /watch-list/player/:playerId)
   reportCount?: number;
-  avgRating?: number | null;
   primaryPosition?: string | null;
   player: {
     id: string;
@@ -183,6 +250,9 @@ export interface WatchList {
     draftYear?: number | null;
     competition: string | null;
     state: AustralianState | null;
+    // Player-level contact permission, surfaced on every watch-list view.
+    contactPermission?: ContactPermission;
+    contactConfirmedAt?: string | null;
   };
 }
 

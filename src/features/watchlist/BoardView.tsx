@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   PanResponder,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,12 +11,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { PIPELINE_STAGES, PipelineStage, WatchList } from '../../types';
 import { IS_WEB, attachGlobalDrag } from './dragWeb';
+import ContactPermissionBadge from '../../components/ContactPermissionBadge';
+import PriorityBadge from '../../components/PriorityBadge';
 import {
   STAGE_CONFIG,
   draftYearOf,
   hasActiveAflInterest,
   isStale,
   lastContactLabel,
+  overallRatingLabel,
 } from './pipeline';
 
 const COLUMN_WIDTH = 240;
@@ -25,15 +29,30 @@ interface Props {
   items: WatchList[];
   onCardPress: (item: WatchList) => void;
   onStageChange: (playerId: string, newStage: PipelineStage) => void;
+  /** Opens the inline priority picker for a watch-list entry (optional). */
+  onEditPriority?: (item: WatchList) => void;
 }
 
 // ─── Card content (shared by in-column card and the floating drag clone) ──
-function CardBody({ item }: { item: WatchList }) {
+// `onEditPriority` is only passed for live, in-column cards; the floating drag
+// clone renders a static (non-interactive) copy.
+function CardBody({
+  item,
+  onEditPriority,
+}: {
+  item: WatchList;
+  onEditPriority?: (item: WatchList) => void;
+}) {
   const active = hasActiveAflInterest(item);
   const stale = isStale(item.lastContactAt);
   const dy = draftYearOf(item);
   return (
     <View style={[styles.card, active && styles.cardAccent]}>
+      {/* Agent-contact permission — the single most prominent indicator. */}
+      <ContactPermissionBadge
+        permission={item.player?.contactPermission}
+        style={styles.cardPermission}
+      />
       <View style={styles.cardTopRow}>
         <Text style={styles.cardName} numberOfLines={1}>{item.player?.fullName || '—'}</Text>
         {active && <Ionicons name="flame" size={15} color={Colors.orange} />}
@@ -43,6 +62,24 @@ function CardBody({ item }: { item: WatchList }) {
           .filter(Boolean)
           .join('  ·  ') || '—'}
       </Text>
+      {/* Priority (inline-editable) + overall rating. Distinct from the contact
+          permission badge above and the orange AFL-interest indicator. */}
+      <View style={styles.cardMetaRow}>
+        {onEditPriority ? (
+          <Pressable
+            onPress={() => onEditPriority(item)}
+            hitSlop={6}
+            {...(IS_WEB ? { dataSet: { nodrag: '1' } } : {})}
+          >
+            <PriorityBadge priority={item.priority ?? null} compact />
+          </Pressable>
+        ) : (
+          <PriorityBadge priority={item.priority ?? null} compact />
+        )}
+        <Text style={styles.cardRating} numberOfLines={1}>
+          {overallRatingLabel(item.avgRating)}
+        </Text>
+      </View>
       {item.aflInterestClub ? (
         <Text style={styles.cardAfl} numberOfLines={1}>{item.aflInterestClub}</Text>
       ) : (
@@ -65,6 +102,7 @@ function BoardCard({
   onDragMove,
   onDragEnd,
   onTap,
+  onEditPriority,
   hidden,
 }: {
   item: WatchList;
@@ -72,6 +110,7 @@ function BoardCard({
   onDragMove: (pageX: number, pageY: number) => void;
   onDragEnd: (pageX: number, pageY: number) => void;
   onTap: (item: WatchList) => void;
+  onEditPriority?: (item: WatchList) => void;
   hidden: boolean;
 }) {
   const cardRef = useRef<any>(null);
@@ -124,12 +163,12 @@ function BoardCard({
       {...(IS_WEB ? { dataSet: { dragcard: item.playerId } } : {})}
       style={[hidden && styles.cardHidden]}
     >
-      <CardBody item={item} />
+      <CardBody item={item} onEditPriority={onEditPriority} />
     </View>
   );
 }
 
-export default function BoardView({ items, onCardPress, onStageChange }: Props) {
+export default function BoardView({ items, onCardPress, onStageChange, onEditPriority }: Props) {
   const columnRefs = useRef<Record<string, View | null>>({});
   const columnRectsRef = useRef<{ stage: PipelineStage; x: number; width: number }[]>([]);
 
@@ -262,6 +301,7 @@ export default function BoardView({ items, onCardPress, onStageChange }: Props) 
                       onDragMove={handleDragMove}
                       onDragEnd={handleDragEnd}
                       onTap={onCardPress}
+                      onEditPriority={onEditPriority}
                     />
                   ))
                 )}
@@ -314,6 +354,9 @@ const styles = StyleSheet.create({
   },
   cardAccent: { borderLeftWidth: 3, borderLeftColor: Colors.orange },
   cardHidden: { opacity: 0.3 },
+  cardPermission: { marginBottom: 8 },
+  cardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  cardRating: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700' },
   cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardName: { color: Colors.text, fontWeight: '700', fontSize: 14, flex: 1 },
   cardSub: { color: Colors.textSecondary, fontSize: 12, marginTop: 3 },

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   PanResponder,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,15 +11,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { WatchList } from '../../types';
 import { IS_WEB, attachGlobalDrag } from './dragWeb';
+import ContactPermissionBadge from '../../components/ContactPermissionBadge';
+import PriorityBadge from '../../components/PriorityBadge';
 import {
   STAGE_CONFIG,
   draftYearOf,
   hasActiveAflInterest,
   isStale,
   lastContactLabel,
+  overallRatingLabel,
 } from './pipeline';
 
-const ROW_HEIGHT = 60;
+const ROW_HEIGHT = 104;
 
 // Controller the drag handles call into. Kept in a ref so each handle attaches
 // its web pointer listener exactly once (state updates during a drag must not
@@ -66,44 +70,51 @@ interface Props {
   onRowPress: (item: WatchList) => void;
   // Called with the new full order of player IDs after a drag reorder.
   onReorder: (orderedPlayerIds: string[]) => void;
+  /** Opens the inline priority picker for a watch-list entry (optional). */
+  onEditPriority?: (item: WatchList) => void;
 }
 
+// Main (tappable) content for a row — everything except the drag handle and the
+// inline-editable priority cell, which live outside the row-press touchable.
 function RowContent({ item }: { item: WatchList }) {
   const cfg = STAGE_CONFIG[item.stage];
   const dy = draftYearOf(item);
   const stale = isStale(item.lastContactAt);
   return (
-    <>
-      <Text style={styles.rank}>{item.priorityRank ?? '—'}</Text>
-      <View style={styles.nameCol}>
+    <View style={styles.contentCol}>
+      {/* Line 1: rank (manual order) + name + overall rating */}
+      <View style={styles.contentLine}>
+        <Text style={styles.rank}>{item.priorityRank ?? '—'}</Text>
         <Text style={styles.name} numberOfLines={1}>{item.player?.fullName || '—'}</Text>
-        <Text style={styles.nameSub} numberOfLines={1}>
-          {[item.player?.team, dy ? `Draft ${dy}` : null].filter(Boolean).join('  ·  ') || '—'}
-        </Text>
+        <Text style={styles.ratingText} numberOfLines={1}>{overallRatingLabel(item.avgRating)}</Text>
       </View>
-      <View style={styles.aflCol}>
+      {/* Line 2: agent-contact permission — the single most prominent indicator */}
+      <ContactPermissionBadge
+        permission={item.player?.contactPermission}
+        style={styles.rowPermission}
+      />
+      {/* Line 3: stage + AFL interest + last contact */}
+      <View style={styles.contentLine}>
+        <View style={[styles.stagePill, { backgroundColor: cfg.color + '22', borderColor: cfg.color }]}>
+          <Text style={[styles.stagePillText, { color: cfg.color }]} numberOfLines={1}>{cfg.label}</Text>
+        </View>
         {item.aflInterestClub ? (
           <View style={styles.aflChip}>
             <Ionicons name="flame" size={11} color={Colors.orange} />
             <Text style={styles.aflChipText} numberOfLines={1}>{item.aflInterestClub}</Text>
           </View>
-        ) : (
-          <Text style={styles.aflMuted}>—</Text>
-        )}
+        ) : null}
+        <View style={{ flex: 1 }} />
+        <Ionicons name="time-outline" size={11} color={stale ? Colors.amber : Colors.textMuted} />
+        <Text style={[styles.lastCol, stale && { color: Colors.amber, fontWeight: '700' }]} numberOfLines={1}>
+          {lastContactLabel(item.lastContactAt)}
+        </Text>
       </View>
-      <View style={styles.stageCol}>
-        <View style={[styles.stagePill, { backgroundColor: cfg.color + '22', borderColor: cfg.color }]}>
-          <Text style={[styles.stagePillText, { color: cfg.color }]} numberOfLines={1}>{cfg.label}</Text>
-        </View>
-      </View>
-      <Text style={[styles.lastCol, stale && { color: Colors.amber, fontWeight: '700' }]} numberOfLines={1}>
-        {lastContactLabel(item.lastContactAt)}
-      </Text>
-    </>
+    </View>
   );
 }
 
-export default function TableView({ items, onRowPress, onReorder }: Props) {
+export default function TableView({ items, onRowPress, onReorder, onEditPriority }: Props) {
   const [order, setOrder] = useState<WatchList[]>(items);
   const listRef = useRef<View>(null);
   const listTopRef = useRef(0);
@@ -231,11 +242,8 @@ export default function TableView({ items, onRowPress, onReorder }: Props) {
       {/* Header */}
       <View style={styles.headerRow}>
         <View style={styles.handleCol} />
-        <Text style={[styles.headerText, styles.rank]}>#</Text>
-        <Text style={[styles.headerText, styles.nameCol]}>Player</Text>
-        <Text style={[styles.headerText, styles.aflCol]}>AFL</Text>
-        <Text style={[styles.headerText, styles.stageCol]}>Stage</Text>
-        <Text style={[styles.headerText, styles.lastCol]}>Contact</Text>
+        <Text style={[styles.headerText, { flex: 1 }]}>Player · Permission · Stage</Text>
+        <Text style={[styles.headerText, styles.priorityCol]}>Priority</Text>
       </View>
 
       <View ref={listRef} collapsable={false} style={{ height: order.length * ROW_HEIGHT }}>
@@ -256,6 +264,17 @@ export default function TableView({ items, onRowPress, onReorder }: Props) {
                 <TouchableOpacity style={styles.rowTouchable} activeOpacity={0.7} onPress={() => onRowPress(item)}>
                   <RowContent item={item} />
                 </TouchableOpacity>
+                {/* Inline-editable priority cell (sits outside the row-press
+                    touchable so a tap edits priority instead of opening the row). */}
+                <Pressable
+                  style={styles.priorityCell}
+                  disabled={!onEditPriority}
+                  hitSlop={6}
+                  onPress={(e: any) => { e?.stopPropagation?.(); onEditPriority?.(item); }}
+                  {...(IS_WEB ? { dataSet: { nodrag: '1' } } : {})}
+                >
+                  <PriorityBadge priority={item.priority ?? null} compact />
+                </Pressable>
               </View>
             </View>
           );
@@ -270,6 +289,9 @@ export default function TableView({ items, onRowPress, onReorder }: Props) {
               </View>
               <View style={styles.rowTouchable}>
                 <RowContent item={order[dragIndex]} />
+              </View>
+              <View style={styles.priorityCell}>
+                <PriorityBadge priority={order[dragIndex].priority ?? null} compact />
               </View>
             </View>
           </View>
@@ -300,23 +322,26 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent, shadowColor: '#000', shadowOpacity: 0.4,
     shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
   },
-  rowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  handleCol: { width: 40, alignItems: 'center', justifyContent: 'center' },
-  rank: { width: 32, color: Colors.text, fontWeight: '800', fontSize: 14, textAlign: 'center' },
-  nameCol: { flex: 1, paddingHorizontal: 8 },
-  name: { color: Colors.text, fontWeight: '700', fontSize: 14 },
-  nameSub: { color: Colors.textSecondary, fontSize: 11, marginTop: 2 },
-  aflCol: { width: 96, paddingHorizontal: 4 },
+  rowTouchable: { flex: 1, justifyContent: 'center', paddingVertical: 6 },
+  contentCol: { flex: 1, justifyContent: 'center', gap: 6, paddingRight: 6 },
+  contentLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  handleCol: { width: 36, alignItems: 'center', justifyContent: 'center' },
+  rank: {
+    minWidth: 20, color: Colors.textSecondary, fontWeight: '800', fontSize: 12, textAlign: 'center',
+  },
+  name: { flex: 1, color: Colors.text, fontWeight: '700', fontSize: 14 },
+  ratingText: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700' },
+  rowPermission: { alignSelf: 'flex-start' },
   aflChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: 'rgba(249,115,22,0.12)', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 3,
   },
   aflChipText: { color: Colors.orange, fontSize: 11, fontWeight: '600' },
-  aflMuted: { color: Colors.textMuted, fontSize: 12, paddingLeft: 4 },
-  stageCol: { width: 96, paddingHorizontal: 4 },
   stagePill: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 3, alignItems: 'center' },
   stagePillText: { fontSize: 10, fontWeight: '700' },
-  lastCol: { width: 74, color: Colors.textMuted, fontSize: 11, textAlign: 'right' },
+  lastCol: { color: Colors.textMuted, fontSize: 11, textAlign: 'right' },
+  priorityCol: { width: 76, textAlign: 'center' },
+  priorityCell: { width: 76, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
   insertLine: {
     position: 'absolute', top: 2, left: 0, right: 0, height: 3,
     backgroundColor: Colors.accent, borderRadius: 2,
