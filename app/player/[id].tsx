@@ -15,6 +15,7 @@ import {
   NationalChampionshipsPlayerResponse,
   WatchList,
   isContactAllowed,
+  isPlayerSigned,
 } from '../../src/types';
 import Card from '../../src/components/Card';
 import RatingBar from '../../src/components/RatingBar';
@@ -431,6 +432,7 @@ export default function PlayerDetailScreen() {
   const [watchListEntry, setWatchListEntry] = useState<WatchList | null>(null);
   const [watchListLoading, setWatchListLoading] = useState(false);
   const [priorityEditOpen, setPriorityEditOpen] = useState(false);
+  const playerSigned = isPlayerSigned(player as any) || isPlayerSigned(watchListEntry);
 
   const handleSavePriority = async (playerId: string, priority: number | null, reason: string | null) => {
     const previous = watchListEntry;
@@ -760,9 +762,11 @@ export default function PlayerDetailScreen() {
                 </TouchableOpacity>
               </View>
               {/* Agent-contact permission — most prominent status, directly under the name */}
-              <View style={styles.permissionBadgeRow}>
-                <ContactPermissionBadge permission={player.contactPermission} size="lg" />
-              </View>
+              {!playerSigned && (
+                <View style={styles.permissionBadgeRow}>
+                  <ContactPermissionBadge permission={player.contactPermission} size="lg" />
+                </View>
+              )}
               {player.team && <Text style={styles.info}>🏢 {player.team}</Text>}
             </View>
           </View>
@@ -958,12 +962,14 @@ export default function PlayerDetailScreen() {
         </Card>
 
         {/* ═══════════ AGENT CONTACT PERMISSION SECTION ═══════════ */}
-        <ContactPermissionSection
-          player={player}
-          playerId={id!}
-          canManage={canEditNotes}
-          onUpdated={load}
-        />
+        {!playerSigned && (
+          <ContactPermissionSection
+            player={player}
+            playerId={id!}
+            canManage={canEditNotes}
+            onUpdated={load}
+          />
+        )}
 
         {/* ═══════════ GENERAL NOTES SECTION ═══════════ */}
         <GeneralNotesSection
@@ -1166,7 +1172,7 @@ export default function PlayerDetailScreen() {
               Contact History ({contactLog.length})
             </Text>
           </View>
-          {isContactAllowed(player.contactPermission) ? (
+          {!playerSigned && isContactAllowed(player.contactPermission) ? (
             <TouchableOpacity style={styles.addMeetingBtn} onPress={openAddContact} activeOpacity={0.8}>
               <Ionicons name="add-circle-outline" size={18} color="#fff" />
               <Text style={styles.addMeetingBtnText}>Log Contact</Text>
@@ -1179,7 +1185,7 @@ export default function PlayerDetailScreen() {
           )}
         </View>
 
-        {!isContactAllowed(player.contactPermission) && (
+        {!playerSigned && !isContactAllowed(player.contactPermission) && (
           <View style={styles.contactBlockedBanner}>
             <Ionicons name="alert-circle" size={16} color={Colors.error} />
             <Text style={styles.contactBlockedText}>

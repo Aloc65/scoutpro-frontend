@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { WatchList } from '../../types';
 import { IS_WEB, attachGlobalDrag } from './dragWeb';
+import { isPlayerSigned } from '../../types';
 import ContactPermissionBadge from '../../components/ContactPermissionBadge';
 import PriorityBadge from '../../components/PriorityBadge';
 import {
@@ -89,10 +90,12 @@ function RowContent({ item }: { item: WatchList }) {
         <Text style={styles.ratingText} numberOfLines={1}>{overallRatingLabel(item.avgRating)}</Text>
       </View>
       {/* Line 2: agent-contact permission — the single most prominent indicator */}
-      <ContactPermissionBadge
-        permission={item.player?.contactPermission}
-        style={styles.rowPermission}
-      />
+      {!isPlayerSigned(item) && (
+        <ContactPermissionBadge
+          permission={item.player?.contactPermission}
+          style={styles.rowPermission}
+        />
+      )}
       {/* Line 3: stage + AFL interest + last contact */}
       <View style={styles.contentLine}>
         <View style={[styles.stagePill, { backgroundColor: cfg.color + '22', borderColor: cfg.color }]}>

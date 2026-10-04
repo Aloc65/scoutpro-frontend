@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { PIPELINE_STAGES, PipelineStage, WatchList } from '../../types';
 import { IS_WEB, attachGlobalDrag } from './dragWeb';
+import { isPlayerSigned } from '../../types';
 import ContactPermissionBadge from '../../components/ContactPermissionBadge';
 import PriorityBadge from '../../components/PriorityBadge';
 import {
@@ -49,10 +50,12 @@ function CardBody({
   return (
     <View style={[styles.card, active && styles.cardAccent]}>
       {/* Agent-contact permission — the single most prominent indicator. */}
-      <ContactPermissionBadge
-        permission={item.player?.contactPermission}
-        style={styles.cardPermission}
-      />
+      {!isPlayerSigned(item) && (
+        <ContactPermissionBadge
+          permission={item.player?.contactPermission}
+          style={styles.cardPermission}
+        />
+      )}
       <View style={styles.cardTopRow}>
         <Text style={styles.cardName} numberOfLines={1}>{item.player?.fullName || '—'}</Text>
         {active && <Ionicons name="flame" size={15} color={Colors.orange} />}

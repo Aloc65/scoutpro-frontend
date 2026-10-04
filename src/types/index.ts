@@ -43,6 +43,16 @@ export function isContactAllowed(permission: ContactPermission | null | undefine
   return permission === 'ALLOWED';
 }
 
+// A signed player is already committed (to us or another club), so agent-contact
+// notices/warnings are not shown for them and approach actions stay off.
+export function isPlayerSigned(src: {
+  stage?: string | null;
+  signedStatus?: string | null;
+  signingStatus?: string | null;
+} | null | undefined): boolean {
+  return !!src && (src.stage === 'SIGNED' || src.signedStatus === 'Signed' || src.signingStatus === 'SIGNED');
+}
+
 // One audit-history row for a player's contact permission.
 export interface ContactPermissionAudit {
   id: string;

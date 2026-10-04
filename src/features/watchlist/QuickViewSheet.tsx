@@ -21,6 +21,7 @@ import {
   PipelineStage,
   WatchList,
   isContactAllowed,
+  isPlayerSigned,
   CONTACT_PERMISSION_LABELS,
 } from '../../types';
 import {
@@ -209,9 +210,11 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
 
   const showAflBanner = hasActiveAflInterest(current) || !!current.aflInterestClub;
   const permissionValue = player?.contactPermission ?? 'NOT_RECORDED';
-  const permissionAllowed = isContactAllowed(permissionValue);
+  const signed = isPlayerSigned(current) || isPlayerSigned(player as any);
+  // Signed players are committed: approach stays off, notices are hidden.
+  const permissionAllowed = !signed && isContactAllowed(permissionValue);
   // Warn when moving into a contact-initiating stage without permission.
-  const stageWarn = !!pendingStage && CONTACT_STAGES.includes(pendingStage) && !permissionAllowed;
+  const stageWarn = !!pendingStage && CONTACT_STAGES.includes(pendingStage) && !permissionAllowed && !signed;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -237,6 +240,7 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
 
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
             {/* Agent-contact permission — most prominent indicator, shown first */}
+            {!signed && (
             <View style={styles.permissionRow}>
               <ContactPermissionBadge permission={permissionValue} size="lg" />
               {player?.contactConfirmedAt ? (
@@ -245,6 +249,7 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
                 </Text>
               ) : null}
             </View>
+            )}
 
             {/* AFL interest banner */}
             {showAflBanner ? (
@@ -426,7 +431,7 @@ export default function QuickViewSheet({ visible, entry, onClose, onEntryChanged
               )}
             </View>
 
-            {!permissionAllowed && (
+            {!permissionAllowed && !signed && (
               <View style={styles.contactBlocked}>
                 <Ionicons name="hand-left" size={15} color={Colors.error} />
                 <Text style={styles.contactBlockedText}>
