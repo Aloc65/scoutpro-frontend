@@ -948,9 +948,9 @@ export default function PlayerDetailScreen() {
                 <Text style={styles.draftYearText}>{player.draftYear} Draft</Text>
               </View>
             )}
-            <View style={player.signingStatus === 'SIGNED' ? styles.signingBadgeSigned : styles.signingBadgeNotSigned}>
+            <View style={player.signingStatus === 'SIGNED' ? styles.signingBadgeSigned : player.signingStatus === 'COMMITTED' ? styles.signingBadgeCommitted : styles.signingBadgeNotSigned}>
               <Ionicons
-                name={player.signingStatus === 'SIGNED' ? 'checkmark-circle' : 'remove-circle'}
+                name={player.signingStatus === 'SIGNED' ? 'checkmark-circle' : player.signingStatus === 'COMMITTED' ? 'lock-closed' : 'remove-circle'}
                 size={14}
                 color="#fff"
               />
@@ -1498,6 +1498,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: Colors.green,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  signingBadgeCommitted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#8B5CF6',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,

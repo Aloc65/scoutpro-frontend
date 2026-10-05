@@ -1,10 +1,11 @@
 export const COMPETITIONS = ['Futures', 'Colts', 'Reserves', 'League', 'PSA', 'State 18s', "Under 16's"] as const;
 export const POSITIONS = ['Small Forward', 'Key Forward', 'High Forward', 'Medium Forward', 'Ruck', 'Outside Mid', 'Inside Mid', 'Key Back', 'Rebound Defender', 'Small Defender', 'Mid Defender'] as const;
 export const PROJECTIONS = ['Strong Prospect', 'Watch Player', 'Not Recommended'] as const;
-export const SIGNING_STATUSES = ['SIGNED', 'NOT_SIGNED'] as const;
+export const SIGNING_STATUSES = ['SIGNED', 'COMMITTED', 'NOT_SIGNED'] as const;
 export type SigningStatus = typeof SIGNING_STATUSES[number];
 export const SIGNING_STATUS_LABELS: Record<SigningStatus, string> = {
   SIGNED: 'Signed',
+  COMMITTED: 'Committed',
   NOT_SIGNED: 'Not Signed',
 };
 
@@ -50,7 +51,7 @@ export function isPlayerSigned(src: {
   signedStatus?: string | null;
   signingStatus?: string | null;
 } | null | undefined): boolean {
-  return !!src && (src.stage === 'SIGNED' || src.signedStatus === 'Signed' || src.signingStatus === 'SIGNED');
+  return !!src && (src.stage === 'SIGNED' || src.signedStatus === 'Signed' || src.signingStatus === 'SIGNED' || src.signingStatus === 'COMMITTED');
 }
 
 // One audit-history row for a player's contact permission.
@@ -216,7 +217,7 @@ export interface Player {
   height: number | null;
   weight: number | null;
   draftYear: number | null;
-  signingStatus: 'SIGNED' | 'NOT_SIGNED';
+  signingStatus: 'SIGNED' | 'COMMITTED' | 'NOT_SIGNED';
   notes: string | null;
   photoUrl: string | null;
   photoLastUpdated: string | null;

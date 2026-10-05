@@ -516,6 +516,12 @@ export default function PlayersScreen() {
                         <Text style={styles.signingBadgeText}>Signed</Text>
                       </View>
                     )}
+                    {item.signingStatus === 'COMMITTED' && (
+                      <View style={styles.signingBadgeCommitted}>
+                        <Ionicons name="lock-closed" size={12} color="#fff" />
+                        <Text style={styles.signingBadgeText}>Committed</Text>
+                      </View>
+                    )}
                     {item.signingStatus === 'NOT_SIGNED' && (
                       <View style={styles.signingBadgeNotSigned}>
                         <Ionicons name="remove-circle" size={12} color="#fff" />
@@ -600,7 +606,7 @@ export default function PlayersScreen() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                 {SIGNING_STATUSES.map((s) => (
                   <TouchableOpacity key={s} onPress={() => setForm({ ...form, signingStatus: s })}
-                    style={[styles.chip, form.signingStatus === s && (s === 'SIGNED' ? styles.chipSigned : styles.chipNotSigned)]}>
+                    style={[styles.chip, form.signingStatus === s && (s === 'SIGNED' ? styles.chipSigned : s === 'COMMITTED' ? styles.chipCommitted : styles.chipNotSigned)]}>
                     <Text style={[styles.chipText, form.signingStatus === s && { color: '#fff' }]}>{SIGNING_STATUS_LABELS[s]}</Text>
                   </TouchableOpacity>
                 ))}
@@ -853,6 +859,7 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipSigned: { backgroundColor: Colors.green, borderColor: Colors.green },
+  chipCommitted: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
   chipNotSigned: { backgroundColor: Colors.orange, borderColor: Colors.orange },
   chipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
   compHint: { color: Colors.textMuted, fontSize: 13, fontStyle: 'italic', marginBottom: 12 },
@@ -863,6 +870,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     backgroundColor: Colors.green,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  signingBadgeCommitted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#8B5CF6',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,

@@ -298,13 +298,13 @@ export default function EditPlayerForm({ visible, player, onSave, onClose }: Edi
                     key={s}
                     style={[
                       styles.signingChip,
-                      signingStatus === s && (s === 'SIGNED' ? styles.signingChipSigned : styles.signingChipNotSigned),
+                      signingStatus === s && (s === 'SIGNED' ? styles.signingChipSigned : s === 'COMMITTED' ? styles.signingChipCommitted : styles.signingChipNotSigned),
                     ]}
                     onPress={() => setSigningStatus(s)}
                     activeOpacity={0.7}
                   >
                     <Ionicons
-                      name={s === 'SIGNED' ? 'checkmark-circle' : 'remove-circle'}
+                      name={s === 'SIGNED' ? 'checkmark-circle' : s === 'COMMITTED' ? 'lock-closed' : 'remove-circle'}
                       size={16}
                       color={signingStatus === s ? '#fff' : Colors.textMuted}
                     />
@@ -523,6 +523,10 @@ const styles = StyleSheet.create({
   signingChipSigned: {
     backgroundColor: Colors.green,
     borderColor: Colors.green,
+  },
+  signingChipCommitted: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
   },
   signingChipNotSigned: {
     backgroundColor: Colors.orange,
