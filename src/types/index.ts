@@ -93,6 +93,7 @@ export const PIPELINE_STAGES = [
   'INITIAL_CALL',
   'FAMILY_MEETING',
   'OFFER_MADE',
+  'COMMITTED',
   'SIGNED',
 ] as const;
 export type PipelineStage = typeof PIPELINE_STAGES[number];
@@ -102,6 +103,7 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   INITIAL_CALL: 'Initial Call',
   FAMILY_MEETING: 'Family Meeting',
   OFFER_MADE: 'Offer Made',
+  COMMITTED: 'Committed',
   SIGNED: 'Signed',
 };
 

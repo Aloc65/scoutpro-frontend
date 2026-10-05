@@ -13,6 +13,7 @@ export const STAGE_CONFIG: Record<
   INITIAL_CALL: { label: PIPELINE_STAGE_LABELS.INITIAL_CALL, color: Colors.accent, icon: 'call-outline' },
   FAMILY_MEETING: { label: PIPELINE_STAGE_LABELS.FAMILY_MEETING, color: Colors.primary, icon: 'people-outline' },
   OFFER_MADE: { label: PIPELINE_STAGE_LABELS.OFFER_MADE, color: Colors.amber, icon: 'document-text-outline' },
+  COMMITTED: { label: PIPELINE_STAGE_LABELS.COMMITTED, color: '#8B5CF6', icon: 'hand-right-outline' },
   SIGNED: { label: PIPELINE_STAGE_LABELS.SIGNED, color: Colors.green, icon: 'checkmark-circle-outline' },
 };
 

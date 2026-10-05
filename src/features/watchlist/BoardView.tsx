@@ -182,7 +182,7 @@ export default function BoardView({ items, onCardPress, onStageChange, onEditPri
 
   const grouped = React.useMemo(() => {
     const map: Record<PipelineStage, WatchList[]> = {
-      NOT_CONTACTED: [], INITIAL_CALL: [], FAMILY_MEETING: [], OFFER_MADE: [], SIGNED: [],
+      NOT_CONTACTED: [], INITIAL_CALL: [], FAMILY_MEETING: [], OFFER_MADE: [], COMMITTED: [], SIGNED: [],
     };
     for (const it of items) (map[it.stage] || map.NOT_CONTACTED).push(it);
     return map;
