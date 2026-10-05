@@ -51,7 +51,7 @@ export function isPlayerSigned(src: {
   signedStatus?: string | null;
   signingStatus?: string | null;
 } | null | undefined): boolean {
-  return !!src && (src.stage === 'SIGNED' || src.signedStatus === 'Signed' || src.signingStatus === 'SIGNED' || src.signingStatus === 'COMMITTED');
+  return !!src && (src.stage === 'SIGNED' || src.signedStatus === 'Signed' || src.signingStatus === 'SIGNED');
 }
 
 // One audit-history row for a player's contact permission.
