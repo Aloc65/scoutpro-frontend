@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, getToken } from '../../src/api/client';
 import EmptyState from '../../src/components/EmptyState';
 import { Colors } from '../../src/theme/colors';
-import { showAlert } from '../../src/utils/alert';
+import { showAlert, showConfirm } from '../../src/utils/alert';
 import { PipelineStage, WatchList, AUSTRALIAN_STATES } from '../../src/types';
 import BoardView from '../../src/features/watchlist/BoardView';
 import TableView from '../../src/features/watchlist/TableView';
@@ -24,6 +24,7 @@ import QuickViewSheet from '../../src/features/watchlist/QuickViewSheet';
 import PriorityEditorSheet from '../../src/features/watchlist/PriorityEditorSheet';
 import { hasActiveAflInterest } from '../../src/features/watchlist/pipeline';
 import { updatePriority as apiUpdatePriority } from '../../src/api/watchList';
+import { useAuth } from '../../src/context/AuthContext';
 
 type ViewMode = 'board' | 'table';
 const VIEW_MODE_KEY = 'watchlist_view_mode';
@@ -108,10 +109,13 @@ function Dropdown({
 }
 
 export default function WatchListScreen() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [items, setItems] = useState<WatchList[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [rollingOver, setRollingOver] = useState(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>(cachedViewMode);
   const [search, setSearch] = useState('');
@@ -334,9 +338,45 @@ export default function WatchListScreen() {
     }
   };
 
+  // Admin safety-net: manually move undrafted watch-list players into the new
+  // draft year. This is the same action the automatic 1 January job performs,
+  // provided here in case the server was not running at the turn of the year.
+  const handleRollOver = () => {
+    const thisYear = new Date().getFullYear();
+    showConfirm(
+      'Roll over to new year',
+      `This moves every undrafted watch-list player whose draft year is before ${thisYear} up to ${thisYear}. Drafted players are not affected. Continue?`,
+      async () => {
+        try {
+          setRollingOver(true);
+          const res = await api.post<{ year: number; moved: number }>(
+            '/api/watch-list/roll-over',
+            {},
+          );
+          await load();
+          showAlert(
+            'Done',
+            `${res?.moved ?? 0} player(s) moved to the ${res?.year ?? thisYear} draft year.`,
+          );
+        } catch (e: any) {
+          showAlert('Roll-over failed', e.message || 'Could not roll players over.');
+        } finally {
+          setRollingOver(false);
+        }
+      },
+    );
+  };
+
   const draftYearOptions = useMemo(() => {
-    if (draftYear === 'All' || availableDraftYears.includes(draftYear)) return availableDraftYears;
-    const merged = Array.from(new Set([...availableDraftYears.filter((y) => y !== 'All'), draftYear])).sort(
+    // Always offer the current year plus the next 5 draft years (e.g. 2029+),
+    // even before any players are added to those cohorts, so you can build a
+    // future draft-year board. Merge with years already present in the data and
+    // the currently-selected year.
+    const thisYear = new Date().getFullYear();
+    const upcoming = Array.from({ length: 7 }, (_, i) => String(thisYear + i));
+    const fromData = availableDraftYears.filter((y) => y !== 'All');
+    const selected = draftYear !== 'All' ? [draftYear] : [];
+    const merged = Array.from(new Set([...fromData, ...upcoming, ...selected])).sort(
       (a, b) => Number(a) - Number(b),
     );
     return ['All', ...merged];
@@ -370,16 +410,35 @@ export default function WatchListScreen() {
             })}
           </View>
 
-          <TouchableOpacity style={[styles.exportBtn, exporting && styles.disabled]} onPress={exportExcel} disabled={exporting}>
-            {exporting ? (
-              <ActivityIndicator size="small" color={Colors.text} />
-            ) : (
-              <>
-                <Ionicons name="download-outline" size={16} color={Colors.text} />
-                <Text style={styles.exportBtnText}>Export</Text>
-              </>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.rollOverBtn, rollingOver && styles.disabled]}
+                onPress={handleRollOver}
+                disabled={rollingOver}
+                accessibilityLabel="Roll undrafted players over to the new draft year"
+              >
+                {rollingOver ? (
+                  <ActivityIndicator size="small" color={Colors.text} />
+                ) : (
+                  <>
+                    <Ionicons name="refresh-outline" size={16} color={Colors.text} />
+                    <Text style={styles.exportBtnText}>New year</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+            <TouchableOpacity style={[styles.exportBtn, exporting && styles.disabled]} onPress={exportExcel} disabled={exporting}>
+              {exporting ? (
+                <ActivityIndicator size="small" color={Colors.text} />
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={16} color={Colors.text} />
+                  <Text style={styles.exportBtnText}>Export</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search */}
@@ -501,6 +560,11 @@ const styles = StyleSheet.create({
     borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9,
   },
   exportBtnText: { color: Colors.text, fontWeight: '700', fontSize: 13 },
+  rollOverBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.elevated, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9,
+  },
   disabled: { opacity: 0.6 },
 
   searchWrap: {

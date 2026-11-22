@@ -21,6 +21,7 @@ import Card from '../../src/components/Card';
 import RatingBar from '../../src/components/RatingBar';
 import ContactPermissionBadge from '../../src/components/ContactPermissionBadge';
 import ContactPermissionSection from '../../src/features/players/ContactPermissionSection';
+import DraftedSection from '../../src/features/players/DraftedSection';
 import PriorityBadge from '../../src/components/PriorityBadge';
 import PriorityEditorSheet from '../../src/features/watchlist/PriorityEditorSheet';
 import { updatePriority } from '../../src/api/watchList';
@@ -942,6 +943,14 @@ export default function PlayerDetailScreen() {
 
           {/* ── Badges row ── */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {player.drafted && (
+              <View style={styles.draftedBadge}>
+                <Ionicons name="trophy" size={14} color="#fff" />
+                <Text style={styles.draftedBadgeText}>
+                  Drafted{player.draftedClub ? ` · ${player.draftedClub}` : ''}
+                </Text>
+              </View>
+            )}
             {player.draftYear && (
               <View style={styles.draftYearBadge}>
                 <Ionicons name="calendar-outline" size={14} color={Colors.accent} />
@@ -960,6 +969,14 @@ export default function PlayerDetailScreen() {
             </View>
           </View>
         </Card>
+
+        {/* ═══════════ DRAFT SECTION ═══════════ */}
+        <DraftedSection
+          player={player}
+          playerId={id!}
+          canManage={canEditNotes}
+          onUpdated={load}
+        />
 
         {/* ═══════════ AGENT CONTACT PERMISSION SECTION ═══════════ */}
         {!playerSigned && (
@@ -1492,6 +1509,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: Colors.accent,
+  },
+  draftedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#14B8A6',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  draftedBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
   },
   signingBadgeSigned: {
     flexDirection: 'row',

@@ -160,6 +160,28 @@ export interface FollowUpsResponse {
 }
 
 export const AUSTRALIAN_STATES = ['WA', 'SA', 'VIC', 'NSW', 'QLD', 'TAS', 'ACT', 'NT'] as const;
+
+/** The 18 AFL clubs a player can be drafted to. */
+export const AFL_CLUBS = [
+  'Adelaide Crows',
+  'Brisbane Lions',
+  'Carlton',
+  'Collingwood',
+  'Essendon',
+  'Fremantle',
+  'Geelong Cats',
+  'Gold Coast Suns',
+  'GWS Giants',
+  'Hawthorn',
+  'Melbourne',
+  'North Melbourne',
+  'Port Adelaide',
+  'Richmond',
+  'St Kilda',
+  'Sydney Swans',
+  'West Coast Eagles',
+  'Western Bulldogs',
+] as const;
 export type AustralianState = typeof AUSTRALIAN_STATES[number];
 
 // National Championships is a cross-state competition. It is selectable
@@ -231,6 +253,11 @@ export interface Player {
   contactRecordedById?: string | null;
   contactRecordedByName?: string | null;
   contactRecordedAt?: string | null;
+  // Drafted status (set when a player is picked in an AFL draft).
+  drafted?: boolean;
+  draftedClub?: string | null;
+  draftedPick?: number | null;
+  draftedAt?: string | null;
 }
 
 export interface WatchList {
