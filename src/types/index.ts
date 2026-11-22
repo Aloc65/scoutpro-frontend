@@ -257,6 +257,7 @@ export interface Player {
   drafted?: boolean;
   draftedClub?: string | null;
   draftedPick?: number | null;
+  draftedType?: string | null;
   draftedAt?: string | null;
 }
 

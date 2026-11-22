@@ -85,6 +85,7 @@ export default function DraftedSection({
   const [isDrafted, setIsDrafted] = useState<boolean>(!!player.drafted);
   const [club, setClub] = useState<string>(player.draftedClub || '');
   const [pick, setPick] = useState<string>(player.draftedPick != null ? String(player.draftedPick) : '');
+  const [draftType, setDraftType] = useState<string>(player.draftedType || '');
   const [dateStr, setDateStr] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +95,7 @@ export default function DraftedSection({
     setIsDrafted(!!player.drafted);
     setClub(player.draftedClub || '');
     setPick(player.draftedPick != null ? String(player.draftedPick) : '');
+    setDraftType(player.draftedType || '');
     setDateStr(player.draftedAt ? formatDateAU(player.draftedAt) : todayAU());
     setError(null);
     setEditorOpen(true);
@@ -125,6 +127,7 @@ export default function DraftedSection({
       if (isDrafted) {
         payload.draftedClub = club;
         if (pickNum != null) payload.draftedPick = pickNum;
+        if (draftType.trim()) payload.draftedType = draftType.trim();
         const iso = parseDateToISO(dateStr);
         if (iso) payload.draftedAt = iso;
       }
@@ -181,6 +184,10 @@ export default function DraftedSection({
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Club</Text>
               <Text style={styles.detailValue}>{player.draftedClub || '—'}</Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Taken in</Text>
+              <Text style={styles.detailValue}>{player.draftedType || '—'}</Text>
             </View>
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Pick</Text>
@@ -252,6 +259,17 @@ export default function DraftedSection({
                     </Text>
                     <Ionicons name="chevron-down" size={18} color={Colors.textSecondary} />
                   </TouchableOpacity>
+
+                  {/* How taken (free text) */}
+                  <Text style={styles.fieldLabel}>Taken in (optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={draftType}
+                    onChangeText={setDraftType}
+                    placeholder="e.g. Main draft, Rookie, Cat B, SSP, Mid season"
+                    placeholderTextColor={Colors.textMuted}
+                    maxLength={100}
+                  />
 
                   {/* Pick number */}
                   <Text style={styles.fieldLabel}>Pick number (optional)</Text>
@@ -384,7 +402,7 @@ const styles = StyleSheet.create({
   },
   draftedBannerText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
-  detailRow: { flexDirection: 'row', gap: 20, marginBottom: 12 },
+  detailRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 20, rowGap: 10, marginBottom: 12 },
   detailItem: { gap: 2 },
   detailLabel: { color: Colors.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
   detailValue: { color: Colors.text, fontSize: 15, fontWeight: '600' },
