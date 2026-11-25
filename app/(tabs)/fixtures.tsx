@@ -25,7 +25,7 @@ import { Colors } from '../../src/theme/colors';
 import { showAlert } from '../../src/utils/alert';
 import { Fixture } from '../../src/types';
 import { useAuth } from '../../src/context/AuthContext';
-import { createFixture, listFixtures, getFixtureDates, uploadFixturesExcel, countFixturesByYear, deleteFixturesByYear } from '../../src/api/fixtures';
+import { createFixture, listFixtures, uploadFixturesExcel, countFixturesByYear, deleteFixturesByYear } from '../../src/api/fixtures';
 
 // Enable LayoutAnimation on Android
 if (
@@ -49,8 +49,41 @@ const STATUS_COLORS: Record<Fixture['status'], string> = {
   CANCELLED: Colors.error,
 };
 
-const COMPETITION_OPTIONS = ['All', 'WAFL Colts'] as const;
-type CompetitionFilter = (typeof COMPETITION_OPTIONS)[number];
+// Competition category tabs. Each tab matches fixtures by keyword in the
+// (free-text) competition name, so messy imported names still group correctly.
+interface CompetitionCategory {
+  key: string;
+  label: string;
+  match: (competition: string) => boolean;
+}
+
+const COMPETITION_CATEGORIES: CompetitionCategory[] = [
+  { key: 'ALL', label: 'All', match: () => true },
+  {
+    key: 'U16',
+    label: 'Nationals U16s',
+    match: (c) => /u\.?\s*16|under\s*16|development champs/i.test(c),
+  },
+  {
+    key: 'U18',
+    label: 'U18s',
+    match: (c) =>
+      /u\.?\s*18|under\s*18/i.test(c) ||
+      (/national champs/i.test(c) && !/development/i.test(c)),
+  },
+  {
+    key: 'WAFL',
+    label: 'WAFL Seniors',
+    match: (c) => /wafl/i.test(c) && !/colt/i.test(c),
+  },
+  {
+    key: 'PSA',
+    label: 'PSA',
+    match: (c) => /\bpsa\b/i.test(c),
+  },
+];
+
+const DEFAULT_CATEGORY_KEY = 'ALL';
 
 type FixtureStatus = Fixture['status'];
 
@@ -158,14 +191,12 @@ export default function FixturesScreen() {
   const isAdmin = normalizedRole === 'ADMIN';
 
 
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [allFixtures, setAllFixtures] = useState<Fixture[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [competition, setCompetition] = useState<CompetitionFilter>('WAFL Colts');
+  const [categoryKey, setCategoryKey] = useState<string>(DEFAULT_CATEGORY_KEY);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [calendarExpanded, setCalendarExpanded] = useState(false);
-  const [fixtureDates, setFixtureDates] = useState<string[]>([]);
-  const [datesLoading, setDatesLoading] = useState(false);
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [fixtureForm, setFixtureForm] = useState<FixtureFormState>(EMPTY_FIXTURE_FORM);
@@ -185,44 +216,17 @@ export default function FixturesScreen() {
     setFixtureForm(EMPTY_FIXTURE_FORM);
   };
 
-  // Fetch fixture dates for calendar dot markers
-  useEffect(() => {
-    let cancelled = false;
-    const loadDates = async () => {
-      setDatesLoading(true);
-      const comp = competition === 'All' ? undefined : competition;
-      const dates = await getFixtureDates(comp);
-      console.log('[Fixtures] Date markers response:', {
-        competition: comp,
-        datesCount: dates?.length ?? 0,
-      });
-      if (!cancelled) {
-        setFixtureDates(dates ?? []);
-        setDatesLoading(false);
-      }
-    };
-    loadDates();
-    return () => { cancelled = true; };
-  }, [competition]);
-
-  // Load fixtures
+  // Load ALL fixtures once; tab + date filtering happens client-side so the
+  // category tabs can match the (free-text) competition names reliably.
   const loadFixtures = useCallback(async () => {
     try {
-      const comp = competition === 'All' ? undefined : competition;
-      const params = {
-        competition: comp,
-        date: selectedDate ?? undefined,
-        limit: 200,
-      };
-      console.log('[Fixtures] Request params:', params);
-      const result = await listFixtures(params);
+      const result = await listFixtures({ limit: 2000 });
       console.log('[Fixtures] API response:', {
         total: result?.total,
         count: result?.fixtures?.length ?? 0,
-        firstFixture: result?.fixtures?.[0],
       });
       const sorted = [...(result?.fixtures ?? [])].sort(fixtureSort);
-      setFixtures(sorted);
+      setAllFixtures(sorted);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to load fixtures';
       console.error('[Fixtures] Load failed:', e);
@@ -230,7 +234,7 @@ export default function FixturesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [competition, selectedDate]);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -245,10 +249,40 @@ export default function FixturesScreen() {
 
   const refreshFixturesAndDates = async () => {
     await loadFixtures();
-    const comp = competition === 'All' ? undefined : competition;
-    const dates = await getFixtureDates(comp);
-    setFixtureDates(dates ?? []);
   };
+
+  // The currently selected category tab.
+  const activeCategory = useMemo(
+    () => COMPETITION_CATEGORIES.find((c) => c.key === categoryKey) ?? COMPETITION_CATEGORIES[0],
+    [categoryKey],
+  );
+
+  // Fixtures matching the selected tab (ignoring any date filter).
+  const categoryFixtures = useMemo(
+    () => (allFixtures ?? []).filter((f) => activeCategory.match(f?.competition || '')),
+    [allFixtures, activeCategory],
+  );
+
+  // What the list shows: category fixtures, optionally narrowed to one date.
+  const fixtures = useMemo(() => {
+    if (!selectedDate) return categoryFixtures;
+    return categoryFixtures.filter(
+      (f) => (f?.date ? String(f.date).slice(0, 10) : '') === selectedDate,
+    );
+  }, [categoryFixtures, selectedDate]);
+
+  // Calendar dots: every date that has a fixture in the selected category.
+  const fixtureDates = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          categoryFixtures
+            .map((f) => (f?.date ? String(f.date).slice(0, 10) : ''))
+            .filter(Boolean),
+        ),
+      ),
+    [categoryFixtures],
+  );
 
   const openAddFixtureModal = () => {
     resetFixtureForm();
@@ -539,28 +573,33 @@ export default function FixturesScreen() {
 
       <View style={styles.filtersWrap}>
         <Text style={styles.heading}>FIXTURES</Text>
-        <Text style={styles.subheading}>WAFL Colts fixture list and match schedule</Text>
+        <Text style={styles.subheading}>{activeCategory.label} fixture list and match schedule</Text>
 
-        <View style={styles.filterRow}>
-          {COMPETITION_OPTIONS.map((option) => {
-            const active = competition === option;
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {COMPETITION_CATEGORIES.map((cat) => {
+            const active = categoryKey === cat.key;
             return (
               <TouchableOpacity
-                key={option}
+                key={cat.key}
                 style={[styles.filterChip, active && styles.filterChipActive]}
                 onPress={() => {
-                  setCompetition(option);
+                  setCategoryKey(cat.key);
                   setSelectedDate(null);
                 }}
-                accessibilityLabel={`Filter by ${option}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${cat.label} fixtures`}
               >
                 <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                  {option}
+                  {cat.label}
                 </Text>
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
 
         {/* Calendar Section */}
         <View style={styles.calendarSection}>
@@ -576,15 +615,11 @@ export default function FixturesScreen() {
               color={Colors.accent}
             />
             <Text style={styles.calendarToggleText}>{calendarToggleLabel}</Text>
-            {datesLoading ? (
-              <ActivityIndicator size="small" color={Colors.accent} />
-            ) : (
-              <Ionicons
-                name={calendarExpanded ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color={Colors.textMuted}
-              />
-            )}
+            <Ionicons
+              name={calendarExpanded ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color={Colors.textMuted}
+            />
           </TouchableOpacity>
 
           {calendarExpanded && (
