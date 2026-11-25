@@ -60,6 +60,11 @@ interface CompetitionCategory {
 const COMPETITION_CATEGORIES: CompetitionCategory[] = [
   { key: 'ALL', label: 'All', match: () => true },
   {
+    key: 'COLTS',
+    label: 'WAFL Colts',
+    match: (c) => /colt/i.test(c),
+  },
+  {
     key: 'U16',
     label: 'Nationals U16s',
     match: (c) => /u\.?\s*16|under\s*16|development champs/i.test(c),
