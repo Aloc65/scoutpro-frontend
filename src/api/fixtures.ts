@@ -52,6 +52,14 @@ export async function uploadFixturesExcel(file: any): Promise<FixtureUploadRespo
   return api.upload<FixtureUploadResponse>('/api/fixtures/upload', file);
 }
 
+export async function countFixturesByYear(year: number): Promise<{ year: number; count: number }> {
+  return api.get<{ year: number; count: number }>(`/api/fixtures/year/${year}/count`);
+}
+
+export async function deleteFixturesByYear(year: number): Promise<{ success: boolean; year: number; deleted: number }> {
+  return api.delete<{ success: boolean; year: number; deleted: number }>(`/api/fixtures/year/${year}`);
+}
+
 export async function getFixtureDates(competition?: string): Promise<string[]> {
   try {
     const query = competition ? `?competition=${encodeURIComponent(competition)}` : '';

@@ -25,7 +25,7 @@ import { Colors } from '../../src/theme/colors';
 import { showAlert } from '../../src/utils/alert';
 import { Fixture } from '../../src/types';
 import { useAuth } from '../../src/context/AuthContext';
-import { createFixture, listFixtures, getFixtureDates, uploadFixturesExcel } from '../../src/api/fixtures';
+import { createFixture, listFixtures, getFixtureDates, uploadFixturesExcel, countFixturesByYear, deleteFixturesByYear } from '../../src/api/fixtures';
 
 // Enable LayoutAnimation on Android
 if (
@@ -171,6 +171,13 @@ export default function FixturesScreen() {
   const [fixtureForm, setFixtureForm] = useState<FixtureFormState>(EMPTY_FIXTURE_FORM);
   const [savingFixture, setSavingFixture] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+
+  // Delete-by-year (admin)
+  const [deleteYearModalVisible, setDeleteYearModalVisible] = useState(false);
+  const [deleteYearInput, setDeleteYearInput] = useState('');
+  const [deleteYearCount, setDeleteYearCount] = useState<number | null>(null);
+  const [checkingYear, setCheckingYear] = useState(false);
+  const [deletingYear, setDeletingYear] = useState(false);
 
   const today = useMemo(() => todayString(), []);
 
@@ -363,6 +370,54 @@ export default function FixturesScreen() {
     }
   };
 
+  const openDeleteYearModal = () => {
+    const current = new Date().getFullYear();
+    setDeleteYearInput(String(current));
+    setDeleteYearCount(null);
+    setDeleteYearModalVisible(true);
+  };
+
+  // Re-check the count whenever the typed year changes to a valid 4-digit year
+  useEffect(() => {
+    if (!deleteYearModalVisible) return;
+    const y = parseInt(deleteYearInput, 10);
+    if (!/^\d{4}$/.test(deleteYearInput) || y < 2000 || y > 2100) {
+      setDeleteYearCount(null);
+      return;
+    }
+    let cancelled = false;
+    setCheckingYear(true);
+    countFixturesByYear(y)
+      .then((r) => { if (!cancelled) setDeleteYearCount(r.count); })
+      .catch(() => { if (!cancelled) setDeleteYearCount(null); })
+      .finally(() => { if (!cancelled) setCheckingYear(false); });
+    return () => { cancelled = true; };
+  }, [deleteYearInput, deleteYearModalVisible]);
+
+  const handleConfirmDeleteYear = async () => {
+    const y = parseInt(deleteYearInput, 10);
+    if (!/^\d{4}$/.test(deleteYearInput) || y < 2000 || y > 2100) {
+      showAlert('Invalid year', 'Please enter a 4-digit year, for example 2026.');
+      return;
+    }
+    if (!deleteYearCount || deleteYearCount === 0) {
+      showAlert('Nothing to delete', `There are no games in ${y}.`);
+      return;
+    }
+    setDeletingYear(true);
+    try {
+      const res = await deleteFixturesByYear(y);
+      setDeleteYearModalVisible(false);
+      await loadFixtures();
+      showAlert('Done', `Deleted ${res.deleted} game${res.deleted === 1 ? '' : 's'} from ${y}.`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not delete games for that year.';
+      showAlert('Delete failed', msg);
+    } finally {
+      setDeletingYear(false);
+    }
+  };
+
   // Build marked dates for calendar
   const markedDates = useMemo(() => {
     const marks: Record<string, {
@@ -466,6 +521,17 @@ export default function FixturesScreen() {
                   <Text style={styles.topActionButtonText}>Upload Excel</Text>
                 </>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.topActionButton, styles.deleteYearButton]}
+              onPress={openDeleteYearModal}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Delete games for a year"
+            >
+              <Ionicons name="trash-outline" size={16} color="#fff" style={styles.buttonIcon} />
+              <Text style={styles.topActionButtonText}>Delete Year</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -778,6 +844,79 @@ export default function FixturesScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ───────── Delete all games for a year (admin) ───────── */}
+      <Modal
+        visible={deleteYearModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteYearModalVisible(false)}
+      >
+        <View style={styles.deleteOverlay}>
+          <View style={styles.deleteCard}>
+            <View style={styles.deleteIconCircle}>
+              <Ionicons name="trash-outline" size={22} color="#fff" />
+            </View>
+            <Text style={styles.deleteTitle}>Delete all games for a year</Text>
+            <Text style={styles.deleteSubtext}>
+              This permanently removes every game (fixture) in the year you choose. Players, reports and watch lists are not affected.
+            </Text>
+
+            <Text style={styles.deleteLabel}>Year</Text>
+            <TextInput
+              style={styles.deleteInput}
+              value={deleteYearInput}
+              onChangeText={(t) => setDeleteYearInput(t.replace(/[^0-9]/g, '').slice(0, 4))}
+              placeholder="e.g. 2026"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              maxLength={4}
+            />
+
+            <View style={styles.deleteCountBox}>
+              {checkingYear ? (
+                <Text style={styles.deleteCountText}>Checking…</Text>
+              ) : deleteYearCount == null ? (
+                <Text style={styles.deleteCountText}>Enter a 4-digit year to see how many games will be deleted.</Text>
+              ) : deleteYearCount === 0 ? (
+                <Text style={styles.deleteCountText}>No games found for {deleteYearInput}.</Text>
+              ) : (
+                <Text style={styles.deleteCountWarn}>
+                  {deleteYearCount} game{deleteYearCount === 1 ? '' : 's'} will be permanently deleted from {deleteYearInput}.
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.deleteBtnRow}>
+              <TouchableOpacity
+                style={[styles.deleteCancelBtn]}
+                onPress={() => setDeleteYearModalVisible(false)}
+                disabled={deletingYear}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.deleteCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.deleteConfirmBtn,
+                  (!deleteYearCount || deletingYear) && styles.deleteConfirmBtnDisabled,
+                ]}
+                onPress={handleConfirmDeleteYear}
+                disabled={!deleteYearCount || deletingYear}
+                activeOpacity={0.85}
+              >
+                {deletingYear ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.deleteConfirmText}>
+                    {deleteYearCount ? `Delete ${deleteYearCount} game${deleteYearCount === 1 ? '' : 's'}` : 'Delete'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -894,8 +1033,122 @@ const styles = StyleSheet.create({
   addFixtureButton: {
     backgroundColor: Colors.primary,
   },
+  deleteYearButton: {
+    backgroundColor: Colors.error,
+  },
   buttonIcon: {
     marginRight: 6,
+  },
+  // Delete-by-year modal
+  deleteOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  deleteCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: Colors.elevated,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  deleteIconCircle: {
+    alignSelf: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  deleteTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  deleteSubtext: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  deleteLabel: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  deleteInput: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  deleteCountBox: {
+    marginTop: 12,
+    marginBottom: 18,
+    minHeight: 20,
+  },
+  deleteCountText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  deleteCountWarn: {
+    color: Colors.error,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  deleteBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  deleteCancelBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  deleteCancelText: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  deleteConfirmBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.error,
+  },
+  deleteConfirmBtnDisabled: {
+    opacity: 0.5,
+  },
+  deleteConfirmText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,
